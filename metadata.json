@@ -1,0 +1,6 @@
+{
+  "name": "Astrology Mandala",
+  "description": "Minimalist 12-house astrology mandala with custom paths, lunar axes, and a central petal flower.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

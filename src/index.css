@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cinzel", Georgia, serif;
+}
+
+:root {
+  --color-terracotta: #C78B73; /* Fogo - Ação, Vontade */
+  --color-sage: #9DB08E;       /* Terra - Estrutura, Prática */
+  --color-mineral: #7A9EB1;    /* Ar - Intelecto, Visão */
+  --color-sand: #D1BFAE;       /* Água - Emoção, Fluidez */
+  --color-cosmic: #705680;     /* Púrpura - Tensão/Alma */
+  --color-lavender: #A38EB0;   /* Lavanda - Interseção/Harmonia */
+}
+
+/* Classes para os elementos das Casas */
+.house {
+  fill: transparent;
+  fill-opacity: 0;
+  stroke: transparent;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Somente aplica a cor quando estiver ativo (tropical, vedic, intersect) ou clicado (active) */
+.house.element-fire.state-tropical,
+.house.element-fire.state-vedic,
+.house.element-fire.state-intersect,
+.house.element-fire.active {
+  fill: var(--color-terracotta) !important;
+}
+
+.house.element-earth.state-tropical,
+.house.element-earth.state-vedic,
+.house.element-earth.state-intersect,
+.house.element-earth.active {
+  fill: var(--color-sage) !important;
+}
+
+.house.element-air.state-tropical,
+.house.element-air.state-vedic,
+.house.element-air.state-intersect,
+.house.element-air.active {
+  fill: var(--color-mineral) !important;
+}
+
+.house.element-water.state-tropical,
+.house.element-water.state-vedic,
+.house.element-water.state-intersect,
+.house.element-water.active {
+  fill: var(--color-sand) !important;
+}
+
+/* Classes para os estados das Casas */
+.house.state-tropical {
+  fill-opacity: 0.4 !important;
+}
+.house.state-vedic {
+  fill-opacity: 0.8 !important;
+}
+.house.state-intersect {
+  fill-opacity: 1.0 !important;
+  stroke: var(--color-lavender) !important;
+  filter: drop-shadow(0 0 4px var(--color-lavender)) !important;
+}
+
+.house.active:not(.state-tropical):not(.state-vedic):not(.state-intersect) {
+  fill-opacity: 0.25 !important;
+  fill: var(--color-lavender) !important;
+}
+
