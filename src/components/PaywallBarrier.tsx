@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { Lock, Sparkles, Loader2, CreditCard } from "lucide-react";
-import { paymentService } from "../lib/paymentService";
+import React, { useEffect } from "react";
+import { Lock, Sparkles, CreditCard, X, ArrowRight } from "lucide-react";
+import { trackEvent } from "../lib/analytics";
 
 interface PaywallBarrierProps {
   subscriptionTier: "FREE" | "PLUS";
@@ -11,108 +11,99 @@ interface PaywallBarrierProps {
   children: React.ReactNode;
   title?: string;
   description?: string;
+  standalone?: boolean;
+  onClose?: () => void;
 }
 
 export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
   subscriptionTier,
-  userId,
-  userEmail,
-  fullName,
-  onUpgradeSuccess,
   children,
-  title = "Leitura Profunda Bloqueada",
-  description = "Acesse o Mapa Sideral Védico, os Caminhos Ocultos e análises astrológicas profundas sintetizadas com IA."
+  title = "PASSE DE EXPANSÃO",
+  description = "Desbloqueie todas as leituras profundas e meditações, tenha acesso ao diário alquímico e chat astrológico, além da leitura dos seus trânsitos astrológicos.",
+  standalone = false,
+  onClose,
 }) => {
-  const [isUpgrading, setIsUpgrading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (subscriptionTier !== "PLUS") {
+      trackEvent("view_paywall");
+    }
+  }, []);
 
   if (subscriptionTier === "PLUS") {
     return <>{children}</>;
   }
 
-  const handleUnlock = async () => {
-    setIsUpgrading(true);
-    try {
-      const result = await paymentService.createCheckoutSession({
-        userId,
-        userEmail,
-        fullName
-      });
-
-      if (result.success) {
-        setSuccessMsg("Pagamento Aprovado! Desbloqueando portal...");
-        setTimeout(() => {
-          onUpgradeSuccess();
-          setSuccessMsg(null);
-        }, 1500);
-      }
-    } catch (err: any) {
-      console.error("Erro no upgrade do paywall:", err);
-      alert("Houve um erro simulado ao processar o checkout. Tente novamente.");
-    } finally {
-      setIsUpgrading(false);
-    }
+  const handleUnlock = () => {
+    window.location.href = "/planos";
   };
+
+  const cardContent = (
+    <div className="max-w-md w-full bg-[#fbf9f5]/95 border border-[#8c7f70]/15 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#3c352d]/10 text-[#3c352d] flex flex-col items-center relative">
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 rounded-full text-[#8c7f70] hover:text-[#3c352d] hover:bg-[#8c7f70]/10 transition-colors"
+          aria-label="Fechar"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Icon */}
+      <div className="relative mb-4 flex items-center justify-center w-14 h-14 rounded-full bg-[#8c6239]/10 border border-[#8c6239]/20">
+        <Lock className="w-6 h-6 text-[#8c6239]" />
+        <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-[#8c6239] animate-pulse" />
+      </div>
+
+      <h3 className="font-serif text-lg sm:text-xl font-light tracking-wider uppercase mb-2 text-center">
+        {title}
+      </h3>
+
+      <p className="font-sans text-xs sm:text-sm text-[#6e6356] leading-relaxed mb-6 font-light text-center">
+        {description}
+      </p>
+
+      {/* Pricing Highlight */}
+      <div className="mb-6 inline-flex flex-col items-center px-5 py-3 bg-[#8c6239] text-[#fbf9f5] rounded-2xl shadow-lg shadow-[#8c6239]/15">
+        <span className="text-[10px] uppercase tracking-widest font-semibold opacity-90">Acesso a partir de</span>
+        <span className="text-2xl sm:text-3xl font-serif font-bold">6x de R$ 26,66</span>
+      </div>
+
+      {/* Upgrade Button */}
+      <button
+        onClick={handleUnlock}
+        className="relative overflow-hidden w-full bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] py-3.5 px-6 rounded-xl font-sans text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-lg shadow-[#8c6239]/10 active:scale-95 flex items-center justify-center gap-2"
+      >
+        <CreditCard className="w-4 h-4" />
+        <span>Ver Planos de Acesso</span>
+        <ArrowRight className="w-4 h-4" />
+      </button>
+
+      <p className="font-mono text-[9px] text-[#8c7f70] mt-3 uppercase tracking-widest flex items-center justify-center gap-1">
+        <Lock className="w-3 h-3" />
+        <span>Pagamento seguro via InfinitePay • Pix e Cartão</span>
+      </p>
+    </div>
+  );
+
+  if (standalone) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#3c352d]/15 backdrop-blur-sm transition-all duration-500 animate-fadeIn">
+        {cardContent}
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-[#8c7f70]/10 bg-[#fbf9f5]/50">
       {/* Blurred background content */}
-      <div className="blur-md select-none pointer-events-none scale-[0.99] filter duration-300">
+      <div className="blur-sm select-none pointer-events-none scale-[0.99] transition-all duration-300">
         {children}
       </div>
 
-      {/* Glassmorphism Paywall Overlay */}
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center bg-[#1c1815]/40 backdrop-blur-md transition-all duration-500 animate-fadeIn">
-        <div className="max-w-md bg-[#2a241f]/95 border border-[#d4af37]/30 rounded-2xl p-6 sm:p-8 shadow-2xl text-[#e8e4db] flex flex-col items-center">
-          
-          {/* Animated Glowing Icon */}
-          <div className="relative mb-4 flex items-center justify-center w-14 h-14 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30">
-            <Lock className="w-6 h-6 text-[#d4af37]" />
-            <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-[#d4af37] animate-pulse" />
-          </div>
-
-          <h3 className="font-serif text-[#e8e4db] text-lg sm:text-xl font-light tracking-wider uppercase mb-2">
-            {title}
-          </h3>
-          
-          <p className="font-sans text-xs sm:text-sm text-[#c0b4a4] leading-relaxed mb-6 font-light">
-            {description}
-          </p>
-
-          {/* Pricing Highlight */}
-          <div className="mb-6 flex items-baseline gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-xl">
-            <span className="text-[10px] uppercase tracking-wider text-[#8c7f70] font-mono">Acesso Vitalício</span>
-            <span className="text-xl font-serif font-semibold text-[#d4af37]">R$ 29,90</span>
-          </div>
-
-          {/* Upgrade Button */}
-          <button
-            onClick={handleUnlock}
-            disabled={isUpgrading || !!successMsg}
-            className="relative overflow-hidden w-full bg-[#d4af37] hover:bg-[#b08d24] disabled:bg-[#d4af37]/50 text-[#1c1815] py-3.5 px-6 rounded-xl font-sans text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-lg shadow-[#d4af37]/10 active:scale-95 flex items-center justify-center gap-2"
-          >
-            {isUpgrading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processando Checkout...</span>
-              </>
-            ) : successMsg ? (
-              <>
-                <Sparkles className="w-4 h-4 animate-pulse text-[#1c1815]" />
-                <span>{successMsg}</span>
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-4 h-4" />
-                <span>Desbloquear Leitura Profunda</span>
-              </>
-            )}
-          </button>
-
-          <p className="font-mono text-[9px] text-[#8c7f70] mt-3 uppercase tracking-widest">
-            Simulador de pagamento ativo • Liberação instantânea
-          </p>
-        </div>
+      {/* Light Paywall Overlay */}
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center bg-[#f4f1eb]/70 backdrop-blur-md transition-all duration-500 animate-fadeIn">
+        {cardContent}
       </div>
     </div>
   );

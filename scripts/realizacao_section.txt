@@ -1,0 +1,138 @@
+[REGRA EXCLUSIVA — CAMINHO DA REALIZAÇÃO]
+Esta regra prevalece sobre qualquer instrução genérica deste prompt quando "nome_caminho" for "Caminho da Realização".
+
+REGRA DE OURO DE REDAÇÃO:
+O texto longo não pode ser um resumo paralelo. Ele deve ser o desdobramento pedagógico e integrador das Chaves de Coerência fixadas no painel. Gere as chaves abaixo como a base concreta da leitura e explique, no texto longo, a mecânica viva de como Marte, Saturno e Amatyakaraka interagem para escalar a montanha pública sem perder a alma. Não crie conceitos novos que não estejam conectados a uma chave já aberta.
+
+REGRA DA COSTURA (SIGNO + CASA):
+A leitura nunca deve separar o signo da casa ou fatiar os planetas de forma isolada. A interpretação deve fundir como o "motor" (Marte) interage com a "estrutura/freio" (Saturno) para entregar o "talento inato" (Amatyakaraka) ao topo da montanha (Meio do Céu e seu Regente). O Amatyakaraka (AmK) é o "ministro da alma", o talento natural que facilita a carreira e deve ser integrado como a ferramenta de maior destreza do usuário.
+
+DINÂMICA MARTE x SATURNO x AMATYAKARAKA:
+- Marte (A Força de Ação): onde o usuário tem coragem e energia para romper a inércia e agir.
+- Saturno (O Pilar da Estrutura): onde o usuário sente o peso da responsabilidade, o medo de falhar e a necessidade de construir alicerces lentos, mas indestrutíveis.
+- Meio do Céu + Regente: o palco público, o legado, a atmosfera do sucesso e para onde a montanha aponta.
+
+REGRA DOS VERBOS (COMPASSO DA REALIZAÇÃO):
+Exatamente 3 verbos no formato fixo: [Verbo de Marte] — Marte em [Signo/Casa] ➔ [Verbo de Saturno] — Saturno em [Signo/Casa] ➔ [Verbo do AmK] — AmK [Planeta] em [Signo/Casa]. Os verbos são os fornecidos na seção VERBOS ARQUETÍPICOS PRECALCULADOS para Marte, Saturno e AmK. Use-os exatamente; não os substitua por sinônimos.
+
+MATRIZ SISTÊMICA DE TRADUÇÃO:
+- MEIO DO CÉU (CASA 10) — O Palco Público e a Montanha: use o signo real da cúspide da Casa 10. Ele define a atmosfera do reconhecimento e o campo onde o legado se manifesta.
+- REGENTE DA CASA 10 — O Guia da Vocação: use o planeta, signo, casa e Nakshatra reais do regente da Casa 10. Ele mostra como o usuário é conduzido ao topo e qual ferramenta precisa ser honrada.
+- MARTE — A Força de Ação: use o signo, casa e Nakshatra reais de Marte. Ele é o primeiro verbo do Compasso da Realização e o impulso que quebra a inércia.
+- SATURNO — O Pilar da Estrutura: use o signo, casa e Nakshatra reais de Saturno. Ele é o segundo verbo do Compasso e o freio responsável por tornar a conquista sólida e madura.
+- AMATYAKARAKA (AmK) — O Ministro da Alma: use o planeta, signo, casa e Nakshatra reais do Amatyakaraka. Ele é o terceiro verbo do Compasso e o talento inato que abre o caminho público com destreza.
+
+CHAVES DE COERÊNCIA OBRIGATÓRIAS:
+1. Compasso da Realização: [Verbo de Marte PRECÁLCULADO] — Marte em [Signo] na Casa [X] ➔ [Verbo de Saturno PRECÁLCULADO] — Saturno em [Signo] na Casa [Y] ➔ [Verbo do AmK PRECÁLCULADO] — AmK [Planeta] em [Signo] na Casa [Z]
+   Os verbos são os fornecidos na seção VERBOS ARQUETÍPICOS PRECALCULADOS no início desta instrução. Use-os exatamente. Em uma linha abaixo, explique o fluxo de ação estruturada que transforma coragem em alicerce e alicerce em talento manifestado no mundo.
+2. Sombra e Escudo:
+   Sombra Primária: [medo inconsciente extraído da tensão entre Meio do Céu, Regente da Casa 10, Marte e Saturno]
+   Escudo de Proteção: [defesa automática que usa Marte, Saturno ou AmK para postergar a entrega pública]
+3. Bússola Somática:
+   Em desarmonia — Performando: [três sintomas físicos concretos de tensão relacionados à pressão por realização]
+   Em harmonia — Autêntica: [três sinais físicos de presença, estrutura e confiança no corpo]
+4. Princípio Orientador: [nome de uma ação ou pausa de reposicionamento]
+   Em uma linha abaixo, escreva a instrução prática inspirada nas Nakshatras do Regente da Casa 10 e/ou do AmK, com o teste de checagem Coração, Corpo e Alma.
+5. Virtude Nativa: [nome do dom integrado]
+   Em uma linha abaixo, descreva a autoridade natural, o magnetismo público e a competência que emergem sem forçar.
+6. Pulso de Concretização: [ritmo e modo de manifestação]
+   Em uma linha abaixo, explique como a pessoa coloca sua vocação no mundo no próprio tempo, sem sucumbir à pressão do ambiente.
+7. Código de Ancoragem: [mantra oracular curto e potente, unindo a coragem de Marte, a estrutura de Saturno e o talento do AmK]
+
+REGRAS DE DESIGN E SINTAXE DO DASHBOARD:
+- ZERO EMOJIS: proibido usar qualquer ícone, emoji ou caractere decorativo em qualquer parte do campo "chaves_coerencia", inclusive nos títulos das sete chaves. Use exclusivamente numeração simples de 1. até 7.
+- É proibido usar parênteses no campo "chaves_coerencia", inclusive para signos, explicações ou dados técnicos. Esta proibição prevalece sobre qualquer outra regra de formatação deste prompt dentro do dashboard.
+- As chaves 1, 4, 5 e 6 têm obrigatoriamente três linhas de conteúdo: a linha do título, a linha do nome ou sequência principal e uma terceira linha descritiva completa. Nunca omita a terceira linha, mesmo que o nome da chave já pareça autoexplicativo.
+- O Compasso da Realização deve seguir exatamente: "1. Compasso da Realização:" em uma linha, seguido da sequência literal fornecida na seção VERBOS ARQUETÍPICOS PRECALCULADOS para Marte, Saturno e AmK, com os verbos precalculados e os dados reais de signo e casa. Em uma terceira linha, escreva obrigatoriamente a explicação do fluxo de realização, sem parênteses.
+- A chave 4 deve seguir exatamente: "4. Princípio Orientador:" em uma linha, o nome da ação ou pausa de reposicionamento em uma segunda linha e, em uma terceira linha, a instrução prática inspirada nas Nakshatras com o teste de checagem Coração, Corpo e Alma.
+- A chave 5 deve seguir exatamente: "5. Virtude Nativa:" em uma linha, o nome do dom integrado em uma segunda linha e, em uma terceira linha, a descrição da autoridade e do magnetismo público naturais.
+- A chave 6 deve seguir exatamente: "6. Pulso de Concretização:" em uma linha, o nome do ritmo e modo de manifestação em uma segunda linha e, em uma terceira linha, a explicação de como a pessoa concretiza sua vocação no próprio tempo.
+- A chave 7 deve seguir exatamente: "7. Código de Ancoragem:" em uma linha e o mantra oracular curto em uma segunda linha, sem aspas.
+- Antes de finalizar, confira que o dashboard contém as três linhas obrigatórias das chaves 1, 4, 5 e 6. Se qualquer uma delas estiver ausente, reescreva o dashboard completo antes de responder.
+- FORMATO LITERAL OBRIGATÓRIO: retorne as quebras de linha abaixo. Os trechos entre colchetes devem ser preenchidos com conteúdo individualizado e nunca removidos:
+  "Chaves de Coerência\n\n1. Compasso da Realização:\n[Verbo de Marte] — Marte em [Signo] na Casa [X] ➔ [Verbo de Saturno] — Saturno em [Signo] na Casa [Y] ➔ [Verbo do AmK] — AmK [Planeta] em [Signo] na Casa [Z]\n[explicação completa do fluxo de ação estruturada]\n\n2. Sombra e Escudo:\nSombra Primária: [medo]\nEscudo de Proteção: [defesa]\n\n3. Bússola Somática:\nEm desarmonia — Performando: [três sintomas]\nEm harmonia — Autêntica: [três sinais]\n\n4. Princípio Orientador:\n[nome da pausa ou ação]\n[instrução prática e teste Coração, Corpo e Alma]\n\n5. Virtude Nativa:\n[nome do dom]\n[descrição do magnetismo e autoridade]\n\n6. Pulso de Concretização:\n[nome do ritmo]\n[explicação completa do modo de concretização]\n\n7. Código de Ancoragem:\n[mantra oracular]"
+
+ESTRUTURA DA LEITURA PROFUNDA:
+A leitura deve carregar o título "Caminho da Realização" e o eixo "EU MANIFESTO: A ARQUITETURA DA MINHA VOZ E DO MEU IMPACTO". Desenvolva exatamente três movimentos, em parágrafos profundos e didáticos:
+
+1. O Desafio Evolutivo — Desdobrando a Sombra e o Escudo no seu Compasso da Realização:
+Cite nominalmente os três Verbos do Compasso da Realização, a Sombra Primária e o Escudo de Proteção que foram abertos no dashboard. Explique como o medo do palco, do fracasso ou da exposição pública sequestra o Compasso, qual etapa da sequência Marte ➔ Saturno ➔ AmK é atropelada e como isso aciona o Escudo. Mostre a gestão interna do medo sem moralizar ou tratar a defesa como defeito.
+
+2. O Caminho de Integração — Escutar a Bússola Somática e Acionar o Princípio Orientador:
+Cite nominalmente os sinais reais de desarmonia e harmonia, as Nakshatras do Regente da Casa 10 e/ou do AmK e o Princípio Orientador. Desenvolva um teste em três passos específicos aos dados reais: Coração, Corpo e Alma. O teste e a ação prática devem derivar do mito e da Shakti das Nakshatras citadas. Mostre como o corpo retorna ao chão e à ação.
+
+3. A Virtude Lapidada — A Expressão Real: Sua Virtude Nativa e o Pulso de Concretização:
+Cite nominalmente a Virtude Nativa, o Pulso de Concretização e o Código de Ancoragem. Mostre como a Virtude Nativa vive no trabalho e no legado público, desenvolva o Pulso de Concretização como ritmo real de manifestação e finalize retomando literalmente o Código de Ancoragem, sem outro mantra.
+
+MAPEAMENTO PARA O JSON ATUAL:
+- "chaves_coerencia" deve conter exclusivamente o dashboard completo "CHAVES DE COERÊNCIA", com as sete chaves na ordem fixa acima e quebras de linha reais. Cada item numerado deve começar em uma linha própria; Sombra Primária, Escudo de Proteção, Em desarmonia e Em harmonia devem começar em linhas próprias; deixe uma linha vazia entre os sete itens. Para todos os outros caminhos, retorne string vazia.
+- "frase_didatica" deve conter exclusivamente "EU MANIFESTO: A ARQUITETURA DA MINHA VOZ E DO MEU IMPACTO". Não inclua as Chaves de Coerência neste campo.
+- "tensao_evolucionaria" deve conter somente o movimento 1, sob o título visual externo "Desdobrando a Sombra e o Escudo no seu Compasso da Realização". Não repita esse título dentro do campo.
+- "integracao" deve conter somente o movimento 2, sob o título visual externo "Escutar a Bússola Somática e Acionar o Princípio Orientador". Não repita esse título dentro do campo.
+- "dom" deve conter somente o movimento 3, sob o título visual externo "A Expressão Real: Sua Virtude Nativa e o Pulso de Concretização". Não repita esse título dentro do campo.
+- "armadilha" deve conter string vazia para este caminho. A Sombra e o Escudo já foram desenvolvidos no dashboard e no primeiro movimento; jamais crie um quarto bloco ou resumo paralelo.
+
+CALIBRAÇÃO DE TOM E FLUIDEZ:
+O resultado deve seguir uma lógica como: o Compasso da Realização saudável atravessa a coragem de Marte, sustenta-a na estrutura de Saturno e só entrega ao mundo pelo talento do AmK; a Sombra faz a pessoa fugir da sequência e aciona o Escudo; a Bússola Somática revela a interrupção no corpo; as Nakshatras fundamentam o Princípio Orientador; e a Virtude Nativa com o Pulso de Concretização se tornam a expressão reconciliada.
+
+A leitura não pode reduzir essa mecânica a resumos conceituais. No movimento 1, primeiro apresente o fluxo saudável completo e, em um segundo parágrafo, narre o instante íntimo em que a Sombra o interrompe e o Escudo assume o comando. No movimento 2, primeiro localize os sinais físicos concretos; depois desenvolva a imagem, o símbolo ou a qualidade das Nakshatras como fundamento do Princípio Orientador; apresente o teste Coração, Corpo e Alma em linhas próprias e encerre com o retorno físico à harmonia. No movimento 3, mostre a Virtude Nativa viva no palco público, desenvolva o Pulso de Concretização como ritmo real de manifestação e feche com o Código de Ancoragem literal. Escreva com a cadência humana, concreta, acolhedora e pedagógica: cenas internas, transições orgânicas e imagens específicas; jamais frases telegráficas, listas secas ou definições genéricas.
+
+[GABARITO DE CALIBRAGEM DO CAMINHO DA REALIZAÇÃO — USE COMO TEMPLATE DE ESTRUTURA, HIERARQUIA E DENSIDADE PSICOLÓGICA]
+Contexto de exemplo: MC em Gêmeos, Regente Mercúrio em Peixes na Casa 7 (Nakshatra Uttara Bhadrapada), Saturno em Capricórnio na Casa 4, Marte em Aquário na Casa 5, Amatyakaraka Vênus em Aquário na Casa 5 (Nakshatra Shravana).
+
+Chaves de Coerência
+
+1. Compasso da Realização:
+Inovar — Marte em Aquário na Casa 5 ➔ Estruturar — Saturno em Capricórnio na Casa 4 ➔ Magnetizar — AmK Vênus em Aquário na Casa 5
+O fluxo do seu impacto no mundo ocorre quando a sua força de ação disruptiva e criativa (Marte) se apoia em uma base estruturada, madura e firme no seu mundo interno (Saturno), permitindo que o seu talento magnético e estético (AmK Vênus) brilhe publicamente sem que você se sinta ameaçada.
+
+2. Sombra e Escudo:
+Sombra Primária: O medo de que a exposição pública da sua voz e vocação (MC em Gêmeos) desestabilize a sua base de segurança e o seu refúgio privado, fazendo com que você não se sinta "pronta" ou estruturada o suficiente (Saturno em Capricórnio na 4).
+Escudo de Proteção: Usar o perfeccionismo e o peso das responsabilidades domésticas/internas como desculpa para não agir, ou manter as suas criações intelectuais (Marte em Aquário na 5) restritas, evitando a entrega e o escrutínio do outro.
+
+3. Bússola Somática:
+Em desarmonia — Performando: Garganta apertada (medo de comunicar a essência), ombros pesados carregando cobranças irreais e tensão na coluna cervical.
+Em harmonia — Autêntica: Coluna ereta e sustentada, respiração que flui até o ventre e voz que se projeta com naturalidade e magnetismo.
+
+4. Princípio Orientador:
+A Escuta da Ação
+Diante da paralisia analítica ou do peso da cobrança, ancore-se nas frequências das suas estrelas guias (Uttara Bhadrapada e Shravana). Faça a pausa e teste: "Estou me escondendo atrás da necessidade de ter controle absoluto do meu mundo privado (Saturno na 4) para evitar colocar a minha criatividade disruptiva no palco (Marte/Vênus na 5) e ser vista pelo outro (Mercúrio na 7)?"
+
+5. Virtude Nativa:
+Comunicação Estruturada e Visionária
+O talento agudo de traduzir o invisível, a arte e a emoção profunda em uma linguagem que o outro compreenda, ancorando a inovação estética em bases sólidas e inegociáveis.
+
+6. Pulso de Concretização:
+Impacto Original e Empático
+Você escala a montanha do sucesso quando une a sua genialidade intelectual e criativa à empatia profunda, entregando sabedoria ao público de forma leve e disruptiva.
+
+7. Código de Ancoragem:
+Eu sustento a minha base com sabedoria, ajo com liberdade criativa e manifesto a minha voz autêntica no mundo.
+
+Caminho da Realização
+EU MANIFESTO: A ARQUITETURA DA MINHA VOZ E DO MEU IMPACTO
+
+O Desafio Evolutivo
+Desdobrando a Sombra e o Escudo no seu Compasso da Realização
+O seu caminho rumo ao topo da montanha possui uma arquitetura instigante: o seu destino aponta para a comunicação, a multiplicidade e a entrega da sabedoria ao outro (Meio do Céu em Gêmeos, guiado por Mercúrio nas águas sensíveis da Casa 7 em Peixes). No entanto, o motor da sua ação (Marte) e a estrela do seu talento inato (Amatyakaraka Vênus) habitam o palco criativo e rebelde da Casa 5 em Aquário. Você possui uma genialidade estética e intelectual disruptiva pronta para brilhar, mas essa força criativa frequentemente colide com a gravidade de Saturno.
+
+Saturno em Capricórnio, posicionado na raiz do seu mapa (Casa 4), é o guardião do seu mundo privado. Ele exige garantias, estrutura absoluta e controle. Aqui reside a sua Sombra Primária: o pavor de que a sua expansão pública e a entrega da sua voz (Gêmeos) ao olhar do outro (Casa 7) ameacem a sua segurança e derrubem as suas paredes de contenção emocional. Quando esse medo do palco ou do julgamento ataca, você aciona o seu Escudo de Proteção. Você se esconde atrás da "falta de estrutura", intelectualiza excessivamente a sua arte para não mostrar a sua vulnerabilidade e se recolhe no conforto pesado da sua fortaleza particular, sabotando o movimento fluido da sua criação.
+
+O Caminho de Integração
+Escutar a Bússola Somática e Acionar o Princípio Orientador
+O corpo acusa o peso de tentar segurar a própria luz. Em desarmonia, a sua Bússola Somática trava a região da comunicação: a garganta aperta, o pescoço enrijece e a coluna lombar dói sob o peso de responsabilidades que você usa como desculpa para não agir.
+
+Para destravar esse mecanismo, você precisa invocar as energias das Nakshatras que guiam o seu talento (Shravana) e a sua vocação (Uttara Bhadrapada). Elas ensinam o poder da escuta profunda e da sabedoria das águas. Acione o seu Princípio Orientador: A Escuta da Ação. Diante da estagnação, faça o filtro alquímico:
+- No Marte/Vênus (AmK): Estou usando o meu talento criativo e disruptivo, ou estou apenas acumulando conhecimento sem colocá-lo no palco da vida?
+- No Saturno: A estrutura que eu construí no meu mundo privado me serve como trampolim ou se tornou um bunker onde eu me escondo do mundo?
+- No Meio do Céu: O que me impede de comunicar a minha verdade com leveza para o outro?
+
+Ao investigar essas perguntas sem julgamento, a coluna se alinha, a voz destrava e a força para agir retorna ao corpo.
+
+A Virtude Lapidada
+A Expressão Real: Sua Virtude Nativa e o Pulso de Concretização
+Quando você cessa a guerra entre a necessidade de controle absoluto e a urgência de inovar, você desbloqueia a sua Virtude Nativa: a Comunicação Estruturada e Visionária. Você entende que a solidez do seu mundo interno (Saturno) não é uma âncora que a prende, mas sim a plataforma de lançamento que permite que a sua genialidade (Marte/Vênus em Aquário) ganhe o mundo com segurança.
+
+Ao ancorar esse Pulso de Concretização, o seu impacto torna-se real. A sua capacidade de inovar, aliada à sensibilidade de entender o outro (Peixes na 7), a transforma em uma voz de autoridade leve, capaz de ensinar e curar. Sustentada pelo seu Código de Ancoragem (Eu sustento a minha base com sabedoria, ajo com liberdade criativa e manifesto a minha voz autêntica no mundo), você escala a sua montanha. Não pela força bruta, mas pela clareza radiante de quem estruturou a própria alma e não tem mais medo de ser ouvida.
+
+Este exemplo é apenas um modelo de tom, hierarquia e densidade psicológica. Nunca copie signos, casas, verbos, sintomas, perguntas, mantras ou conclusões; substitua sempre pelos dados reais do mapa fornecido.

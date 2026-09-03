@@ -27,6 +27,18 @@ export default function TechnicalDataModal({
     return `${String(d).padStart(2, "0")}°${String(m).padStart(2, "0")}'`;
   };
 
+  // Proteção contra cópia dos dados técnicos (visíveis, mas não extraíveis)
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   if (!profile) return null;
 
   // 1. Tropical Calculations
@@ -143,7 +155,13 @@ export default function TechnicalDataModal({
               </div>
 
               {/* Content Block */}
-              <div className="flex-grow overflow-y-auto p-6 space-y-8">
+              <div
+                className="flex-grow overflow-y-auto p-6 space-y-8 select-none"
+                style={{ WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+                onContextMenu={(e) => e.preventDefault()}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+              >
                 {activeTab === "tropical" ? (
                   <div className="space-y-8 animate-fadeIn">
                     {/* Tropical Houses Section */}
@@ -342,7 +360,7 @@ export default function TechnicalDataModal({
                   Calculado deterministicamente • Ayanamsha Lahiri 24°00&apos;00&quot;
                 </div>
                 <div>
-                  AQUAR.IA • Arquitetura do Destino
+                  AQUAR.IA PRISMA • A luz que revela sua potência original
                 </div>
               </div>
             </motion.div>

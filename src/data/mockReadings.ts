@@ -26,6 +26,7 @@ export interface ReadingData {
     leitura_psicologica: string;
   };
   vedic?: {
+    resumo_basico: string;
     leitura_karmica: string;
     qualidades_e_drishtis: string;
   };

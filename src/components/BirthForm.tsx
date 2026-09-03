@@ -3,10 +3,13 @@ import { motion, AnimatePresence } from "motion/react";
 import { Star, MapPin, Calendar, Clock, Sparkles, Loader2, Check } from "lucide-react";
 import tzlookup from "tz-lookup";
 
+type GenderPreference = "feminino" | "masculino" | "neutro";
+
 interface BirthFormProps {
   onSubmit: (data: {
     name: string;
     gender: "masculino" | "feminino";
+    gender_preference: GenderPreference;
     birthDate: string;
     birthTime: string;
     birthPlace: {
@@ -17,16 +20,28 @@ interface BirthFormProps {
     };
   }) => void;
   isLoading: boolean;
+  initialData?: {
+    name: string;
+    gender_preference: GenderPreference;
+    birthDate: string;
+    birthTime: string;
+    birthPlace: {
+      name: string;
+      latitude: number;
+      longitude: number;
+      timezone: string;
+    };
+  } | null;
 }
 
-export default function BirthForm({ onSubmit, isLoading }: BirthFormProps) {
-  const [name, setName] = useState("");
-  const [gender, setGender] = useState<"masculino" | "feminino">("feminino");
-  const [birthDate, setBirthDate] = useState("");
-  const [birthTime, setBirthTime] = useState("");
-  
+export default function BirthForm({ onSubmit, isLoading, initialData }: BirthFormProps) {
+  const [name, setName] = useState(initialData?.name ?? "");
+  const [genderPreference, setGenderPreference] = useState<GenderPreference>(initialData?.gender_preference ?? "feminino");
+  const [birthDate, setBirthDate] = useState(initialData?.birthDate ?? "");
+  const [birthTime, setBirthTime] = useState(initialData?.birthTime ?? "");
+
   // Birth place search state
-  const [birthPlaceName, setBirthPlaceName] = useState("");
+  const [birthPlaceName, setBirthPlaceName] = useState(initialData?.birthPlace?.name ?? "");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<{
@@ -34,7 +49,7 @@ export default function BirthForm({ onSubmit, isLoading }: BirthFormProps) {
     latitude: number;
     longitude: number;
     timezone: string;
-  } | null>(null);
+  } | null>(initialData?.birthPlace ?? null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [typingError, setTypingError] = useState<string | null>(null);
 
@@ -125,9 +140,12 @@ export default function BirthForm({ onSubmit, isLoading }: BirthFormProps) {
       return;
     }
 
+    const voiceGender = genderPreference === "masculino" ? "masculino" : "feminino";
+
     onSubmit({
       name,
-      gender,
+      gender: voiceGender,
+      gender_preference: genderPreference,
       birthDate,
       birthTime,
       birthPlace: selectedPlace,
@@ -148,9 +166,11 @@ export default function BirthForm({ onSubmit, isLoading }: BirthFormProps) {
       </div>
 
       <div className="text-center mb-8 relative z-10">
-        <div className="inline-flex items-center justify-center p-3 bg-[#ede9de] rounded-full text-[#8c6239] mb-4">
-          <Sparkles className="w-6 h-6 stroke-[1.25]" />
-        </div>
+        <img
+          src="/logo.png"
+          alt="AQUAR.IA"
+          className="w-12 h-12 object-contain mb-4 mx-auto"
+        />
         <h1 className="font-serif text-3xl sm:text-4xl tracking-[0.1em] text-[#3c352d] uppercase">
           AQUAR.IA
         </h1>
@@ -163,7 +183,7 @@ export default function BirthForm({ onSubmit, isLoading }: BirthFormProps) {
         {/* Name Input */}
         <div className="space-y-1">
           <label className="block font-sans text-[10px] tracking-widest uppercase text-[#8c7f70] font-semibold">
-            Nome Completo
+            Por qual nome ou apelido gosta de ser chamad@?
           </label>
           <div className="relative">
             <input
@@ -172,43 +192,58 @@ export default function BirthForm({ onSubmit, isLoading }: BirthFormProps) {
               disabled={isLoading}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome completo"
+              placeholder="Como gostaria de ser chamad@"
               className="w-full px-4 py-3 bg-[#ede9de]/40 border border-[#8c7f70]/20 rounded-lg text-[#3c352d] placeholder-[#a19688]/70 focus:outline-none focus:ring-1 focus:ring-[#8c6239] focus:border-[#8c6239] transition-all font-sans text-sm"
             />
           </div>
         </div>
 
-        {/* Gender Selection */}
+        {/* Preferred Language Mode */}
         <div className="space-y-1">
           <label className="block font-sans text-[10px] tracking-widest uppercase text-[#8c7f70] font-semibold mb-2">
-            Gênero
+            Como gosta de ser chamado
           </label>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <button
               type="button"
               disabled={isLoading}
-              onClick={() => setGender("feminino")}
+              onClick={() => setGenderPreference("feminino")}
               className={`py-3 px-4 rounded-lg border text-xs sm:text-sm font-sans tracking-widest uppercase transition-all duration-300 focus:outline-none ${
-                gender === "feminino"
+                genderPreference === "feminino"
                   ? "bg-[#8c6239] border-[#8c6239] text-[#f4f1eb] shadow-md"
                   : "bg-[#ede9de]/20 border-[#8c7f70]/20 text-[#6e6356] hover:bg-[#ede9de]/40"
               }`}
             >
-              Feminino
+              Ela
             </button>
             <button
               type="button"
               disabled={isLoading}
-              onClick={() => setGender("masculino")}
+              onClick={() => setGenderPreference("masculino")}
               className={`py-3 px-4 rounded-lg border text-xs sm:text-sm font-sans tracking-widest uppercase transition-all duration-300 focus:outline-none ${
-                gender === "masculino"
+                genderPreference === "masculino"
                   ? "bg-[#8c6239] border-[#8c6239] text-[#f4f1eb] shadow-md"
                   : "bg-[#ede9de]/20 border-[#8c7f70]/20 text-[#6e6356] hover:bg-[#ede9de]/40"
               }`}
             >
-              Masculino
+              Ele
+            </button>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setGenderPreference("neutro")}
+              className={`py-3 px-4 rounded-lg border text-xs sm:text-sm font-sans tracking-widest uppercase transition-all duration-300 focus:outline-none ${
+                genderPreference === "neutro"
+                  ? "bg-[#8c6239] border-[#8c6239] text-[#f4f1eb] shadow-md"
+                  : "bg-[#ede9de]/20 border-[#8c7f70]/20 text-[#6e6356] hover:bg-[#ede9de]/40"
+              }`}
+            >
+              Neutro
             </button>
           </div>
+          <p className="text-[10px] text-[#8c7f70]/80 mt-2 leading-relaxed">
+            A opção Neutro gera textos sem flexão de gênero e, quando inevitável, usa a terminação @.
+          </p>
         </div>
 
         {/* Date & Time Inputs */}

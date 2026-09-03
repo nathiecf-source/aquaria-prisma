@@ -1,6 +1,9 @@
+export type GenderPreference = "feminino" | "masculino" | "neutro" | "neutro_estrutural" | "neutro_direto";
+
 export interface BirthData {
   name: string;
   gender: "masculino" | "feminino";
+  gender_preference?: GenderPreference;
   birthDate: string; // YYYY-MM-DD
   birthTime: string; // HH:MM
   birthPlace: {
@@ -39,8 +42,14 @@ export interface TropicalTransit {
   planet: string;
   transitSign: string;
   transitDegree: number;
-  transitHouse: number;
-  aspectToNatal: string; // e.g. "Trígono com Sol Natal"
+  transitHouse: number;       // casa natal por onde o planeta TRANSITA agora
+  transitCoHouse?: number;    // co-casa: outra casa cuja cúspide abre no mesmo signo do trânsito
+  casaNatal?: number;         // casa onde o planeta NATAL aspectado reside
+  aspectToNatal: string; // e.g. "Quadratura com Sol Natal"
+  planetaNatal?: string;
+  ritmo_tempo?: string;
+  casaDoRegenteNatal?: number;        // casa onde o regente do signo natal reside
+  casaRegidaPeloTransitante?: number; // casa regida natalmente pelo planeta transitante
 }
 
 export interface VedicNatalPlanet {
@@ -62,6 +71,7 @@ export interface VedicNatal {
 
 export interface VedicSpecifics {
   lagna: string;
+  lagnaNakshatra: string;
   lagnesha: string; // Ruler of Ascendant
   suryaLagna: string;
   chandraLagna: string;
@@ -88,8 +98,23 @@ export interface VedicBalas {
 
 export interface VedicTiming {
   mahadasha: string;
+  mahadashaNakshatra: string;
+  mahadashaStart: string;
+  mahadashaEnd: string;
   antardasha: string;
+  antardashaNakshatra: string;
+  antardashaStart: string;
+  antardashaEnd: string;
   pratyantardasha: string;
+  pratyantardashaNakshatra: string;
+  pratyantardashaStart: string;
+  pratyantardashaEnd: string;
+  nextMahadasha: string;
+  nextMahadashaStart: string;
+  nextAntardasha: string;
+  nextAntardashaStart: string;
+  nextPratyantardasha: string;
+  nextPratyantardashaStart: string;
   startDate: string;
   endDate: string;
 }
@@ -115,7 +140,7 @@ export interface CompleteAstrologicalProfile {
 const getProKeralaClientID = () => process.env.PROKERALA_CLIENT_ID || "";
 const getProKeralaClientSecret = () => process.env.PROKERALA_CLIENT_SECRET || "";
 
-const signRulers: Record<string, string> = {
+export const signRulers: Record<string, string> = {
   "Áries": "Marte",
   "Touro": "Vênus",
   "Gêmeos": "Mercúrio",
@@ -131,7 +156,7 @@ const signRulers: Record<string, string> = {
 };
 
 // Traduções e utilitários de mapeamento
-function translatePlanetName(name: string): string {
+export function translatePlanetName(name: string): string {
   const translations: Record<string, string> = {
     "sun": "Sol", "moon": "Lua", "mercury": "Mercúrio", "venus": "Vênus",
     "mars": "Marte", "jupiter": "Júpiter", "saturn": "Saturno", "uranus": "Urano",
@@ -142,15 +167,24 @@ function translatePlanetName(name: string): string {
   return translations[key] || name;
 }
 
-function translateSignName(name: string): string {
+export function translateSignName(name: string): string {
   const translations: Record<string, string> = {
     "aries": "Áries", "taurus": "Touro", "gemini": "Gêmeos", "cancer": "Câncer",
     "leo": "Leão", "virgo": "Virgem", "libra": "Libra", "scorpio": "Escorpião",
     "sagittarius": "Sagitário", "capricorn": "Capricórnio", "aquarius": "Aquário", "pisces": "Peixes",
     // Sanskrit names
-    "mesha": "Áries", "vrishabha": "Touro", "mithuna": "Gêmeos", "karka": "Câncer", "karkata": "Câncer",
-    "simha": "Leão", "kanya": "Virgem", "tula": "Libra", "vrishchika": "Escorpião",
-    "dhanus": "Sagitário", "makara": "Capricórnio", "kumbha": "Aquário", "meena": "Peixes"
+    "mesha": "Áries", "mesh": "Áries",
+    "vrishabha": "Touro", "vrishabh": "Touro", "vrish": "Touro",
+    "mithuna": "Gêmeos", "mithun": "Gêmeos",
+    "karka": "Câncer", "karkata": "Câncer", "kark": "Câncer",
+    "simha": "Leão",
+    "kanya": "Virgem",
+    "tula": "Libra",
+    "vrishchika": "Escorpião",
+    "dhanus": "Sagitário", "dhanu": "Sagitário",
+    "makara": "Capricórnio",
+    "kumbha": "Aquário", "kumbh": "Aquário",
+    "meena": "Peixes", "meen": "Peixes"
   };
   const key = name.toLowerCase().replace(/[^a-z]/g, "").trim();
   return translations[key] || name;
@@ -205,6 +239,79 @@ function mapApiAspects(apiAspects: any[]): Aspect[] {
   });
 }
 
+export async function fetchSolarReturnChart(birthData: BirthData, year: number): Promise<TropicalNatal> {
+  const formattedDateTime = formatIsoDateTime(
+    birthData.birthDate,
+    birthData.birthTime,
+    birthData.birthPlace.timezone
+  );
+  const coordinatesStr = `${birthData.birthPlace.latitude},${birthData.birthPlace.longitude}`;
+
+  console.log(`[AQUAR.IA Backend] Solicitando Revolução Solar ${year} na ProKerala...`);
+  const raw = await callProKeralaAPI("astrology/solar-return-planet-position", {
+    "profile[datetime]": formattedDateTime,
+    "profile[coordinates]": coordinatesStr,
+    current_coordinates: coordinatesStr,
+    solar_return_year: year,
+    house_system: "placidus",
+  });
+  console.log(`[DEBUG] Resposta Revolução Solar recebida: ${JSON.stringify(raw).substring(0, 200)}...`);
+
+  const details = raw?.data?.solar_return_details || raw?.solar_return_details || raw?.data || raw;
+  const housesRaw = details?.houses || details?.chart?.houses || details?.solar_details?.houses || [];
+  const planetsRaw = details?.planet_positions || details?.chart?.planet_positions || details?.solar_details?.planet_positions || [];
+  const aspectsRaw = details?.aspects || details?.solar_details?.aspects || [];
+
+  const houses: { house: number; cuspDegree: number; sign: string; ruler: string; longitude: number }[] = housesRaw.map((h: any) => {
+    const rawSign = h.start_cusp?.zodiac?.name || h.sign || h.zodiac_sign || "";
+    const sign = translateSignName(rawSign);
+    const longitude = typeof h.start_cusp?.longitude === "number" ? h.start_cusp.longitude : ((SIGNS_PT.indexOf(sign) ?? 0) * 30);
+    const cuspDegree = typeof h.start_cusp?.degree === "number" ? h.start_cusp.degree : longitude % 30;
+    return {
+      house: typeof h.number === "number" ? h.number : typeof h.house === "number" ? h.house : h.id + 1,
+      cuspDegree: Math.round(cuspDegree * 100) / 100,
+      sign,
+      ruler: signRulers[sign] || h.start_cusp?.zodiac?.lord?.name || "Sol",
+      longitude: Math.round(longitude * 100) / 100,
+    };
+  });
+
+  const planets: PlanetPosition[] = planetsRaw.map((p: any) => {
+    const rawName = p.name || "";
+    const name = translatePlanetName(rawName);
+    const rawSign = p.zodiac?.name || p.sign || "";
+    const sign = translateSignName(rawSign);
+    const longitude = typeof p.longitude === "number" ? p.longitude : ((SIGNS_PT.indexOf(sign) ?? 0) * 30) + (p.degree || 0);
+    let house = typeof p.house_number === "number" ? p.house_number : typeof p.house === "number" ? p.house : 1;
+
+    // Recalcular casa pelas cúspides da RS
+    for (let i = 0; i < houses.length; i++) {
+      const c1 = houses[i].longitude;
+      const c2 = houses[(i + 1) % 12].longitude;
+      const rel = (longitude - c1 + 360) % 360;
+      const span = (c2 - c1 + 360) % 360;
+      if (rel < span) {
+        house = houses[i].house;
+        break;
+      }
+    }
+
+    return {
+      name,
+      sign,
+      degree: Math.round((typeof p.degree === "number" ? p.degree : 0) * 100) / 100,
+      house,
+      isRetrograde: !!p.is_retrograde,
+      ruler: signRulers[sign] || p.zodiac?.lord?.name || "Sol",
+      longitude: Math.round(longitude * 100) / 100,
+    };
+  });
+
+  const aspects = mapApiAspects(aspectsRaw);
+
+  return { planets, houses, aspects };
+}
+
 function mapApiPlanetsToVedic(apiPlanets: any[]): VedicNatalPlanet[] {
   return apiPlanets.map((p) => {
     const rawName = p.name || p.planet || p.id || "";
@@ -237,6 +344,203 @@ function mapApiPlanetsToVedic(apiPlanets: any[]): VedicNatalPlanet[] {
   });
 }
 
+const VIMSHOTTARI_ORDER = ["Ketu", "Vênus", "Sol", "Lua", "Marte", "Rahu", "Júpiter", "Saturno", "Mercúrio"];
+const VIMSHOTTARI_YEARS: Record<string, number> = {
+  Ketu: 7, Vênus: 20, Sol: 6, Lua: 10, Marte: 7, Rahu: 18, Júpiter: 16, Saturno: 19, Mercúrio: 17
+};
+
+function parseISODuration(iso: string): number {
+  const match = iso.match(/P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/);
+  if (!match) return 0;
+  const years = parseInt(match[1] || "0", 10);
+  const months = parseInt(match[2] || "0", 10);
+  const days = parseInt(match[3] || "0", 10);
+  const hours = parseInt(match[4] || "0", 10);
+  const minutes = parseInt(match[5] || "0", 10);
+  const seconds = parseFloat(match[6] || "0");
+  // Aproximação: 1 ano = 365.25 dias, 1 mês = 30.4375 dias
+  return (
+    years * 365.25 * 24 * 60 * 60 * 1000 +
+    months * 30.4375 * 24 * 60 * 60 * 1000 +
+    days * 24 * 60 * 60 * 1000 +
+    hours * 60 * 60 * 1000 +
+    minutes * 60 * 1000 +
+    seconds * 1000
+  );
+}
+
+function getVimshottariSubLord(
+  startDate: Date,
+  endDate: Date,
+  parentLord: string,
+  currentDate: Date,
+  isPratyantardasha: boolean,
+  parentStart?: Date,
+  parentEnd?: Date
+): string {
+  // Duração total do período pai em anos
+  const parentDurationYears = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  // Para Pratyantardasha, o "pai" é a Antardasha, então recalculamos com base na duração da antardasha
+  const baseDuration = (parentEnd && parentStart)
+    ? (parentEnd.getTime() - parentStart.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+    : parentDurationYears;
+
+  const startIdx = VIMSHOTTARI_ORDER.indexOf(parentLord);
+  if (startIdx === -1) return parentLord;
+
+  const elapsedYears = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  let accumulated = 0;
+
+  for (let i = 0; i < VIMSHOTTARI_ORDER.length; i++) {
+    const planet = VIMSHOTTARI_ORDER[(startIdx + i) % VIMSHOTTARI_ORDER.length];
+    const duration = (VIMSHOTTARI_YEARS[planet] / 120) * baseDuration;
+    if (elapsedYears >= accumulated && elapsedYears < accumulated + duration) {
+      return planet;
+    }
+    accumulated += duration;
+  }
+
+  return parentLord;
+}
+
+function calculateVimshottariDasha(
+  birthDate: Date,
+  dashaBalanceLord: string,
+  dashaBalanceDuration: string,
+  currentDate: Date
+): {
+  mahadasha: string;
+  mahadashaStart: string;
+  mahadashaEnd: string;
+  antardasha: string;
+  antardashaStart: string;
+  antardashaEnd: string;
+  pratyantardasha: string;
+  pratyantardashaStart: string;
+  pratyantardashaEnd: string;
+  nextMahadasha: string;
+  nextMahadashaStart: string;
+  nextAntardasha: string;
+  nextAntardashaStart: string;
+  nextPratyantardasha: string;
+  nextPratyantardashaStart: string;
+} {
+  const MS_PER_YEAR = 1000 * 60 * 60 * 24 * 365.25;
+  const balanceLordRaw = translatePlanetName(dashaBalanceLord);
+  const balanceLord = balanceLordRaw === "Nodo Sul" ? "Ketu" : balanceLordRaw === "Nodo Norte" ? "Rahu" : balanceLordRaw;
+  const balanceDurationMs = parseISODuration(dashaBalanceDuration);
+  const totalDurationMs = VIMSHOTTARI_YEARS[balanceLord] * MS_PER_YEAR;
+  const elapsedBeforeBirthMs = totalDurationMs - balanceDurationMs;
+  const mahadashaStart = new Date(birthDate.getTime() - elapsedBeforeBirthMs);
+
+  // Itera pelos Mahadashas a partir do início do primeiro
+  let cursor = new Date(mahadashaStart);
+  let startIdx = VIMSHOTTARI_ORDER.indexOf(balanceLord);
+  if (startIdx === -1) startIdx = 0;
+
+  let mahadasha = balanceLord;
+  let mahadashaStartDate = new Date(cursor);
+  let mahadashaEndDate = new Date(cursor);
+  let nextMahadasha = "";
+  let nextMahadashaStart = "";
+
+  for (let i = 0; i < VIMSHOTTARI_ORDER.length * 2; i++) {
+    const planet = VIMSHOTTARI_ORDER[(startIdx + i) % VIMSHOTTARI_ORDER.length];
+    const durationMs = VIMSHOTTARI_YEARS[planet] * MS_PER_YEAR;
+    const end = new Date(cursor.getTime() + durationMs);
+    if (currentDate >= cursor && currentDate < end) {
+      mahadasha = planet;
+      mahadashaStartDate = new Date(cursor);
+      mahadashaEndDate = new Date(end);
+      nextMahadasha = VIMSHOTTARI_ORDER[(startIdx + i + 1) % VIMSHOTTARI_ORDER.length];
+      nextMahadashaStart = end.toISOString().split("T")[0];
+      break;
+    }
+    cursor = end;
+  }
+
+  let antarStartDate = new Date(mahadashaStartDate);
+  let antarEndDate = new Date(mahadashaEndDate);
+  let nextAntardasha = "";
+  let nextAntardashaStart = "";
+  const antardasha = getVimshottariSubLord(mahadashaStartDate, mahadashaEndDate, mahadasha, currentDate, false);
+
+  // Calcula início/fim da Antardasha e próximo Antardasha
+  const antarStartIdx = VIMSHOTTARI_ORDER.indexOf(mahadasha);
+  if (antarStartIdx !== -1) {
+    const mahaDurationMs = mahadashaEndDate.getTime() - mahadashaStartDate.getTime();
+    let acc = 0;
+    for (let i = 0; i < VIMSHOTTARI_ORDER.length; i++) {
+      const p = VIMSHOTTARI_ORDER[(antarStartIdx + i) % VIMSHOTTARI_ORDER.length];
+      const dur = (VIMSHOTTARI_YEARS[p] / 120) * mahaDurationMs;
+      const segStart = new Date(mahadashaStartDate.getTime() + acc);
+      const segEnd = new Date(mahadashaStartDate.getTime() + acc + dur);
+      if (currentDate >= segStart && currentDate < segEnd) {
+        antarStartDate = segStart;
+        antarEndDate = segEnd;
+        nextAntardasha = VIMSHOTTARI_ORDER[(antarStartIdx + i + 1) % VIMSHOTTARI_ORDER.length];
+        nextAntardashaStart = segEnd.toISOString().split("T")[0];
+        break;
+      }
+      acc += dur;
+    }
+  }
+
+  const pratyantardasha = getVimshottariSubLord(antarStartDate, antarEndDate, antardasha, currentDate, true, antarStartDate, antarEndDate);
+
+  // Calcula início/fim da Pratyantardasha
+  let pratyantarStartDate = new Date(antarStartDate);
+  let pratyantarEndDate = new Date(antarEndDate);
+  let nextPratyantardasha = "";
+  let nextPratyantardashaStart = "";
+  const pratyantarStartIdx = VIMSHOTTARI_ORDER.indexOf(antardasha);
+  if (pratyantarStartIdx !== -1) {
+    const antarDurationMs = antarEndDate.getTime() - antarStartDate.getTime();
+    let acc = 0;
+    for (let i = 0; i < VIMSHOTTARI_ORDER.length; i++) {
+      const p = VIMSHOTTARI_ORDER[(pratyantarStartIdx + i) % VIMSHOTTARI_ORDER.length];
+      const dur = (VIMSHOTTARI_YEARS[p] / 120) * antarDurationMs;
+      const segStart = new Date(antarStartDate.getTime() + acc);
+      const segEnd = new Date(antarStartDate.getTime() + acc + dur);
+      if (currentDate >= segStart && currentDate < segEnd) {
+        pratyantarStartDate = segStart;
+        pratyantarEndDate = segEnd;
+        nextPratyantardasha = VIMSHOTTARI_ORDER[(pratyantarStartIdx + i + 1) % VIMSHOTTARI_ORDER.length];
+        nextPratyantardashaStart = segEnd.toISOString().split("T")[0];
+        break;
+      }
+      acc += dur;
+    }
+  }
+
+  const formatDate = (d: Date) => d.toISOString().split("T")[0];
+
+  return {
+    mahadasha: translatePlanetName(mahadasha),
+    mahadashaStart: formatDate(mahadashaStartDate),
+    mahadashaEnd: formatDate(mahadashaEndDate),
+    antardasha: translatePlanetName(antardasha),
+    antardashaStart: formatDate(antarStartDate),
+    antardashaEnd: formatDate(antarEndDate),
+    nextAntardasha: translatePlanetName(nextAntardasha),
+    nextAntardashaStart: nextAntardashaStart,
+    pratyantardasha: translatePlanetName(pratyantardasha),
+    pratyantardashaStart: formatDate(pratyantarStartDate),
+    pratyantardashaEnd: formatDate(pratyantarEndDate),
+    nextMahadasha: translatePlanetName(nextMahadasha),
+    nextMahadashaStart: nextMahadashaStart,
+    nextPratyantardasha: translatePlanetName(nextPratyantardasha),
+    nextPratyantardashaStart: nextPratyantardashaStart
+  };
+}
+
+function getDashaLordNakshatra(dashaLord: string, vedicPlanets: VedicNatalPlanet[]): string {
+  // Mapeia nomes de regentes védicos para o nome usado nos planetas natais
+  const searchName = dashaLord === "Rahu" ? "Nodo Norte" : dashaLord === "Ketu" ? "Nodo Sul" : dashaLord;
+  const planet = vedicPlanets.find(p => p.name === searchName);
+  return planet?.nakshatra || "Rohini";
+}
+
 function computeVedicKarakas(vedicPlanets: VedicNatalPlanet[]) {
   const validKarakas = vedicPlanets
     .filter(p => !p.name.includes("Nodo") && p.name !== "Rahu" && p.name !== "Ketu" && p.name !== "Ascendente")
@@ -266,39 +570,45 @@ async function getProKeralaToken(): Promise<string | null> {
     return cachedToken;
   }
 
+  const params = new URLSearchParams();
+  params.append("grant_type", "client_credentials");
+  params.append("client_id", clientId);
+  params.append("client_secret", clientSecret);
+
+  console.log("[ProKerala] Solicitando novo Token de Acesso...");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   try {
-    const params = new URLSearchParams();
-    params.append("grant_type", "client_credentials");
-    params.append("client_id", clientId);
-    params.append("client_secret", clientSecret);
+      const response = await fetch("https://api.prokerala.com/token", {
+        method: "POST",
+        body: params,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        signal: controller.signal
+      });
 
-    console.log("[ProKerala] Solicitando novo Token de Acesso...");
-    const response = await fetch("https://api.prokerala.com/token", {
-      method: "POST",
-      body: params,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+      if (!response.ok) {
+        throw new Error(`Erro ao obter token do ProKerala: ${response.status} ${response.statusText}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`Erro ao obter token do ProKerala: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      if (data.access_token) {
+        cachedToken = data.access_token;
+        // Expira 5 minutos antes do tempo real fornecido (expires_in vem em segundos)
+        const expiresInSec = data.expires_in || 3600;
+        tokenExpiry = Date.now() + (expiresInSec - 300) * 1000;
+        return cachedToken;
+      }
+      throw new Error("Resposta de token sem access_token");
+    } catch (error) {
+      console.error("[ProKerala] Erro na autenticação OAuth2:", error);
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data = await response.json();
-    if (data.access_token) {
-      cachedToken = data.access_token;
-      // Expira 5 minutos antes do tempo real fornecido (expires_in vem em segundos)
-      const expiresInSec = data.expires_in || 3600;
-      tokenExpiry = Date.now() + (expiresInSec - 300) * 1000;
-      return cachedToken;
-    }
-    throw new Error("Resposta de token sem access_token");
-  } catch (error) {
-    console.error("[ProKerala] Erro na autenticação OAuth2:", error);
-    return null;
   }
-}
 
 // Helper function to resolve the actual offset of an IANA timezone for a specific date and time
 function getTimezoneOffset(timezone: string, dateStr: string, timeStr: string): string {
@@ -465,25 +775,86 @@ function getSignAndDegree(longitude: number): { sign: string; degree: number } {
   };
 }
 
+function assignHouseFromLong(longitude: number, houses: { house: number; longitude: number }[]): number {
+  for (let i = 0; i < 12; i++) {
+    const cusp1 = houses[i].longitude;
+    const cusp2 = houses[(i + 1) % 12].longitude;
+    const relative = (longitude - cusp1 + 360) % 360;
+    const cuspRel = (cusp2 - cusp1 + 360) % 360;
+    if (relative < cuspRel) {
+      return houses[i].house;
+    }
+  }
+  return 1;
+}
+
+function createTropicalPoint(
+  name: string,
+  longitude: number,
+  houses: { house: number; longitude: number }[],
+  knownHouse?: number,
+  isRetrograde = false
+): PlanetPosition {
+  const { sign, degree } = getSignAndDegree(longitude);
+  const house = knownHouse ?? assignHouseFromLong(longitude, houses);
+  return {
+    name,
+    sign,
+    degree,
+    house,
+    isRetrograde,
+    ruler: signRulers[sign] || "Sol",
+    longitude
+  };
+}
+
+function calculatePartOfFortune(ascLong: number, sunLong: number, moonLong: number, isDay: boolean): number {
+  const raw = isDay ? (ascLong + moonLong - sunLong) : (ascLong + sunLong - moonLong);
+  return (raw % 360 + 360) % 360;
+}
+
+const TRANSPERSONAL_PLANETS = new Set(["Urano", "Netuno", "Plutão"]);
+const SOCIAL_PLANETS = new Set(["Júpiter", "Saturno"]);
+const PASSIVE_POINTS = new Set(["Ascendente", "Meio do Céu", "Quíron", "Nodo Norte", "Nodo Sul"]);
+
+function getAspectOrb(p1Name: string, p2Name: string): number {
+  const p1IsPoint = PASSIVE_POINTS.has(p1Name);
+  const p2IsPoint = PASSIVE_POINTS.has(p2Name);
+  // Quíron, Nodos, Ascendente e MC: orbe de 3° quando recebem aspectos
+  if (p1IsPoint || p2IsPoint) return 3;
+
+  const p1IsTrans = TRANSPERSONAL_PLANETS.has(p1Name);
+  const p2IsTrans = TRANSPERSONAL_PLANETS.has(p2Name);
+  if (p1IsTrans && p2IsTrans) return 3;
+  if ((p1IsTrans && SOCIAL_PLANETS.has(p2Name)) || (p2IsTrans && SOCIAL_PLANETS.has(p1Name))) return 5;
+
+  return 8;
+}
+
 function calculateAspects(planets: { name: string; longitude: number }[]): Aspect[] {
   const aspects: Aspect[] = [];
   const definitions = [
-    { name: "Conjunção", angle: 0, orb: 8 },
-    { name: "Oposição", angle: 180, orb: 8 },
-    { name: "Trígono", angle: 120, orb: 8 },
-    { name: "Quadratura", angle: 90, orb: 8 }
+    { name: "Conjunção", angle: 0 },
+    { name: "Oposição", angle: 180 },
+    { name: "Trígono", angle: 120 },
+    { name: "Quadratura", angle: 90 }
   ];
 
   for (let i = 0; i < planets.length; i++) {
     for (let j = i + 1; j < planets.length; j++) {
       const p1 = planets[i];
       const p2 = planets[j];
+
+      // Pontos passivos (Quíron, Nodos, ASC, MC) só recebem aspectos — não emitem
+      if (PASSIVE_POINTS.has(p1.name)) continue;
+
+      const orb = getAspectOrb(p1.name, p2.name);
       let diff = Math.abs(p1.longitude - p2.longitude);
       if (diff > 180) diff = 360 - diff;
 
       for (const def of definitions) {
         const dev = Math.abs(diff - def.angle);
-        if (dev <= def.orb) {
+        if (dev <= orb) {
           aspects.push({
             planet1: p1.name,
             planet2: p2.name,
@@ -611,6 +982,42 @@ function generateDeterministicAstrologicalData(birthDate: string, birthTime: str
 // Função Principal que se conecta à API ProKerala v2
 import circularHoroscope from 'circular-natal-horoscope-js';
 import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const LOCAL_CACHE_DIR = path.resolve(process.cwd(), 'data');
+
+function getLocalCachePath(birthDate: string, birthTime: string, lat: number, lng: number): string {
+  const key = `${birthDate}_${birthTime.replace(':', '')}_${lat}_${lng}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  return path.join(LOCAL_CACHE_DIR, `chart_${key}.json`);
+}
+
+function readLocalCache(cachePath: string): any | null {
+  try {
+    if (fs.existsSync(cachePath)) {
+      const raw = fs.readFileSync(cachePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed?.vedicPlanetRes) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('[CACHE] Erro ao ler cache local:', e);
+  }
+  return null;
+}
+
+function writeLocalCache(cachePath: string, payload: any): void {
+  try {
+    if (!fs.existsSync(LOCAL_CACHE_DIR)) {
+      fs.mkdirSync(LOCAL_CACHE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(cachePath, JSON.stringify(payload, null, 2), 'utf-8');
+    console.log(`[CACHE] Mapa natal salvo em: ${cachePath}`);
+  } catch (e) {
+    console.warn('[CACHE] Erro ao salvar cache local:', e);
+  }
+}
 const { Origin, Horoscope } = circularHoroscope;
 
 export async function fetchAstrologicalData(
@@ -626,6 +1033,9 @@ export async function fetchAstrologicalData(
     birthData.birthTime,
     birthData.birthPlace.timezone
   );
+  console.log(`[DEBUG] formattedDateTime enviado para API: ${formattedDateTime}`);
+  console.log(`[DEBUG] birthDate: ${birthData.birthDate}, birthTime: ${birthData.birthTime}, timezone: ${birthData.birthPlace.timezone}`);
+  
   const coordinatesStr = `${birthData.birthPlace.latitude},${birthData.birthPlace.longitude}`;
 
 
@@ -675,20 +1085,31 @@ export async function fetchAstrologicalData(
   let rawVedicPlanetRes: any = null;
   let rawTropicalPlanetRes: any = null;
   let rawKundliRes: any = null;
-  let dataSource: "API_PROKERALA" | "MOTOR_FALLBACK" | "SUPABASE_CACHE" = "API_PROKERALA";
+  let rawDashaRes: any = null;
+  let dataSource: "API_PROKERALA" | "SUPABASE_CACHE" | "LOCAL_CACHE" = "API_PROKERALA";
   let cachedPayload: any = null;
 
-  if (supabase && userId) {
+  // 1ª camada: cache local em arquivo (mais rápido e sem custo)
+  const localCachePath = getLocalCachePath(
+    birthData.birthDate,
+    birthData.birthTime,
+    birthData.birthPlace.latitude,
+    birthData.birthPlace.longitude
+  );
+  const localCache = readLocalCache(localCachePath);
+  if (localCache) {
+    console.log(`[CACHE] Mapa carregado da memória (arquivo local): ${localCachePath}`);
+    cachedPayload = localCache;
+    dataSource = "LOCAL_CACHE";
+  }
+
+  // 2ª camada: cache Supabase (se não encontrou local)
+  if (!cachedPayload && supabase && userId) {
     try {
       const { data: chartData, error } = await supabase
-        .from('user_charts')
+        .from('user_chart')
         .select('prokerala_raw_data')
         .eq('user_id', userId)
-        // Optionally match date/time/lat/lng to ensure we are caching the right chart if user can have multiple
-        .eq('birth_date', birthData.birthDate)
-        .eq('birth_time', birthData.birthTime)
-        .eq('latitude', birthData.birthPlace.latitude)
-        .eq('longitude', birthData.birthPlace.longitude)
         .single();
       
       if (!error && chartData && chartData.prokerala_raw_data) {
@@ -702,53 +1123,75 @@ export async function fetchAstrologicalData(
   }
 
   if (cachedPayload) {
+    if (dataSource === "LOCAL_CACHE") {
+      console.log(`[CACHE] Mapa carregado da memória (arquivo local).`);
+    }
     rawVedicPlanetRes = cachedPayload.vedicPlanetRes;
     rawTropicalPlanetRes = cachedPayload.tropicalPlanetRes;
     rawKundliRes = cachedPayload.kundliRes;
+    rawDashaRes = cachedPayload.dashaRes;
   } else {
-    try {
-      if (!getProKeralaClientID() || !getProKeralaClientSecret()) {
-        throw new Error("Credenciais da API ProKerala não configuradas nas variáveis de ambiente (.env).");
-      }
-
-      console.log(`[AQUAR.IA Backend] Solicitando planet-position Védico (Sideral)...`);
-      rawVedicPlanetRes = await callProKeralaAPI("astrology/planet-position", {
-        datetime: formattedDateTime,
-        coordinates: coordinatesStr,
-        ayanamsa: 1, // Lahiri
-        house_system: "equal"
-      });
-    } catch (err: any) {
-      console.warn("[AQUAR.IA Backend] Falha na API ProKerala, ativando gerador astrológico offline de contingência:", err?.message || err);
-      dataSource = "MOTOR_FALLBACK";
-      rawVedicPlanetRes = generateDeterministicAstrologicalData(birthData.birthDate, birthData.birthTime);
-      console.log("[AQUAR.IA Backend] Pós-fallback, rawVedicPlanetRes:", JSON.stringify(rawVedicPlanetRes));
+    // SEM FALLBACK - Se a API falhar, o erro deve explodir no console
+    console.log(`[DEBUG] PROKERALA_CLIENT_ID configurado: ${!!getProKeralaClientID()}`);
+    console.log(`[DEBUG] PROKERALA_CLIENT_SECRET configurado: ${!!getProKeralaClientSecret()}`);
+    
+    if (!getProKeralaClientID() || !getProKeralaClientSecret()) {
+      throw new Error("Credenciais da API ProKerala não configuradas nas variáveis de ambiente (.env). Configure PROKERALA_CLIENT_ID e PROKERALA_CLIENT_SECRET.");
     }
 
+    console.log(`[AQUAR.IA Backend] Solicitando planet-position Védico (Sideral)...`);
+    console.log(`[DEBUG] Payload Védico: datetime=${formattedDateTime}, coordinates=${coordinatesStr}, ayanamsa=1, house_system=equal`);
+    rawVedicPlanetRes = await callProKeralaAPI("astrology/planet-position", {
+      datetime: formattedDateTime,
+      coordinates: coordinatesStr,
+      ayanamsa: 1, // Lahiri
+      house_system: "equal"
+    });
+    console.log(`[DEBUG] Resposta Védico recebida: ${JSON.stringify(rawVedicPlanetRes).substring(0, 200)}...`);
+
+    console.log(`[AQUAR.IA Backend] Solicitando planet-position Tropical (Western)...`);
+    console.log(`[DEBUG] Payload Tropical: datetime=${formattedDateTime}, coordinates=${coordinatesStr}, ayanamsa=1 (Lahiri), house_system=placidus, system=placidus`);
+    rawTropicalPlanetRes = await callProKeralaAPI("astrology/planet-position", {
+      datetime: formattedDateTime,
+      coordinates: coordinatesStr,
+      ayanamsa: 1, // API ProKerala não aceita ayanamsa=0, usar 1 e converter manualmente
+      house_system: "placidus",
+      system: "placidus"
+    });
+    console.log(`[DEBUG] Resposta Tropical recebida: ${JSON.stringify(rawTropicalPlanetRes).substring(0, 200)}...`);
+
+    console.log(`[AQUAR.IA Backend] Solicitando dados do Kundli do ProKerala com ayanamsa=1...`);
+    console.log(`[DEBUG] Payload Kundli: datetime=${formattedDateTime}, coordinates=${coordinatesStr}, ayanamsa=1, house_system=equal`);
+    rawKundliRes = await callProKeralaAPI("astrology/kundli", {
+      datetime: formattedDateTime,
+      coordinates: coordinatesStr,
+      ayanamsa: 1,
+      house_system: "equal"
+    });
+    console.log(`[DEBUG] Resposta Kundli recebida: ${JSON.stringify(rawKundliRes).substring(0, 200)}...`);
+
+    console.log(`[AQUAR.IA Backend] Solicitando Vimshottari Dasha do ProKerala...`);
     try {
-      console.log(`[AQUAR.IA Backend] Solicitando planet-position Tropical (Western)...`);
-      rawTropicalPlanetRes = await callProKeralaAPI("astrology/planet-position", {
+      rawDashaRes = await callProKeralaAPI("astrology/dasha-periods", {
         datetime: formattedDateTime,
         coordinates: coordinatesStr,
-        ayanamsa: 1,
-        house_system: "placidus",
-        system: "placidus"
+        ayanamsa: 1
       });
-    } catch (err: any) {
-      console.error("[AQUAR.IA Backend] Erro não fatal ao solicitar planet-position tropical:", err?.message || err);
+      console.log(`[DEBUG] Resposta Dasha COMPLETA: ${JSON.stringify(rawDashaRes).substring(0, 2000)}`);
+    } catch (dashaErr: any) {
+      console.warn(`[AVISO] Falha ao buscar dasha-periods (não fatal): ${dashaErr?.message || dashaErr}`);
+      rawDashaRes = null;
     }
 
-    try {
-      console.log(`[AQUAR.IA Backend] Solicitando dados do Kundli do ProKerala com ayanamsa=1...`);
-      rawKundliRes = await callProKeralaAPI("astrology/kundli", {
-        datetime: formattedDateTime,
-        coordinates: coordinatesStr,
-        ayanamsa: 1,
-        house_system: "equal"
-      });
-    } catch (err: any) {
-      console.warn("[AQUAR.IA Backend] Erro não fatal ao buscar dados adicionais do Kundli:", err?.message || err);
-    }
+    // Salvar cache local (dados natais estáticos - sem trânsitos)
+    const natalPayload = {
+      vedicPlanetRes: rawVedicPlanetRes,
+      tropicalPlanetRes: rawTropicalPlanetRes,
+      kundliRes: rawKundliRes,
+      dashaRes: rawDashaRes
+    };
+    console.log(`[API] Buscando mapa na ProKerala e salvando cache...`);
+    writeLocalCache(localCachePath, natalPayload);
 
     let finalUserId = userId;
     if (supabase && !finalUserId) {
@@ -765,54 +1208,34 @@ export async function fetchAstrologicalData(
       console.error("ERRO: userId está null na hora de salvar o mapa!");
     }
 
-    if (supabase && finalUserId && dataSource !== "MOTOR_FALLBACK") {
+    if (supabase && finalUserId) {
       try {
         const payloadToCache = {
           vedicPlanetRes: rawVedicPlanetRes,
           tropicalPlanetRes: rawTropicalPlanetRes,
-          kundliRes: rawKundliRes
+          kundliRes: rawKundliRes,
+          dashaRes: rawDashaRes
         };
 
         console.log(`[AQUAR.IA Backend] Salvando cache no Supabase para o usuário ${finalUserId}...`);
         
-        // Execute the database instruction (inserting raw data first)
-        const { data, error: insertError } = await supabase
-          .from('user_charts')
-          .insert([
-            {
-              user_id: finalUserId,
-              birth_date: birthData.birthDate,
-              birth_time: birthData.birthTime,
-              latitude: birthData.birthPlace.latitude,
-              longitude: birthData.birthPlace.longitude,
-              prokerala_raw_data: payloadToCache,
-              updated_at: new Date().toISOString()
-            }
-          ]);
+        // Upsert direto por user_id (tabela tem UNIQUE(user_id))
+        const { error: upsertError } = await supabase
+          .from('user_chart')
+          .upsert({
+            user_id: finalUserId,
+            birth_date: birthData.birthDate,
+            birth_time: birthData.birthTime,
+            latitude: birthData.birthPlace.latitude,
+            longitude: birthData.birthPlace.longitude,
+            prokerala_raw_data: payloadToCache,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
 
-        if (insertError) {
-          console.error("ERRO FATAL NO SUPABASE (USER_CHARTS):", insertError.message, insertError.details, insertError.hint);
-          // If insert fails due to a unique key constraint violation (e.g. key already exists), we fallback to upsert
-          if (insertError.code === '23505' || String(insertError.message).includes('unique_user_chart')) {
-            console.log("[AQUAR.IA Backend] Linha já existente. Executando UPSERT para atualizar o cache...");
-            const { data: upsertData, error: upsertError } = await supabase.from('user_charts').upsert({
-              user_id: finalUserId,
-              birth_date: birthData.birthDate,
-              birth_time: birthData.birthTime,
-              latitude: birthData.birthPlace.latitude,
-              longitude: birthData.birthPlace.longitude,
-              prokerala_raw_data: payloadToCache,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id,birth_date,birth_time,latitude,longitude' });
-
-            if (upsertError) {
-              console.error("ERRO FATAL NO SUPABASE (USER_CHARTS - UPSERT):", upsertError.message, upsertError.details, upsertError.hint);
-            } else {
-              console.log("SUCESSO ABSOLUTO! Cache atualizado com sucesso via UPSERT.");
-            }
-          }
+        if (upsertError) {
+          console.error("ERRO FATAL NO SUPABASE (USER_CHART):", upsertError.message, upsertError.details, upsertError.hint);
         } else {
-          console.log("SUCESSO ABSOLUTO! Cache criado com sucesso.");
+          console.log("[SUPABASE] Cache do mapa natal salvo/atualizado com sucesso.");
         }
       } catch (err) {
         console.warn("[AQUAR.IA Backend] Falha na operação de cache no Supabase:", err);
@@ -820,28 +1243,93 @@ export async function fetchAstrologicalData(
     }
   }
 
+  const VEDIC_SIGN_LORDS: Record<string, string> = {
+    "Áries": "Marte", "Touro": "Vênus", "Gêmeos": "Mercúrio", "Câncer": "Lua",
+    "Leão": "Sol", "Virgem": "Mercúrio", "Libra": "Vênus", "Escorpião": "Marte",
+    "Sagitário": "Júpiter", "Capricórnio": "Saturno", "Aquário": "Saturno", "Peixes": "Júpiter"
+  };
+
+  function getVedicDignity(planet: string, sign: string, deg: number): VedicNatalPlanet["dignity"] {
+    const exaltation: Record<string, string> = {
+      Sun: "Áries", Moon: "Touro", Mars: "Capricórnio", Mercury: "Virgem",
+      Jupiter: "Câncer", Venus: "Peixes", Saturn: "Libra", Rahu: "Gêmeos", Ketu: "Sagitário"
+    };
+    const debilitation: Record<string, string> = {
+      Sun: "Libra", Moon: "Escorpião", Mars: "Câncer", Mercury: "Peixes",
+      Jupiter: "Capricórnio", Venus: "Virgem", Saturn: "Áries", Rahu: "Sagitário", Ketu: "Gêmeos"
+    };
+    if (exaltation[planet] === sign) return "Exaltado";
+    if (debilitation[planet] === sign) return "Debilitado";
+
+    const moola: Record<string, [string, number, number][]> = {
+      Sun: [["Leão", 0, 20]],
+      Moon: [["Touro", 3, 30]],
+      Mars: [["Áries", 0, 12], ["Escorpião", 0, 12]],
+      Mercury: [["Virgem", 16, 30]],
+      Jupiter: [["Sagitário", 0, 10], ["Peixes", 0, 10]],
+      Venus: [["Libra", 0, 15], ["Touro", 0, 15]],
+      Saturn: [["Aquário", 0, 20], ["Capricórnio", 0, 20]]
+    };
+    if (moola[planet]?.some(([s, a, b]) => s === sign && deg >= a && deg <= b)) return "Moolatrikona";
+
+    const ownSigns: Record<string, string[]> = {
+      Sun: ["Leão"], Moon: ["Câncer"], Mars: ["Áries", "Escorpião"],
+      Mercury: ["Gêmeos", "Virgem"], Jupiter: ["Sagitário", "Peixes"],
+      Venus: ["Touro", "Libra"], Saturn: ["Capricórnio", "Aquário"]
+    };
+    if (ownSigns[planet]?.includes(sign)) return "Moolatrikona";
+
+    const friends: Record<string, string[]> = {
+      Sun: ["Lua", "Marte", "Júpiter"],
+      Moon: ["Sol", "Mercúrio"],
+      Mars: ["Sol", "Lua", "Júpiter"],
+      Mercury: ["Sol", "Vênus"],
+      Jupiter: ["Sol", "Lua", "Marte"],
+      Venus: ["Mercúrio", "Saturno"],
+      Saturn: ["Mercúrio", "Vênus"],
+      Rahu: ["Mercúrio", "Vênus", "Saturno"],
+      Ketu: ["Mercúrio", "Vênus", "Saturno"]
+    };
+    const enemies: Record<string, string[]> = {
+      Sun: ["Saturno", "Vênus"],
+      Moon: [],
+      Mars: ["Mercúrio", "Vênus"],
+      Mercury: ["Lua"],
+      Jupiter: ["Mercúrio", "Vênus"],
+      Venus: ["Sol", "Lua"],
+      Saturn: ["Sol", "Lua", "Marte"],
+      Rahu: ["Sol", "Lua", "Marte", "Júpiter"],
+      Ketu: ["Sol", "Lua", "Marte", "Júpiter"]
+    };
+    const signLord = VEDIC_SIGN_LORDS[sign];
+    if (!signLord) return "Neutro";
+    if (friends[planet]?.includes(signLord)) return "Amigo";
+    if (enemies[planet]?.includes(signLord)) return "Inimigo";
+    return "Neutro";
+  }
+
+  function angularDistance(a: number, b: number): number {
+    const diff = Math.abs(((a - b + 360) % 360));
+    return diff > 180 ? 360 - diff : diff;
+  }
+
+  const COMBUST_ORBS: Record<string, number> = {
+    Moon: 12, Mars: 17, Mercury: 14, Jupiter: 11, Venus: 10, Saturn: 15, Rahu: 15, Ketu: 15
+  };
+
+  const sunSideralLong = rawVedicPlanetRes?.data?.planet_position.find((p: any) => p.name === "Sun")?.longitude ?? -1;
+
   let rawPlanetPositionData = rawVedicPlanetRes?.data?.planet_position || [];
   console.log("[AQUAR.IA Backend] final rawPlanetPositionData length:", rawPlanetPositionData.length);
   
   if (rawPlanetPositionData.length === 0) {
-    console.warn("[AQUAR.IA Backend] Dados vazios ou ausentes da API ProKerala. Ativando gerador astrológico offline de contingência em segundo nível...");
-    dataSource = "MOTOR_FALLBACK";
-    rawVedicPlanetRes = generateDeterministicAstrologicalData(birthData.birthDate, birthData.birthTime);
-    rawPlanetPositionData = rawVedicPlanetRes?.data?.planet_position || [];
+    throw new Error("Erro crítico: Dados vazios ou ausentes da API ProKerala. Verifique as credenciais e a conexão.");
   }
 
-  // Encontrar o Ascendente (Lagna) Sideral retornado pelo ProKerala ou gerado localmente
+  // Encontrar o Ascendente (Lagna) Sideral retornado pelo ProKerala
   let sideralAscObj = rawPlanetPositionData.find((p: any) => p.name === "Ascendant" || p.id === 10);
   if (!sideralAscObj) {
-    console.warn("[AQUAR.IA Backend] Ascendente ausente na resposta da API. Ativando gerador astrológico offline de contingência em terceiro nível...");
-    dataSource = "MOTOR_FALLBACK";
-    rawVedicPlanetRes = generateDeterministicAstrologicalData(birthData.birthDate, birthData.birthTime);
-    rawPlanetPositionData = rawVedicPlanetRes?.data?.planet_position || [];
-    sideralAscObj = rawPlanetPositionData.find((p: any) => p.name === "Ascendant" || p.id === 10);
-  }
-
-  if (!sideralAscObj) {
-    throw new Error("Erro crítico: Não foi possível localizar ou gerar a posição do Ascendente.");
+    throw new Error("Erro crítico: Ascendente ausente na resposta da API ProKerala.");
   }
   const sideralAscLongitude = sideralAscObj.longitude;
 
@@ -856,19 +1344,26 @@ export async function fetchAstrologicalData(
   const vedicPlanets: VedicNatalPlanet[] = rawPlanetPositionData
     .filter((p: any) => p.name !== "Ascendant")
     .map((p: any) => {
-      const name = translatePlanetName(p.name);
+      const rawName = p.name;
+      const name = translatePlanetName(rawName);
       const degree = typeof p.degree === "number" ? p.degree : 0;
       const isRetrograde = !!p.is_retrograde;
       const sideralLong = p.longitude;
       const signName = translateSignName(p.rasi?.name || "");
-      
+
       const house = (Math.floor(sideralLong / 30) - Math.floor(sideralAscLongitude / 30) + 12) % 12 + 1;
       const nakInfo = getNakshatraInfo(sideralLong);
 
       const dignities: ("Exaltado" | "Moolatrikona" | "Amigo" | "Neutro" | "Inimigo" | "Debilitado")[] = [
         "Exaltado", "Moolatrikona", "Amigo", "Neutro", "Inimigo", "Debilitado"
       ];
-      const dignity = p.dignity && dignities.includes(p.dignity) ? p.dignity : "Neutro";
+      const dignity = p.dignity && dignities.includes(p.dignity)
+        ? p.dignity
+        : getVedicDignity(rawName, signName, degree);
+
+      const isCombust = rawName !== "Sun" && rawName !== "Ascendant" && sunSideralLong >= 0
+        ? angularDistance(sideralLong, sunSideralLong) <= (COMBUST_ORBS[rawName] || 0)
+        : false;
 
       return {
         name,
@@ -879,22 +1374,34 @@ export async function fetchAstrologicalData(
         pada: nakInfo.pada,
         dignity,
         isRetrograde,
-        isCombust: false
+        isCombust
       };
     });
 
   // Chara Karakas baseados em graus védicos
   const karakas = computeVedicKarakas(vedicPlanets);
 
-  // 2. Processando Planetas Tropicais (Western) usando translação de coordenadas Lahiri Ayanamsha
+  // 2. Processando Planetas Tropicais (Western) - Converter dados siderais para tropicais
   const planetNamesBase = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Rahu", "Ketu"];
-  const tropicalPlanets: PlanetPosition[] = rawPlanetPositionData
+  
+  let tropicalPlanetPositionData = rawTropicalPlanetRes?.data?.planet_position || [];
+  console.log(`[DEBUG] rawTropicalPlanetRes disponível: ${!!rawTropicalPlanetRes}, planetas tropicais: ${tropicalPlanetPositionData.length}`);
+  
+  // Se não temos dados tropicais da API, lança erro
+  if (tropicalPlanetPositionData.length === 0) {
+    throw new Error("Erro crítico: Dados tropicais não disponíveis da API ProKerala.");
+  }
+
+  const tropicalPlanets: PlanetPosition[] = tropicalPlanetPositionData
     .filter((p: any) => p.name !== "Ascendant")
     .map((p: any) => {
       const name = translatePlanetName(p.name);
       const isRetrograde = !!p.is_retrograde;
+      
+      // Converter de sideral (ayanamsa=1) para tropical adicionando o ayanamsa
       const sideralLong = p.longitude;
       const tropicalLong = (sideralLong + ayanamsha) % 360;
+      
       const { sign, degree } = getSignAndDegree(tropicalLong);
       const house = Math.floor(((tropicalLong - tropicalAscLongitude + 360) % 360) / 30) + 1;
 
@@ -909,15 +1416,29 @@ export async function fetchAstrologicalData(
       };
     });
 
-  // Incluir planetas exteriores de forma astronômica precisa e deterministicamente
+  // Incluir planetas exteriores de forma astronômica precisa usando data/hora completa
   const outerPlanetsDef = [
     { name: "Urano", sideralBase: 291.15, speed: 4.285 },
     { name: "Netuno", sideralBase: 280.15, speed: 2.186 },
     { name: "Plutão", sideralBase: 227.15, speed: 1.451 }
   ];
 
+  // Calcular dias desde época para precisão temporal
+  const birthDateObj = new Date(birthData.birthDate);
+  const epochDate = new Date("2000-01-01");
+  const daysSinceEpoch = (birthDateObj.getTime() - epochDate.getTime()) / (1000 * 60 * 60 * 24);
+  
+  console.log(`[DEBUG] Cálculo planetas externos - birthYear: ${birthYear}, daysSinceEpoch: ${daysSinceEpoch}`);
+
   outerPlanetsDef.forEach((def) => {
-    const sideralLong = (def.sideralBase + (birthYear - 2000) * def.speed + 360) % 360;
+    // Se a API já retornou o planeta externo, mantém os dados reis (incluindo retrogradação).
+    const existing = tropicalPlanets.find((p) => p.name === def.name);
+    if (existing) {
+      return;
+    }
+
+    // Fallback astronômico aproximado apenas se o planeta estiver ausente na resposta da API.
+    const sideralLong = (def.sideralBase + daysSinceEpoch * (def.speed / 365.25) + 360) % 360;
     const tropicalLong = (sideralLong + ayanamsha) % 360;
     const { sign, degree } = getSignAndDegree(tropicalLong);
     const house = Math.floor(((tropicalLong - tropicalAscLongitude + 360) % 360) / 30) + 1;
@@ -938,7 +1459,8 @@ export async function fetchAstrologicalData(
   const [bHour, bMinute] = birthData.birthTime.split(':');
   
   let placidusHousesCalculated = false;
-  let tropicalHouses = [];
+  let tropicalHouses: { house: number; cuspDegree: number; sign: string; ruler: string; longitude: number }[] = [];
+  let additionalTropicalPoints: PlanetPosition[] = [];
   
   try {
     const origin = new Origin({
@@ -984,6 +1506,37 @@ export async function fetchAstrologicalData(
         };
     });
     placidusHousesCalculated = true;
+
+    // Extração modular de Quíron, Lilith e Roda da Fortuna (sem alterar planetas/casas principais)
+    try {
+      const sunBody = horoscope.CelestialBodies.sun;
+      const moonBody = horoscope.CelestialBodies.moon;
+      const ascBody = horoscope._ascendant;
+      const chironBody = horoscope.CelestialBodies.chiron;
+      const lilithBody = horoscope._celestialPoints?.lilith;
+
+      if (sunBody && moonBody && ascBody) {
+        const sunLong = sunBody.ChartPosition.Ecliptic.DecimalDegrees;
+        const moonLong = moonBody.ChartPosition.Ecliptic.DecimalDegrees;
+        const ascLong = ascBody.ChartPosition.Ecliptic.DecimalDegrees;
+        const isDay = (sunBody.ChartPosition.Horizon.DecimalDegrees > 0);
+
+        const pofLong = calculatePartOfFortune(ascLong, sunLong, moonLong, isDay);
+        additionalTropicalPoints.push(createTropicalPoint("Roda da Fortuna", pofLong, tropicalHouses));
+
+        if (chironBody && chironBody.ChartPosition?.Ecliptic?.DecimalDegrees != null) {
+          const chironHouse = typeof chironBody.House?.id === "number" ? chironBody.House.id : undefined;
+          additionalTropicalPoints.push(createTropicalPoint("Quíron", chironBody.ChartPosition.Ecliptic.DecimalDegrees, tropicalHouses, chironHouse, !!chironBody.isRetrograde));
+        }
+
+        if (lilithBody && lilithBody.ChartPosition?.Ecliptic?.DecimalDegrees != null) {
+          const lilithHouse = typeof lilithBody.House?.id === "number" ? lilithBody.House.id : undefined;
+          additionalTropicalPoints.push(createTropicalPoint("Lilith", lilithBody.ChartPosition.Ecliptic.DecimalDegrees, tropicalHouses, lilithHouse, false));
+        }
+      }
+    } catch (addErr) {
+      console.warn("[AQUAR.IA Backend] Erro ao extrair pontos adicionais do horóscopo:", addErr);
+    }
   } catch (err) {
     console.warn("[AQUAR.IA Backend] Erro ao calcular casas Placidus, fazendo fallback para Equal House:", err);
   }
@@ -1008,7 +1561,7 @@ export async function fetchAstrologicalData(
 
   // Re-assign correct houses to tropical planets based on true house cusps
   tropicalPlanets.forEach(p => {
-    const planetLong = p.longitude;
+    const planetLong = p.longitude!;
     let assignedHouse = 1;
     for (let i = 0; i < 12; i++) {
       const cusp1 = tropicalHouses[i].longitude;
@@ -1023,15 +1576,65 @@ export async function fetchAstrologicalData(
     p.house = assignedHouse;
   });
 
+  // Fallback aproximado para Quíron e Lilith caso o horóscopo não tenha sido gerado
+  if (additionalTropicalPoints.length === 0) {
+    const sunObj = tropicalPlanets.find(p => p.name === "Sol");
+    const moonObj = tropicalPlanets.find(p => p.name === "Lua");
+    if (sunObj && moonObj) {
+      const chironLong = (210 + daysSinceEpoch * (360 / 18492)) % 360;
+      const lilithLong = (0 + daysSinceEpoch * (360 / 3232.5)) % 360;
+      const pofLong = calculatePartOfFortune(
+        tropicalAscLongitude,
+        sunObj.longitude ?? 0,
+        moonObj.longitude ?? 0,
+        (sunObj.house > 6)
+      );
+      additionalTropicalPoints.push(
+        createTropicalPoint("Quíron", chironLong, tropicalHouses),
+        createTropicalPoint("Lilith", lilithLong, tropicalHouses),
+        createTropicalPoint("Roda da Fortuna", pofLong, tropicalHouses)
+      );
+    }
+  }
+
+  // Injeta os pontos adicionais no mapa Tropical sem afetar os planetas principais
+  const existingTropicalNames = new Set(tropicalPlanets.map(p => p.name));
+  for (const point of additionalTropicalPoints) {
+    if (!existingTropicalNames.has(point.name)) {
+      tropicalPlanets.push(point);
+      existingTropicalNames.add(point.name);
+    }
+  }
+
   // 4. Aspectos Astrológicos calculados a partir das longitudes tropicalizadas reais
-  const aspectPlanets = rawPlanetPositionData.map((p: any) => {
-    const tropicalLong = (p.longitude + ayanamsha) % 360;
-    return { name: translatePlanetName(p.name), longitude: tropicalLong };
-  });
+  // O Ascendente bruto da API é descartado aqui para evitar duplicata; usamos a cúspide da Casa 1.
+  const aspectPlanets = rawPlanetPositionData
+    .filter((p: any) => (p.name || "").toLowerCase() !== "ascendant")
+    .map((p: any) => {
+      const tropicalLong = (p.longitude + ayanamsha) % 360;
+      return { name: translatePlanetName(p.name), longitude: tropicalLong };
+    });
+
+  // Inclui Quíron (já computado nos planetas tropicais), Ascendente (Casa 1) e Meio do Céu (Casa 10)
+  const quironObj = tropicalPlanets.find((p) => p.name === "Quíron");
+  if (quironObj && typeof quironObj.longitude === "number") {
+    aspectPlanets.push({ name: "Quíron", longitude: quironObj.longitude });
+  }
+
+  const ascHouse = tropicalHouses.find((h) => h.house === 1);
+  const mcHouse = tropicalHouses.find((h) => h.house === 10);
+  if (ascHouse) {
+    aspectPlanets.push({ name: "Ascendente", longitude: ascHouse.longitude });
+  }
+  if (mcHouse) {
+    aspectPlanets.push({ name: "Meio do Céu", longitude: mcHouse.longitude });
+  }
+
   const aspects = calculateAspects(aspectPlanets);
 
   // 5. Vedic Specifics (Lagna deve ser calculado sobre a longitude sideral do ascendente)
   const lagna = getSignAndDegree(sideralAscLongitude).sign;
+  const lagnaNakshatra = getNakshatraInfo(sideralAscLongitude).name;
   const lagnesha = signRulers[lagna] || "Marte";
   const sunObj = tropicalPlanets.find(p => p.name === "Sol");
   const moonObj = tropicalPlanets.find(p => p.name === "Lua");
@@ -1095,6 +1698,7 @@ export async function fetchAstrologicalData(
 
   const vedicSpecifics: VedicSpecifics = {
     lagna,
+    lagnaNakshatra,
     lagnesha,
     suryaLagna,
     chandraLagna,
@@ -1138,19 +1742,117 @@ export async function fetchAstrologicalData(
     ashtakavarga[h] = 22 + ((h * 7 + 13) % 15);
   }
 
-  // 7. Vimshottari Dasha
-  const moonSideral = rawPlanetPositionData.find((p: any) => p.name === "Moon");
-  const moonSideralLong = moonSideral ? moonSideral.longitude : 0;
-  const dashaLords = ["Ketu", "Vênus", "Sol", "Lua", "Marte", "Rahu", "Júpiter", "Saturno", "Mercúrio"];
-  const nakIndex = Math.floor(moonSideralLong / (360 / 27));
-  const dashaIndex = nakIndex % 9;
-  const subDashaIndex = (dashaIndex + 1) % 9;
-  const subSubDashaIndex = (subDashaIndex + 2) % 9;
+  // 7. Vimshottari Dasha - Extração da API ProKerala com lógica de 3 níveis
+  const currentDate = new Date(currentDateStr);
+  console.log(`[DEBUG] Data alvo para Dasha: ${currentDateStr} (${currentDate.toISOString()})`);
+  
+  let mahadashaLord = "Desconhecido";
+  let antardashaLord = "Desconhecido";
+  let pratyantardashaLord = "Desconhecido";
 
+  let dashaDates = {
+    mahadashaStart: `${birthYear - 5}-01-01`,
+    mahadashaEnd: `${birthYear + 15}-12-31`,
+    antardashaStart: `${birthYear - 5}-01-01`,
+    antardashaEnd: `${birthYear + 15}-12-31`,
+    pratyantardashaStart: `${birthYear - 5}-01-01`,
+    pratyantardashaEnd: `${birthYear + 15}-12-31`,
+    nextMahadasha: "Desconhecido",
+    nextMahadashaStart: `${birthYear + 15}-12-31`,
+    nextAntardasha: "Desconhecido",
+    nextAntardashaStart: `${birthYear + 15}-12-31`,
+    nextPratyantardasha: "Desconhecido",
+    nextPratyantardashaStart: `${birthYear + 15}-12-31`
+  };
+
+  // ProKerala dasha-periods responde com data.dasha_periods ou data.vimshottari_dasha
+  const dashaRoot = rawDashaRes?.data?.dasha_periods
+    || rawDashaRes?.data?.vimshottari_dasha
+    || rawDashaRes?.data?.dasha
+    || rawDashaRes?.data;
+
+  // dashaRoot precisa ser um array de objetos com campo .antardasha
+  const isValidDashaArray = Array.isArray(dashaRoot) && dashaRoot.length > 0 && dashaRoot[0]?.antardasha;
+  console.log(`[DEBUG] dashaRoot keys: ${JSON.stringify(rawDashaRes?.data ? Object.keys(rawDashaRes.data) : null)}`);
+
+  if (isValidDashaArray) {
+    const dashaData = dashaRoot;
+    console.log(`[DEBUG] Dasha data disponível: ${dashaData.length} períodos principais`);
+    
+    // Calcula Dashas via Vimshottari a partir do dasha_balance (mais confiável que as datas/ordem da API)
+    const dashaBalance = rawDashaRes?.data?.dasha_balance;
+    if (dashaBalance?.lord?.name && dashaBalance?.duration) {
+      const birthDateObj = new Date(birthData.birthDate);
+      const calculated = calculateVimshottariDasha(birthDateObj, dashaBalance.lord.name, dashaBalance.duration, currentDate);
+      mahadashaLord = calculated.mahadasha;
+      antardashaLord = calculated.antardasha;
+      pratyantardashaLord = calculated.pratyantardasha;
+      dashaDates = {
+        mahadashaStart: calculated.mahadashaStart,
+        mahadashaEnd: calculated.mahadashaEnd,
+        antardashaStart: calculated.antardashaStart,
+        antardashaEnd: calculated.antardashaEnd,
+        nextAntardasha: calculated.nextAntardasha,
+        nextAntardashaStart: calculated.nextAntardashaStart,
+        pratyantardashaStart: calculated.pratyantardashaStart,
+        pratyantardashaEnd: calculated.pratyantardashaEnd,
+        nextMahadasha: calculated.nextMahadasha,
+        nextMahadashaStart: calculated.nextMahadashaStart,
+        nextPratyantardasha: calculated.nextPratyantardasha,
+        nextPratyantardashaStart: calculated.nextPratyantardashaStart
+      };
+      console.log(`[DEBUG] Dasha calculada via balance: Mahadasha=${mahadashaLord}, Antardasha=${antardashaLord}, Pratyantardasha=${pratyantardashaLord}`);
+    } else {
+      // Fallback: usa as datas da API diretamente
+      for (const maha of dashaData) {
+        const mahaStart = new Date(maha.start);
+        const mahaEnd = new Date(maha.end);
+        if (currentDate >= mahaStart && currentDate <= mahaEnd) {
+          mahadashaLord = translatePlanetName(maha.name || maha.planet);
+          antardashaLord = getVimshottariSubLord(mahaStart, mahaEnd, mahadashaLord, currentDate, false);
+          const antarStartIdx = VIMSHOTTARI_ORDER.indexOf(mahadashaLord);
+          const mahaDurationMs = mahaEnd.getTime() - mahaStart.getTime();
+          let acc = 0;
+          for (let i = 0; i < VIMSHOTTARI_ORDER.length; i++) {
+            const p = VIMSHOTTARI_ORDER[(antarStartIdx + i) % VIMSHOTTARI_ORDER.length];
+            const dur = (VIMSHOTTARI_YEARS[p] / 120) * mahaDurationMs;
+            if (currentDate.getTime() >= mahaStart.getTime() + acc && currentDate.getTime() < mahaStart.getTime() + acc + dur) {
+              const antarStart = new Date(mahaStart.getTime() + acc);
+              const antarEnd = new Date(mahaStart.getTime() + acc + dur);
+              pratyantardashaLord = getVimshottariSubLord(antarStart, antarEnd, antardashaLord, currentDate, true, antarStart, antarEnd);
+              break;
+            }
+            acc += dur;
+          }
+          break;
+        }
+      }
+    }
+  } else {
+    console.warn("[DEBUG] Dasha data não disponível na resposta da API ProKerala");
+  }
+
+  console.log(`[VALIDAÇÃO DASHA] Extraído para ${currentDateStr}: Mahadasha=${mahadashaLord}, Antardasha=${antardashaLord}, Pratyantardasha=${pratyantardashaLord}`);
+  
   const vedicTiming: VedicTiming = {
-    mahadasha: dashaLords[dashaIndex],
-    antardasha: dashaLords[subDashaIndex],
-    pratyantardasha: dashaLords[subSubDashaIndex],
+    mahadasha: mahadashaLord,
+    mahadashaNakshatra: getDashaLordNakshatra(mahadashaLord, vedicPlanets),
+    mahadashaStart: dashaDates.mahadashaStart,
+    mahadashaEnd: dashaDates.mahadashaEnd,
+    antardasha: antardashaLord,
+    antardashaNakshatra: getDashaLordNakshatra(antardashaLord, vedicPlanets),
+    antardashaStart: dashaDates.antardashaStart,
+    antardashaEnd: dashaDates.antardashaEnd,
+    pratyantardasha: pratyantardashaLord,
+    pratyantardashaNakshatra: getDashaLordNakshatra(pratyantardashaLord, vedicPlanets),
+    pratyantardashaStart: dashaDates.pratyantardashaStart,
+    pratyantardashaEnd: dashaDates.pratyantardashaEnd,
+    nextMahadasha: dashaDates.nextMahadasha,
+    nextMahadashaStart: dashaDates.nextMahadashaStart,
+    nextAntardasha: dashaDates.nextAntardasha,
+    nextAntardashaStart: dashaDates.nextAntardashaStart,
+    nextPratyantardasha: dashaDates.nextPratyantardasha,
+    nextPratyantardashaStart: dashaDates.nextPratyantardashaStart,
     startDate: `${birthYear - 5}-01-01`,
     endDate: `${birthYear + 15}-12-31`
   };
@@ -1170,25 +1872,8 @@ export async function fetchAstrologicalData(
       d10Dasamsa[name] = SIGNS_PT[dasamsaIndex];
     });
 
-  // 9. Slow Planets Transits (Tropical)
-  const slowPlanetsList = ["Júpiter", "Saturno", "Urano", "Netuno", "Plutão", "Nodo Norte", "Nodo Sul"];
-  const currentYear = new Date(currentDateStr).getFullYear();
-  const tropicalTransits: TropicalTransit[] = slowPlanetsList.map((planet, index) => {
-    const transSeed = currentYear + index * 41;
-    const transitSign = SIGNS_PT[transSeed % 12];
-    const transitDegree = Math.round(((transSeed % 300) / 10) * 100) / 100;
-    const transitHouse = (transSeed % 12) + 1;
-    const aspectOptions = ["Trígono", "Quadratura", "Oposição", "Conjunção", "Sêxtil"];
-    const chosenAspect = aspectOptions[transSeed % aspectOptions.length];
-
-    return {
-      planet,
-      transitSign,
-      transitDegree,
-      transitHouse,
-      aspectToNatal: `${chosenAspect} com ${translatePlanetName(planetNamesBase[index % planetNamesBase.length])} Natal`
-    };
-  });
+  // 9. Tropical transits: calculados pelo motor interno (transitEngine.ts) no endpoint
+  const tropicalTransits: TropicalTransit[] = [];
 
   return {
     birthData,
@@ -1318,6 +2003,7 @@ export interface VisualStateHouseItem {
   id: number;
   state: 'tropical-active' | 'vedic-active' | 'intersect-active' | 'inactive';
   element: 'fire' | 'earth' | 'air' | 'water';
+  sign: string;
   elementClass: string;
   stateClass: string;
 }
@@ -1397,12 +2083,13 @@ export function calculateVisualState(profile: CompleteAstrologicalProfile): Visu
     else if (waterSigns.includes(sign)) element = 'water';
 
     const elementClass = `element-${element}`;
-    const stateClass = state === 'intersect-active' ? 'state-intersect' : state === 'tropical-active' ? 'state-tropical' : state === 'vedic-active' ? 'state-vedic' : '';
+    const stateClass = state === 'intersect-active' ? 'state-intersect' : state === 'tropical-active' ? 'state-tropical' : state === 'vedic-active' ? 'state-vedic' : 'state-inactive';
 
     houses.push({
       id: h,
       state,
       element,
+      sign,
       elementClass,
       stateClass
     });

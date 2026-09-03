@@ -7,23 +7,42 @@
 }
 
 :root {
-  --color-terracotta: #C78B73; /* Fogo - Ação, Vontade */
-  --color-sage: #9DB08E;       /* Terra - Estrutura, Prática */
-  --color-mineral: #7A9EB1;    /* Ar - Intelecto, Visão */
-  --color-sand: #D1BFAE;       /* Água - Emoção, Fluidez */
+  --color-terracotta: #aa684a; /* Fogo - Ação, Vontade */
+  --color-sage: #898e80;       /* Terra - Estrutura, Prática */
+  --color-mineral: #277e92;    /* Água - Emoção, Intuição (azul mineral) */
+  --color-sand: #7c728b;       /* Ar - Comunicação, Conexão (areia sutil) */
   --color-cosmic: #705680;     /* Púrpura - Tensão/Alma */
   --color-lavender: #A38EB0;   /* Lavanda - Interseção/Harmonia */
 }
 
 /* Classes para os elementos das Casas */
 .house {
-  fill: transparent;
-  fill-opacity: 0;
   stroke: transparent;
   transition: all 0.3s ease-in-out;
 }
 
-/* Somente aplica a cor quando estiver ativo (tropical, vedic, intersect) ou clicado (active) */
+/* Cor base: vem do signo da cúspide tropical. A opacidade é controlada pelos estados de presença de planetas. */
+.house {
+  fill-opacity: 0.08;
+}
+
+.house.element-fire {
+  fill: var(--color-terracotta);
+}
+
+.house.element-earth {
+  fill: var(--color-sage);
+}
+
+.house.element-air {
+  fill: var(--color-sand);
+}
+
+.house.element-water {
+  fill: var(--color-mineral);
+}
+
+/* Estados de opacidade sobre a cor da cúspide (tropical, vedic, intersect) ou destaque por clique (active) */
 .house.element-fire.state-tropical,
 .house.element-fire.state-vedic,
 .house.element-fire.state-intersect,
@@ -42,14 +61,14 @@
 .house.element-air.state-vedic,
 .house.element-air.state-intersect,
 .house.element-air.active {
-  fill: var(--color-mineral) !important;
+  fill: var(--color-sand) !important;
 }
 
 .house.element-water.state-tropical,
 .house.element-water.state-vedic,
 .house.element-water.state-intersect,
 .house.element-water.active {
-  fill: var(--color-sand) !important;
+  fill: var(--color-mineral) !important;
 }
 
 /* Classes para os estados das Casas */
@@ -57,12 +76,18 @@
   fill-opacity: 0.4 !important;
 }
 .house.state-vedic {
-  fill-opacity: 0.8 !important;
+  fill-opacity: 0.1 !important;
 }
 .house.state-intersect {
   fill-opacity: 1.0 !important;
   stroke: var(--color-lavender) !important;
   filter: drop-shadow(0 0 4px var(--color-lavender)) !important;
+}
+
+/* Casas vazias recebem a cor exata do fundo da página, criando a impressão de ausência de preenchimento */
+.house.state-inactive {
+  fill: #f4f1eb !important;
+  fill-opacity: 1 !important;
 }
 
 .house.active:not(.state-tropical):not(.state-vedic):not(.state-intersect) {

@@ -1,17 +1,37 @@
 import { ReadingData } from "../data/mockReadings";
 
+const normalizeCoherenceDashboard = (text: string): string => text
+  .replace(/\\n/g, "\n")
+  .replace(/\r\n/g, "\n")
+  .replace(/^\s*CHAVES DE COERÊNCIA\s*/i, "")
+  .replace(/\s*(?=(?:[1-7][️⃣]?\.\s*(?:Compasso Interno|Compasso Relacional|Compasso Kármico|Compasso da Realização|Compasso da Manifestação|Compasso da Transformação|Sombra e Escudo|Bússola Somática|Princípio Orientador|Virtude Nativa|Sabedoria da Alma|Pulso de Criação|Pulso de Consciência|Pulso de Assimilação|Pulso de Integração|Pulso de Transcendência|Pulso de Conexão|Pulso de Concretização|Pulso de Manifestação|Pulso de Transmutação|Código de Ancoragem):))/g, "\n\n")
+  .replace(/\s*(?=(?:👤\s*)?Sombra Primária:)/g, "\n")
+  .replace(/\s*(?=(?:🛡️\s*)?Escudo de Proteção:)/g, "\n")
+  .replace(/\s*(?=(?:🔴\s*)?Em desarmonia(?: \(Performando\))?:)/g, "\n")
+  .replace(/\s*(?=(?:🟢\s*)?Em harmonia(?: \(Autêntica\))?:)/g, "\n")
+  .replace(/\n{3,}/g, "\n\n")
+  .trim();
+
 export function parseGeminiAnalysis(markdown: string): Record<string, Partial<ReadingData>> {
   const result: Record<string, Partial<ReadingData>> = {};
   
   const mappings: Record<string, string> = {
-    "caminho-assimilacao": "Caminho de Assimilação",
-    "eixo-ic": "Caminho de Integração",
+    "caminho-assimilacao": "Caminho de Integração",
+    "eixo-ic": "Caminho de Consciência",
     "caminho-transformacao": "Caminho de Transformação",
     "eixo-asc": "Caminho da Autenticidade",
-    "caminho-manifestacao": "Caminho de Manifestação",
-    "eixo-mc": "Caminho de Realização",
+    "caminho-manifestacao": "Caminho da Manifestação",
+    "eixo-mc": "Caminho da Realização",
     "eixo-dsc": "Caminho de Reconexão"
   };
+
+  const normalizePathName = (name: string): string =>
+    name.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\b(de|da|do)\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
   // 1. Check if the response is a JSON string
   try {
@@ -29,8 +49,8 @@ export function parseGeminiAnalysis(markdown: string): Record<string, Partial<Re
           
           // Match with existing IDs
           const matchEntry = Object.entries(mappings).find(([_, mappedTitle]) => {
-            const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const normMapped = mappedTitle.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const normTitle = normalizePathName(title);
+            const normMapped = normalizePathName(mappedTitle);
             return normTitle.includes(normMapped) || normMapped.includes(normTitle);
           });
 
@@ -46,8 +66,11 @@ export function parseGeminiAnalysis(markdown: string): Record<string, Partial<Re
             integration: caminho.integracao || undefined,
             trap: caminho.armadilha || undefined,
             gift: caminho.dom || undefined,
+            coherenceDashboard: caminho.chaves_coerencia
+              ? normalizeCoherenceDashboard(caminho.chaves_coerencia)
+              : undefined,
             astrologicalSource: caminho.fonte_astrologica || undefined
-          };
+          } as any;
         }
         
         // Return structured result if we have parsed items successfully
@@ -72,8 +95,8 @@ export function parseGeminiAnalysis(markdown: string): Record<string, Partial<Re
     const title = headingLine.replace(/^##\s+/, "").trim();
 
     const matchEntry = Object.entries(mappings).find(([_, mappedTitle]) => {
-      const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const normMapped = mappedTitle.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const normTitle = normalizePathName(title);
+      const normMapped = normalizePathName(mappedTitle);
       return normTitle.includes(normMapped) || normMapped.includes(normTitle);
     });
 

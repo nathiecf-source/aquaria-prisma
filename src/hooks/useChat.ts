@@ -1,0 +1,105 @@
+import { useCallback, useState } from "react";
+
+export type ChatMessageRole = "user" | "bot";
+
+export interface ChatMessage {
+  role: ChatMessageRole;
+  text: string;
+  suggestions?: string[];
+  astrologicalSource?: string;
+  activationKeywords?: string;
+}
+
+export type ChartMode = "tropical" | "sidereal";
+
+export function useChat(userId: string | undefined) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [mode, setMode] = useState<ChartMode>("tropical");
+  const [error, setError] = useState<string | null>(null);
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!userId || !text.trim()) return;
+
+      const trimmedText = text.trim();
+      const userMsg: ChatMessage = { role: "user", text: trimmedText };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            message: trimmedText,
+            mode,
+            history: messages,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Erro ao consultar o oráculo.");
+        }
+
+        if (typeof data.remaining === "number") {
+          setRemaining(data.remaining);
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "bot",
+            text: data.answer,
+            suggestions: data.suggestions,
+            astrologicalSource: data.astrologicalSource,
+            activationKeywords: data.activationKeywords,
+          },
+        ]);
+      } catch (err: any) {
+        const message = err?.message || "Erro ao consultar o oráculo.";
+        setError(message);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "bot",
+            text: "Perdão, houve uma interferência em nossa conexão cósmica. Poderia tentar novamente?",
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [userId, mode, messages]
+  );
+
+  const reset = useCallback(() => {
+    setMessages([]);
+    setInput("");
+    setIsLoading(false);
+    setRemaining(null);
+    setMode("tropical");
+    setError(null);
+  }, []);
+
+  return {
+    messages,
+    input,
+    setInput,
+    isLoading,
+    remaining,
+    mode,
+    setMode,
+    error,
+    sendMessage,
+    reset,
+  };
+}

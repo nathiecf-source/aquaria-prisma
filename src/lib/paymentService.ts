@@ -1,45 +1,48 @@
 import { supabase } from "./supabaseClient";
 
 export interface CheckoutSessionOptions {
-  userId: string;
-  userEmail: string;
-  fullName: string;
+  planId: string;
+  couponCode?: string;
 }
 
-/**
- * Serviço de gateway de pagamentos (preparado para integração Stripe Checkout ou Pix).
- */
 export const paymentService = {
   /**
-   * Simula a criação de uma sessão de checkout.
-   * Em produção, isso bateria em uma API (/api/create-checkout-session) para retornar uma URL do Stripe.
-   * Aqui, simulamos o fluxo de sucesso dando upgrade direto no Supabase para 'PLUS' para testes rápidos!
+   * Cria uma sessão de checkout na InfinitePay.
+   * Requer `planId`: "annual-launch", "semester" ou "annual-official".
    */
-  async createCheckoutSession(options: CheckoutSessionOptions): Promise<{ url: string; success: boolean }> {
-    console.log(`[PaymentService] Inicializando checkout para o usuário ${options.userId} (${options.fullName})`);
-    
-    // Simula atraso na rede
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    try {
-      // Faz o upgrade direto do perfil do usuário para PLUS para fins de teste no MVP
-      const { error } = await supabase
-        .from("profiles")
-        .update({ subscription_tier: "PLUS", updated_at: new Date().toISOString() })
-        .eq("id", options.userId);
-        
-      if (error) {
-        throw error;
-      }
-      
-      console.log(`[PaymentService] Assinatura PLUS ativada com sucesso via simulação.`);
-      return {
-        url: "#payment-success",
-        success: true
-      };
-    } catch (err) {
-      console.error("[PaymentService] Erro ao atualizar nível de assinatura:", err);
-      throw err;
+  async createCheckoutSession(
+    options: CheckoutSessionOptions
+  ): Promise<{ url: string; order_nsu?: string; success: boolean }> {
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
+
+    if (!session?.access_token) {
+      throw new Error("Você precisa estar logada para prosseguir com o pagamento.");
     }
-  }
+
+    const response = await fetch("/api/checkout/infinitepay", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        planId: options.planId,
+        coupon_code: options.couponCode,
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}) as any);
+
+    if (!response.ok || !result.url) {
+      console.error("[PaymentService] Erro ao criar checkout:", result);
+      throw new Error(result.error || "Erro ao gerar link de pagamento.");
+    }
+
+    return {
+      url: result.url,
+      order_nsu: result.order_nsu,
+      success: true,
+    };
+  },
 };

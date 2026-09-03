@@ -1,6 +1,9 @@
 import React, { useState } from "react";
+import { motion } from "motion/react";
 import { Star, Eye, EyeOff, Sparkles, Loader2, MessageSquare, ShieldCheck } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { Footer } from "./Footer";
+import GlobalBanner from "./GlobalBanner";
 
 interface AuthScreenProps {
   onAuthSuccess: (session: any) => void;
@@ -73,6 +76,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                 full_name: fullName,
                 whatsapp_number: whatsappNumber,
                 subscription_tier: "FREE",
+                has_access: false,
+                access_expires_at: null,
                 updated_at: new Date().toISOString()
               });
             if (profileError) console.warn("Erro ao registrar perfil adicional:", profileError);
@@ -118,6 +123,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
   return (
     <div className="min-h-screen bg-[#f4f1eb] flex flex-col items-center justify-center p-4 text-[#3c352d] font-sans selection:bg-[#5c4d66]/15 selection:text-[#5c4d66]">
+      <GlobalBanner />
       
       {/* Dynamic Environment Indicator */}
       <div className="mb-6 flex items-center gap-2 px-3 py-1.5 bg-white border border-[#e6e2d8] rounded-full text-[10px] tracking-wider uppercase font-mono text-[#8c7f70] shadow-sm">
@@ -131,11 +137,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         <Star className="absolute bottom-6 left-6 w-3 h-3 text-[#a37c5c]/10" />
 
         <div className="text-center mb-8">
-          <div className="inline-flex p-3 bg-[#5c4d66]/10 rounded-full border border-[#5c4d66]/20 mb-3">
-            <Star className="w-6 h-6 text-[#5c4d66]" />
-          </div>
+          <motion.img
+            src="/logo.png"
+            alt="AQUAR.IA"
+            className="w-20 h-20 object-contain mx-auto mb-3"
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          />
           <h1 className="text-2xl font-serif tracking-[0.2em] uppercase text-[#3c352d]">AQUAR.IA</h1>
-          <p className="text-[#8c7f70] text-xs font-mono tracking-widest uppercase mt-1">Portal Astrológico</p>
+          <p className="text-[#8c7f70] text-xs font-mono tracking-widest uppercase mt-1">Prisma Astrológico</p>
         </div>
 
         {/* Tab Controls */}
@@ -246,7 +256,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full mt-4 bg-[#5c4d66] hover:bg-[#483c52] disabled:bg-[#5c4d66]/40 text-white py-3.5 rounded-lg font-sans text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-sm active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full mt-4 bg-[#2B3C5C] hover:bg-[#22304a] disabled:bg-[#2B3C5C]/40 text-white py-3.5 rounded-lg font-sans text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-sm active:scale-[0.98] flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <>
@@ -261,9 +271,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-[10px] text-[#8c7f70] uppercase tracking-wider font-mono">
-          © AQUAR.IA • Arquitetura do Destino Sideral
-        </div>
+        <Footer />
       </div>
     </div>
   );

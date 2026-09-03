@@ -6,3 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+data/
+*.err
+assets/
+/*.cjs
+/*.mjs
+clear_cache.sql
+sql-script.sql
+project.tar.gz
+metadata.json
+supabase/.temp/

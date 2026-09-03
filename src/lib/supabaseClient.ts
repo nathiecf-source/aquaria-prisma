@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-let supabaseUrlRaw = ((import.meta as any).env.VITE_SUPABASE_URL || '').trim();
+// Try to get from import.meta.env (Vite) first, then fallback to process.env (Node.js)
+let supabaseUrlRaw = ((import.meta as any).env?.VITE_SUPABASE_URL || '').trim();
 if (supabaseUrlRaw) {
   try {
     const urlObj = new URL(supabaseUrlRaw);
@@ -16,7 +17,7 @@ if (supabaseUrlRaw) {
   }
 }
 const supabaseUrl = supabaseUrlRaw;
-const supabaseAnonKey = ((import.meta as any).env.VITE_SUPABASE_ANON_KEY || '').trim();
+const supabaseAnonKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim();
 
 const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
@@ -94,6 +95,8 @@ if (!supabaseClientInstance) {
           full_name: options?.data?.full_name || 'Usuário de Teste',
           whatsapp_number: options?.data?.whatsapp_number || '',
           subscription_tier: 'FREE',
+          has_access: false,
+          access_expires_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -128,6 +131,8 @@ if (!supabaseClientInstance) {
             full_name: 'Usuário de Teste',
             whatsapp_number: '+55 11 99999-9999',
             subscription_tier: 'FREE',
+            has_access: false,
+            access_expires_at: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -161,6 +166,8 @@ if (!supabaseClientInstance) {
                       full_name: 'Usuário de Teste',
                       whatsapp_number: '+55 11 99999-9999',
                       subscription_tier: 'FREE',
+                      has_access: false,
+                      access_expires_at: null,
                       created_at: new Date().toISOString(),
                       updated_at: new Date().toISOString()
                     };
@@ -204,3 +211,28 @@ if (!supabaseClientInstance) {
 }
 
 export const supabase = supabaseClientInstance;
+
+// Intercepta fetchs para /api e injeta o token de acesso automaticamente
+// quando o header Authorization ainda não foi fornecido.
+if (typeof window !== "undefined" && (window as any).fetch) {
+  const originalFetch = (window as any).fetch.bind(window);
+  (window as any).fetch = async (input: any, init?: any) => {
+    try {
+      const url = typeof input === "string" ? input : input?.url;
+      if (typeof url === "string" && url.startsWith("/api")) {
+        const { data } = await supabase.auth.getSession();
+        const token = data?.session?.access_token;
+        if (token) {
+          const headers = new Headers(init?.headers);
+          if (!headers.has("Authorization") || !headers.get("Authorization")) {
+            headers.set("Authorization", `Bearer ${token}`);
+          }
+          return await originalFetch(input, { ...init, headers });
+        }
+      }
+    } catch (err) {
+      console.warn("[fetch] Não foi possível injetar token:", err);
+    }
+    return await originalFetch(input, init);
+  };
+}

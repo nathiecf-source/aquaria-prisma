@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Compass, Sparkles } from "lucide-react";
+import { Star } from "lucide-react";
 
 export default function LoadingScreen() {
   const [stepIndex, setStepIndex] = useState(0);
@@ -43,18 +43,22 @@ export default function LoadingScreen() {
           className="absolute inset-6 border border-[#5c4d66]/15 rounded-full"
         />
 
-        {/* Inner rotating compass */}
-        <div className="p-5 bg-[#f4f1eb] rounded-full shadow-[0_10px_30px_rgba(74,63,53,0.08)] border border-[#8c7f70]/10 flex items-center justify-center relative z-10">
-          <Compass className="w-10 h-10 text-[#8c6239] stroke-[1.15] animate-pulse" />
+        {/* Central logo */}
+        <div className="relative z-10">
+          <img
+            src="/logo.png"
+            alt="AQUAR.IA"
+            className="w-16 h-16 object-contain"
+          />
         </div>
 
-        {/* Little sparks orbit */}
+        {/* Orbiting star */}
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
           className="absolute w-full h-full flex items-start justify-center"
         >
-          <Sparkles className="w-3.5 h-3.5 text-[#5c4d66] -mt-1.5" />
+          <Star className="w-3.5 h-3.5 text-[#8c6239] -mt-1.5" />
         </motion.div>
       </div>
 
