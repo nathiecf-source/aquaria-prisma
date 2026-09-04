@@ -52,7 +52,12 @@ export interface UpcomingEvent {
 export interface NatalHouseMatch {
   house: number;
   sign: string;
-  cuspDegree: number;
+  cuspDegree: number;       // grau dentro do signo (para exibição)
+  cuspLongitude: number;    // longitude absoluta da cúspide
+  nextCuspHouse?: number;   // próxima casa em ordem zodiacal
+  nextCuspSign?: string;
+  nextCuspDegree?: number;
+  nextCuspLongitude?: number;
   ruler: string;
 }
 
@@ -389,19 +394,27 @@ export function getHouseForLongitude(
 
   const sorted = withLongitude.sort((a, b) => a.absoluteDegree - b.absoluteDegree);
 
-  let match = sorted[sorted.length - 1];
-  for (const h of sorted) {
-    if (h.absoluteDegree <= normalizedLon) {
-      match = h;
+  let matchIndex = sorted.length - 1;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].absoluteDegree <= normalizedLon) {
+      matchIndex = i;
     } else {
       break;
     }
   }
 
+  const match = sorted[matchIndex];
+  const next = sorted[(matchIndex + 1) % sorted.length];
+
   return {
     house: match.house,
-    sign: match.sign || SIGN_NAMES[Math.floor(match.cuspDegree / 30)],
+    sign: match.sign || SIGN_NAMES[Math.floor(match.cuspDegree / 30)] || "?",
     cuspDegree: match.cuspDegree,
+    cuspLongitude: match.absoluteDegree,
+    nextCuspHouse: next?.house,
+    nextCuspSign: next?.sign || SIGN_NAMES[Math.floor(next?.cuspDegree / 30)] || "?",
+    nextCuspDegree: next?.cuspDegree,
+    nextCuspLongitude: next?.absoluteDegree,
     ruler: match.ruler || "?",
   };
 }

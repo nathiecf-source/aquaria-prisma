@@ -22,7 +22,11 @@ export async function generateChatResponse(
   history: ChatMessage[] = [],
   transitContext?: TransitContext
 ): Promise<ChatApiResponse> {
-  const contextText = formatNatalContext(profile, mode, userName);
+  // Eventos cósmicos são sempre calculados em referencial tropical.
+  // Forçar o contexto natal tropical evita que o modelo se confunda
+  // com dados sidereal, que não incluem cúspides de casas.
+  const effectiveMode: ChartMode = transitContext ? "tropical" : mode;
+  const contextText = formatNatalContext(profile, effectiveMode, userName);
 
   let transitContextText: string | undefined;
   let eventHouseNumber: number | undefined;
@@ -39,12 +43,19 @@ export async function generateChatResponse(
         ? `${house.house}ª Casa do mapa natal (cúspide em ${house.sign} ${house.cuspDegree.toFixed(2)}°)`
         : "uma casa não identificada do mapa natal";
 
+      const cuspJustification = house && house.nextCuspHouse
+        ? `Justificativa: a longitude ${transitContext.longitude.toFixed(2)}° (${transitContext.sign}) está entre a cúspide absoluta da ${house.house}ª Casa (${house.cuspLongitude.toFixed(2)}° = ${house.sign} ${house.cuspDegree.toFixed(2)}°) e a cúspide absoluta da ${house.nextCuspHouse}ª Casa (${house.nextCuspLongitude?.toFixed(2)}° = ${house.nextCuspSign} ${house.nextCuspDegree?.toFixed(2)}°), portanto cai na ${house.house}ª Casa.`
+        : "";
+
       transitContextText = `A consulente está perguntando sobre o evento cósmico: "${transitContext.event}".`;
       transitContextText += `\nData aproximada: ${eventDate}.`;
       transitContextText += `\nO evento envolve ${transitContext.planet ? `o planeta ${transitContext.planet}` : "um corpo celeste"} em ${transitContext.sign}, longitude ${transitContext.longitude.toFixed(2)}°.`;
       transitContextText += `\nA CASA ASTROLÓGICA ATIVADA POR ESTE EVENTO É A ${houseDescription.toUpperCase()}.`;
+      if (cuspJustification) {
+        transitContextText += `\n${cuspJustification}`;
+      }
       transitContextText += `\n\nREGRA ABSOLUTA: a resposta deve tratar este trânsito como ativando EXCLUSIVAMENTE a ${eventHouseNumber ?? "?"}ª Casa do mapa natal.`;
-      transitContextText += ` Não escreva que o evento cai em outra casa, mesmo que o planeta evento forme aspectos com planetas natais localizados em outras casas.`;
+      transitContextText += ` Não escreva que o evento cai em outra casa, nem que ${transitContext.sign} ou qualquer signo subsequente esteja na Casa 10. A Casa 10 deste mapa é uma cúspide separada.`;
       transitContextText += ` As casas dos planetas natais aspectados são pano de fundo; a casa central e prioritária é sempre a ${eventHouseNumber ?? "?"}ª Casa.`;
       transitContextText += `\nFaça uma leitura terapêutica focada em como a energia deste evento ativa os temas dessa casa e signo, sem jargões esotéricos, com a abordagem analítica e aprofundada da Aquar.IA. Ao final, conclua com uma pergunta reflexiva que convide a consulente a perceber como esse movimento aparece no dia a dia.`;
 
@@ -68,7 +79,7 @@ export async function generateChatResponse(
     }
   }
 
-  const systemInstruction = buildChatSystemPrompt(userName, contextText, history, mode, transitContextText);
+  const systemInstruction = buildChatSystemPrompt(userName, contextText, history, effectiveMode, transitContextText);
 
   const formattedHistory = history
     .map((msg) => `${msg.role === "user" ? "Consulente" : "Aquar.IA"}: ${msg.text}`)
