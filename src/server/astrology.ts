@@ -34,7 +34,7 @@ export interface Aspect {
 
 export interface TropicalNatal {
   planets: PlanetPosition[];
-  houses: { house: number; cuspDegree: number; sign: string; ruler: string }[];
+  houses: { house: number; cuspDegree: number; longitude?: number; sign: string; ruler: string }[];
   aspects: Aspect[];
 }
 

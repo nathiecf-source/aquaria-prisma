@@ -370,19 +370,28 @@ export function getAllPlanetPositions(date: Date, quiet = true): Record<string, 
   return { ...slow, ...fast };
 }
 
-/** Retorna a casa natal onde uma longitude eclíptica cai. */
+/** Retorna a casa natal onde uma longitude eclíptica cai.
+ *  IMPORTANTE: `natalHouses` pode vir com `cuspDegree` como grau DENTRO do signo
+ *  e `longitude` como grau absoluto na eclíptica. A comparação DEVE usar `longitude`.
+ */
 export function getHouseForLongitude(
   longitude: number,
-  natalHouses: Array<{ house: number; cuspDegree: number; sign?: string; ruler?: string }>
+  natalHouses: Array<{ house: number; cuspDegree: number; longitude?: number; sign?: string; ruler?: string }>
 ): NatalHouseMatch | null {
   if (!natalHouses || natalHouses.length === 0) return null;
 
   const normalizedLon = ((longitude % 360) + 360) % 360;
-  const sorted = [...natalHouses].sort((a, b) => a.cuspDegree - b.cuspDegree);
+
+  const withLongitude = natalHouses.map((h) => ({
+    ...h,
+    absoluteDegree: typeof h.longitude === "number" ? h.longitude : h.cuspDegree,
+  }));
+
+  const sorted = withLongitude.sort((a, b) => a.absoluteDegree - b.absoluteDegree);
 
   let match = sorted[sorted.length - 1];
   for (const h of sorted) {
-    if (h.cuspDegree <= normalizedLon) {
+    if (h.absoluteDegree <= normalizedLon) {
       match = h;
     } else {
       break;

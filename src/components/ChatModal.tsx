@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, Send, FileDown, Loader2 } from "lucide-react";
+import Markdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { useChat, ChartMode, ChatMessage, TransitContext } from "../hooks/useChat";
 import { exportChatToPdf } from "../lib/chatPdfExport";
 
@@ -23,33 +25,46 @@ const TAB_LABELS: Record<ChatTab, string> = {
   ciclos: "Ciclos",
 };
 
-const TypedMessage: React.FC<{
-  text: string;
-  speed?: number;
-  onComplete: () => void;
-}> = ({ text, speed = 45, onComplete }) => {
-  const [displayed, setDisplayed] = useState("");
-  const wordsRef = useRef<string[]>(text.split(/(\s+)/));
-  const [index, setIndex] = useState(0);
-  const completedRef = useRef(false);
+/** Converte quebras de linha simples em hard-breaks do Markdown para preservá-las. */
+function preProcessForMarkdown(text: string): string {
+  return text.replace(/\n/g, "  \n");
+}
 
-  useEffect(() => {
-    if (index >= wordsRef.current.length) {
-      if (!completedRef.current) {
-        completedRef.current = true;
-        setDisplayed(text);
-        onComplete();
-      }
-      return;
-    }
-    const timer = setTimeout(() => {
-      setDisplayed((prev) => prev + wordsRef.current[index]);
-      setIndex((prev) => prev + 1);
-    }, speed);
-    return () => clearTimeout(timer);
-  }, [index, speed, text, onComplete]);
-
-  return <span>{displayed}</span>;
+const ChatMarkdown: React.FC<{ text: string }> = ({ text }) => {
+  return (
+    <div className="leading-relaxed">
+      <Markdown
+        rehypePlugins={[rehypeSanitize]}
+        components={{
+          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          strong: ({ children }) => (
+            <strong className="font-semibold text-[#4a3f35]">{children}</strong>
+          ),
+          em: ({ children }) => <em className="italic">{children}</em>,
+          br: () => <br />,
+          a: ({ children, href }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-[#8c6239] hover:text-[#4a3f35]"
+            >
+              {children}
+            </a>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>
+          ),
+          li: ({ children }) => <li className="mb-1">{children}</li>,
+        }}
+      >
+        {preProcessForMarkdown(text)}
+      </Markdown>
+    </div>
+  );
 };
 
 export const ChatModal: React.FC<ChatModalProps> = ({
@@ -81,7 +96,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [typedIndexes, setTypedIndexes] = useState<Set<number>>(new Set());
 
   const handleClose = () => {
     onClose();
@@ -91,7 +105,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       reset();
-      setTypedIndexes(new Set());
       setActiveTab("tropical");
       setSelectedEvent(null);
     }
@@ -99,7 +112,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesWithWelcome, typedIndexes]);
+  }, [messagesWithWelcome, isLoading]);
 
   useEffect(() => {
     if (activeTab === "ciclos" && events.length === 0) {
@@ -258,11 +271,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
           >
             {messagesWithWelcome.map((msg, idx) => {
               const isBot = msg.role === "bot";
-              const isLastBot =
-                isBot &&
-                idx ===
-                  messagesWithWelcome.map((m) => m.role).lastIndexOf("bot");
-              const shouldType = isLastBot && !typedIndexes.has(idx);
 
               return (
                 <div
@@ -276,19 +284,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                         : "bg-[#c5a880] text-[#4a3f35] rounded-tr-sm"
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">
-                      {isBot && shouldType ? (
-                        <TypedMessage
-                          text={msg.text}
-                          speed={40}
-                          onComplete={() =>
-                            setTypedIndexes((prev) => new Set(prev).add(idx))
-                          }
-                        />
-                      ) : (
-                        msg.text
-                      )}
-                    </div>
+                    <ChatMarkdown text={msg.text} />
 
                     {isBot &&
                       (msg.astrologicalSource || msg.activationKeywords) && (
