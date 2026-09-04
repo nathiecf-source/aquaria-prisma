@@ -71,7 +71,8 @@ export function buildChatSystemPrompt(
   userName: string,
   contextText: string,
   history: ChatMessage[] = [],
-  mode: ChartMode = "tropical"
+  mode: ChartMode = "tropical",
+  transitContextText?: string
 ): string {
   const questionsToAvoidInstruction = buildQuestionsToAvoidInstruction(history);
 
@@ -136,5 +137,9 @@ export function buildChatSystemPrompt(
   const sideralInstruction = mode === "sidereal" ? SIDEREAL_PERSONA_INSTRUCTION.trim() : "";
   const modeSpecificInstructions = sideralInstruction ? `\n\n${sideralInstruction}` : "";
 
-  return `${baseSystemInstruction.trim()}${modeSpecificInstructions}\n\n--- CONTEXTO DO USUÁRIO ATUAL ---\n\nNome da consulente: ${userName || "Consulente"}\n\n${contextText}`;
+  const transitSection = transitContextText
+    ? `\n\n--- CONTEXTO DO EVENTO CÓSMICO ATUAL ---\n\n${transitContextText}`
+    : "";
+
+  return `${baseSystemInstruction.trim()}${modeSpecificInstructions}\n\n--- CONTEXTO DO USUÁRIO ATUAL ---\n\nNome da consulente: ${userName || "Consulente"}\n\n${contextText}${transitSection}`;
 }

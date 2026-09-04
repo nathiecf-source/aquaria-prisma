@@ -12,6 +12,20 @@ export interface ChatMessage {
 
 export type ChartMode = "tropical" | "sidereal";
 
+export interface TransitContext {
+  event: string;
+  date: string;
+  type: "ingress" | "new_moon" | "full_moon" | "solar_eclipse" | "lunar_eclipse";
+  planet?: string;
+  sign: string;
+  longitude: number;
+}
+
+export interface SendMessageOptions {
+  transitContext?: TransitContext;
+  invisible?: boolean;
+}
+
 export function useChat(userId: string | undefined) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -19,15 +33,36 @@ export function useChat(userId: string | undefined) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [mode, setMode] = useState<ChartMode>("tropical");
   const [error, setError] = useState<string | null>(null);
+  const [events, setEvents] = useState<TransitContext[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+
+  const fetchEvents = useCallback(async () => {
+    setIsLoadingEvents(true);
+    try {
+      const res = await fetch("/api/chat/upcoming-events");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.events)) {
+        setEvents(data.events);
+      } else {
+        console.warn("[useChat] Resposta inesperada de /api/chat/upcoming-events:", data);
+      }
+    } catch (err: any) {
+      console.error("[useChat] Erro ao carregar eventos cósmicos:", err);
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  }, []);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, options?: SendMessageOptions) => {
       if (!userId || !text.trim()) return;
 
       const trimmedText = text.trim();
       const userMsg: ChatMessage = { role: "user", text: trimmedText };
 
-      setMessages((prev) => [...prev, userMsg]);
+      if (!options?.invisible) {
+        setMessages((prev) => [...prev, userMsg]);
+      }
       setInput("");
       setIsLoading(true);
       setError(null);
@@ -41,6 +76,7 @@ export function useChat(userId: string | undefined) {
             message: trimmedText,
             mode,
             history: messages,
+            transitContext: options?.transitContext,
           }),
         });
 
@@ -88,6 +124,8 @@ export function useChat(userId: string | undefined) {
     setRemaining(null);
     setMode("tropical");
     setError(null);
+    setEvents([]);
+    setIsLoadingEvents(false);
   }, []);
 
   return {
@@ -99,6 +137,9 @@ export function useChat(userId: string | undefined) {
     mode,
     setMode,
     error,
+    events,
+    isLoadingEvents,
+    fetchEvents,
     sendMessage,
     reset,
   };

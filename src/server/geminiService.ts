@@ -563,8 +563,8 @@ export async function callGeminiWithRetry(
   maxRetries = 3,
   delayMs = 1500
 ): Promise<any> {
-  // Fallback chain: requested model -> gemini-1.5-flash -> gemini-1.5-flash-8b
-  const modelsToTry = Array.from(new Set([params.model, "gemini-1.5-flash", "gemini-1.5-flash-8b"]));
+  // Fallback chain: requested model -> gemini-3.5-flash-lite -> gemini-3.6-flash -> gemini-3.5-flash
+  const modelsToTry = Array.from(new Set([params.model, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]));
   const callParams = { ...params };
 
   for (const modelName of modelsToTry) {
@@ -932,7 +932,7 @@ Bússola Somática corrigida:`;
 
   try {
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
       config: { temperature: 0.2, maxOutputTokens: 1024 },
     });
@@ -1697,7 +1697,7 @@ Em todo o texto (reconhecimento e dom), use EXCLUSIVAMENTE o SIGNO TROPICAL dest
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: userMessage,
       config: {
         systemInstruction,
@@ -2073,7 +2073,7 @@ ${tropicalKnowledge}
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: userMessage,
       config: {
         systemInstruction,
@@ -2295,7 +2295,7 @@ B) SE A PONTUAÇÃO FOR BAIXA (${!isHigh ? "ESTE É O CASO ATUAL" : "NÃO É O C
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: `Por favor, gere a leitura da diretriz de força "${name}" com pontuação ${score} (${vetorType}) utilizando estritamente as diretrizes informadas e retorne no JSON Schema requerido.`,
       config: {
         systemInstruction,
@@ -2393,7 +2393,7 @@ ${MANTO_ESTELAR_RULE}`;
     const luaDataText = luaVedic ? `A Lua do usuário encontra-se no signo de ${luaVedic.sign} e na Nakshatra de ${luaVedic.nakshatra}.` : "";
 
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: `Gere exclusivamente a interpretação profunda da Lua de Nascimento "${birthPhase}" para o usuário no formato JSON requerido. Não gere conteúdo sobre outras fases lunares.\n\n${luaDataText}`, 
       config: {
         systemInstruction,
@@ -2549,7 +2549,7 @@ ${dignityToneNote}
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: userMessage,
       config: {
         systemInstruction,
@@ -2626,7 +2626,7 @@ ${MANTO_ESTELAR_RULE}`;
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: `Gere o JSON das Estrelas-Guias do usuário seguindo rigorosamente o schema e as diretrizes. Liste todos os planetas fornecidos.`,
       config: {
         systemInstruction,
@@ -2680,7 +2680,7 @@ Exemplos de Fidelidade de Tom:
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash", // Using flash-lite for fast tooltip response
+      model: "gemini-3.5-flash-lite", // Using flash-lite for fast tooltip response
       contents: `Explique o seguinte termo astrológico: ${term}`,
       config: {
         systemInstruction,
@@ -3098,7 +3098,7 @@ ${tensePlanets.length > 0 ? `Os pontos com 3 ou mais aspectos tensos (incluindo 
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: `Aplique as regras do PAPEL DO SISTEMA aos dados visuais abaixo e gere a Visão Geral em português, mantendo o formato com headings e bullets coloridos em HTML.\n\n${visualData}`,
       config: {
         systemInstruction,
@@ -3253,7 +3253,7 @@ Por favor, gere a leitura integrada e terapêutica baseada estritamente nesses d
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: promptInput,
       config: {
         systemInstruction,
@@ -3698,7 +3698,7 @@ Por favor, gere a leitura da Tríade do Tempo Cósmico baseada estritamente ness
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: promptInput,
       config: {
         systemInstruction,
@@ -3886,7 +3886,7 @@ ${sourceText}`;
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: `Gere o roteiro de meditação SSML conforme as instruções do sistema.`,
       config: {
         systemInstruction,
@@ -3972,7 +3972,7 @@ export async function generateHousePresenceQuestion(context: HouseSynthesisConte
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
       config: {
         temperature: 0.55,
@@ -4069,7 +4069,7 @@ export async function generateHouseMeditation(
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
       config: {
         temperature: 0.6,
@@ -4157,7 +4157,7 @@ export async function generateHouseMantra(domText: string): Promise<string> {
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
       config: {
         temperature: 0.65,
@@ -4267,7 +4267,7 @@ Use markdown simples com subtítulos em negrito. Não use listas. Não use emoji
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: "Gere a leitura do Regente do Ano seguindo estritamente as instruções do sistema.",
       config: {
         systemInstruction,
@@ -4384,7 +4384,7 @@ Ao longo da semana, observe os pensamentos sem precisar organizá-los de imediat
   try {
     const client = getGeminiClient();
     const response = await callGeminiWithRetry(client, {
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: "Escreva a leitura das ativações listadas seguindo os blocos 'A Ativação' e 'Prática de presença'. A Ativação é descrição pura, sem instrução. A Prática de presença é um convite poético para parar e observar o movimento ao longo da semana, terminando com o efeito relacional/espelhado. Imitando a densidade e cadência dos exemplos padrão-ouro.",
       config: {
         systemInstruction,

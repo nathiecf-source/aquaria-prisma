@@ -196,7 +196,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                   placeholder="(11) 99999-9999"
                 />
                 <span className="text-[9px] text-[#8c7f70] mt-1 block leading-relaxed font-light">
-                  Para o envio do seu PDF astrológico e atualizações exclusivas de trânsitos planetários.
+                  Para receber seu manual astrológico da Aquar.IA.
                 </span>
               </div>
             </>

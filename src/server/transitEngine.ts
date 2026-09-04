@@ -21,8 +21,14 @@ function getRitmoTempo(planeta: string): string {
   if (["Saturno", "Júpiter"].includes(planeta)) {
     return "Médio prazo (semanas a meses). Um ciclo de maturação e ajuste de rota, pedindo responsabilidade e observação.";
   }
-  if (planeta === "Marte") {
+  if (["Marte"].includes(planeta)) {
     return "Curto prazo (dias a semanas). Um gatilho de ação e tensão muscular que exige presença e direcionamento.";
+  }
+  if (planeta === "Lua") {
+    return "Muito curto prazo (horas a 2-3 dias). Um pulso emocional que aciona e dissipa rapidamente.";
+  }
+  if (["Mercúrio", "Vênus"].includes(planeta)) {
+    return "Curto a médio prazo (dias a poucas semanas). Um movimento social, mental ou relacional que reorganiza o campo.";
   }
   // Sol
   return "Curto prazo (~7 dias). Um foco de luz que ilumina a área natal com intensidade passageira e integrativa.";
@@ -32,6 +38,22 @@ export interface TransitPayload {
   transitos_estruturais: TransitAspect[];  // Júpiter, Saturno, Urano, Netuno, Plutão
   transitos_dinamicos: TransitAspect[];    // Sol e Marte
   calculado_em: string;
+}
+
+export interface UpcomingEvent {
+  event: string;
+  date: string; // ISO date string
+  type: "ingress" | "new_moon" | "full_moon" | "solar_eclipse" | "lunar_eclipse";
+  planet?: string;
+  sign: string;
+  longitude: number;
+}
+
+export interface NatalHouseMatch {
+  house: number;
+  sign: string;
+  cuspDegree: number;
+  ruler: string;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -47,6 +69,13 @@ export const DYNAMIC_PLANETS    = ["Sol", "Marte"];
 
 // Planetas natais ALVO: Sol → Saturno (excluídos: Urano, Netuno, Plutão natais)
 export const NATAL_PLANETS_ALLOWED = ["Sol", "Lua", "Mercúrio", "Vênus", "Marte", "Júpiter", "Saturno"];
+
+// Chat: todos os planetas podem ser gatilhos de trânsito, incluindo os rápidos
+export const CHAT_TRANSIT_PLANETS_ALLOWED = ["Sol", "Lua", "Mercúrio", "Vênus", "Marte", "Júpiter", "Saturno", "Urano", "Netuno", "Plutão"];
+
+// Chat: dinâmicos incluem os rápidos; estruturais são os lentos
+export const CHAT_DYNAMIC_PLANETS    = ["Sol", "Lua", "Mercúrio", "Vênus", "Marte"];
+export const CHAT_STRUCTURAL_PLANETS = ["Júpiter", "Saturno", "Urano", "Netuno", "Plutão"];
 
 const ASPECT_TARGETS = [
   { nome: "Conjunção" as const, centro: 0 },
@@ -67,6 +96,10 @@ function normalize(s: string): string {
 const TRANSIT_ALLOWED_NORM = new Set(TRANSIT_PLANETS_ALLOWED.map(normalize));
 const NATAL_ALLOWED_NORM   = new Set(NATAL_PLANETS_ALLOWED.map(normalize));
 const STRUCTURAL_NORM      = new Set(STRUCTURAL_PLANETS.map(normalize));
+
+const CHAT_TRANSIT_ALLOWED_NORM = new Set(CHAT_TRANSIT_PLANETS_ALLOWED.map(normalize));
+const CHAT_DYNAMIC_NORM         = new Set(CHAT_DYNAMIC_PLANETS.map(normalize));
+const CHAT_STRUCTURAL_NORM      = new Set(CHAT_STRUCTURAL_PLANETS.map(normalize));
 
 function getPlutoLongitude(jde: number): number {
   // Plutão geocêntrico tropical — interpolação linear calibrada com JPL Horizons
@@ -93,7 +126,7 @@ function getGeoLon(planet: any, earth: any, jde: number): number {
   return (((Math.atan2(py - ey, px - ex) * 180 / Math.PI) + 360) % 360);
 }
 
-export function getTropicalTransitDegrees(date: Date): Record<string, number> {
+export function getTropicalTransitDegrees(date: Date, quiet = false): Record<string, number> {
   const jde = julian.CalendarGregorianToJD(
     date.getFullYear(),
     date.getMonth() + 1,
@@ -124,10 +157,12 @@ export function getTropicalTransitDegrees(date: Date): Record<string, number> {
     Plutão:   getPlutoLongitude(jde),
   };
 
-  console.log("[TRANSIT ENGINE] Posições tropicais calculadas para", date.toISOString().split("T")[0]);
-  for (const [name, deg] of Object.entries(positions)) {
-    const sign = SIGN_NAMES[Math.floor(deg / 30)];
-    console.log(`  ${name.padEnd(10)}: ${deg.toFixed(2)}°  (${sign} ${(deg % 30).toFixed(1)}°)`);
+  if (!quiet) {
+    console.log("[TRANSIT ENGINE] Posições tropicais calculadas para", date.toISOString().split("T")[0]);
+    for (const [name, deg] of Object.entries(positions)) {
+      const sign = SIGN_NAMES[Math.floor(deg / 30)];
+      console.log(`  ${name.padEnd(10)}: ${deg.toFixed(2)}°  (${sign} ${(deg % 30).toFixed(1)}°)`);
+    }
   }
 
   return positions;
@@ -168,40 +203,25 @@ export function getNatalDegrees(profile: any): NatalPlanet[] {
 
 // ─── Motor de aspectos ────────────────────────────────────────────────────────
 
-export function calculateAspects(
+function buildAspectPayload(
   transitDegrees: Record<string, number>,
-  natalPlanets: Array<{ name: string; longitude: number; casa?: number }>
+  natalPlanets: NatalPlanet[],
+  transitAllowedNorm: Set<string>,
+  natalAllowedNorm: Set<string>,
+  structuralNorm: Set<string>,
+  dynamicNorm: Set<string>,
+  label: string
 ): TransitPayload {
   const estruturais: TransitAspect[] = [];
   const dinamicos: TransitAspect[] = [];
   const seen = new Set<string>();
 
-  // Filtrar apenas planetas natais permitidos (Sol → Saturno), comparação normalizada
-  const filteredNatal = natalPlanets.filter(p => NATAL_ALLOWED_NORM.has(normalize(p.name)));
+  const filteredNatal = natalPlanets.filter(p => natalAllowedNorm.has(normalize(p.name)));
 
-  console.log("[TRANSIT ENGINE] Natais após filtro permitido:", filteredNatal.map(p => p.name));
-
-  // ── [DEBUG MARTE] — log isolado de distâncias para o alvo Marte natal ──────
-  const marteNatal = filteredNatal.find(p => normalize(p.name) === "marte");
-  if (marteNatal) {
-    console.log("[DEBUG MARTE] Marte natal encontrado:", marteNatal.name, "@", marteNatal.longitude.toFixed(4), "° Casa", marteNatal.casa ?? "?");
-    for (const [tp, tdeg] of Object.entries(transitDegrees)) {
-      const diff = Math.abs(tdeg - marteNatal.longitude) % 360;
-      const dist = diff > 180 ? 360 - diff : diff;
-      const nearestAspect = ASPECT_TARGETS.reduce((best, a) => {
-        const o = Math.abs(dist - a.centro);
-        return o < best.orb ? { name: a.nome, orb: o } : best;
-      }, { name: "nenhum", orb: 999 });
-      console.log(`[DEBUG MARTE]   ${tp.padEnd(10)} trânsito@${tdeg.toFixed(2)}°  dist=${dist.toFixed(4)}°  aspecto_mais_próximo=${nearestAspect.name}(orb=${nearestAspect.orb.toFixed(4)}°)  dentro_da_orbe=${nearestAspect.orb <= ORB}`);
-    }
-  } else {
-    console.log("[DEBUG MARTE] ATENÇÃO: Marte natal NÃO encontrado na lista filtrada. Nomes disponíveis:", filteredNatal.map(p => `'${p.name}'`).join(", "));
-  }
-  // ────────────────────────────────────────────────────────────────────────────
+  console.log(`[TRANSIT ENGINE - ${label}] Natais após filtro:`, filteredNatal.map(p => p.name));
 
   for (const [transitPlanet, transitDeg] of Object.entries(transitDegrees)) {
-    // Garantia extra: só processa planetas em trânsito permitidos (comparação normalizada)
-    if (!TRANSIT_ALLOWED_NORM.has(normalize(transitPlanet))) continue;
+    if (!transitAllowedNorm.has(normalize(transitPlanet))) continue;
 
     for (const natal of filteredNatal) {
       const diff = Math.abs(transitDeg - natal.longitude) % 360;
@@ -224,9 +244,10 @@ export function calculateAspects(
             casa_natal: natal.casa,
             ritmo_tempo: getRitmoTempo(transitPlanet),
           };
-          if (STRUCTURAL_NORM.has(normalize(transitPlanet))) {
+
+          if (structuralNorm.has(normalize(transitPlanet))) {
             estruturais.push(entry);
-          } else {
+          } else if (dynamicNorm.has(normalize(transitPlanet))) {
             dinamicos.push(entry);
           }
         }
@@ -240,15 +261,69 @@ export function calculateAspects(
     calculado_em: new Date().toISOString(),
   };
 
-  console.log("[TRANSIT ENGINE] ── Payload estruturado ──────────────────────");
+  console.log(`[TRANSIT ENGINE - ${label}] ── Payload estruturado ──────────────────────`);
   console.log(JSON.stringify(payload, null, 2));
-  console.log("[TRANSIT ENGINE] ─────────────────────────────────────────────");
+  console.log(`[TRANSIT ENGINE - ${label}] ─────────────────────────────────────────────`);
 
   return payload;
 }
 
+export function calculateAspects(
+  transitDegrees: Record<string, number>,
+  natalPlanets: Array<{ name: string; longitude: number; casa?: number }>
+): TransitPayload {
+  const typedNatal = natalPlanets as NatalPlanet[];
+
+  // ── [DEBUG MARTE] — log isolado de distâncias para o alvo Marte natal ──────
+  const filteredForDebug = typedNatal.filter(p => NATAL_ALLOWED_NORM.has(normalize(p.name)));
+  const marteNatal = filteredForDebug.find(p => normalize(p.name) === "marte");
+  if (marteNatal) {
+    console.log("[DEBUG MARTE] Marte natal encontrado:", marteNatal.name, "@", marteNatal.longitude.toFixed(4), "° Casa", marteNatal.casa ?? "?");
+    for (const [tp, tdeg] of Object.entries(transitDegrees)) {
+      const diff = Math.abs(tdeg - marteNatal.longitude) % 360;
+      const dist = diff > 180 ? 360 - diff : diff;
+      const nearestAspect = ASPECT_TARGETS.reduce((best, a) => {
+        const o = Math.abs(dist - a.centro);
+        return o < best.orb ? { name: a.nome, orb: o } : best;
+      }, { name: "nenhum", orb: 999 });
+      console.log(`[DEBUG MARTE]   ${tp.padEnd(10)} trânsito@${tdeg.toFixed(2)}°  dist=${dist.toFixed(4)}°  aspecto_mais_próximo=${nearestAspect.name}(orb=${nearestAspect.orb.toFixed(4)}°)  dentro_da_orbe=${nearestAspect.orb <= ORB}`);
+    }
+  } else {
+    console.log("[DEBUG MARTE] ATENÇÃO: Marte natal NÃO encontrado na lista filtrada. Nomes disponíveis:", filteredForDebug.map(p => `'${p.name}'`).join(", "));
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
+  return buildAspectPayload(
+    transitDegrees,
+    typedNatal,
+    TRANSIT_ALLOWED_NORM,
+    NATAL_ALLOWED_NORM,
+    STRUCTURAL_NORM,
+    new Set(DYNAMIC_PLANETS.map(normalize)),
+    "Mandala"
+  );
+}
+
+export function calculateChatTransits(
+  natalChart: any,
+  targetDate: Date
+): TransitPayload {
+  const natalPlanets = getNatalDegrees({ tropical_natal: natalChart });
+  const transitDegrees = getAllPlanetPositions(targetDate);
+
+  return buildAspectPayload(
+    transitDegrees,
+    natalPlanets,
+    CHAT_TRANSIT_ALLOWED_NORM,
+    NATAL_ALLOWED_NORM,
+    CHAT_STRUCTURAL_NORM,
+    CHAT_DYNAMIC_NORM,
+    "Chat"
+  );
+}
+
 /** Posições tropicais geocêntricas dos planetas rápidos para uma data. */
-export function getFastTransitDegrees(date: Date): Record<string, number> {
+export function getFastTransitDegrees(date: Date, quiet = false): Record<string, number> {
   const jde = julian.CalendarGregorianToJD(
     date.getFullYear(),
     date.getMonth() + 1,
@@ -271,10 +346,12 @@ export function getFastTransitDegrees(date: Date): Record<string, number> {
     Marte:    getGeoLon(marsD,    earthD, jde),
   };
 
-  console.log("[TRANSIT ENGINE] Posições rápidas calculadas para", date.toISOString().split("T")[0]);
-  for (const [name, deg] of Object.entries(positions)) {
-    const sign = SIGN_NAMES[Math.floor(deg / 30)];
-    console.log(`  ${name.padEnd(10)}: ${deg.toFixed(2)}°  (${sign} ${(deg % 30).toFixed(1)}°)`);
+  if (!quiet) {
+    console.log("[TRANSIT ENGINE] Posições rápidas calculadas para", date.toISOString().split("T")[0]);
+    for (const [name, deg] of Object.entries(positions)) {
+      const sign = SIGN_NAMES[Math.floor(deg / 30)];
+      console.log(`  ${name.padEnd(10)}: ${deg.toFixed(2)}°  (${sign} ${(deg % 30).toFixed(1)}°)`);
+    }
   }
 
   return positions;
@@ -284,4 +361,158 @@ export function getFastTransitDegrees(date: Date): Record<string, number> {
 export function getCurrentTransitDegrees(date: Date): Record<string, number> {
   const all = { ...getTropicalTransitDegrees(date), ...getFastTransitDegrees(date) };
   return all;
+}
+
+/** Todas as posições tropicais geocêntricas (rápidas + lentas) para uma data. */
+export function getAllPlanetPositions(date: Date, quiet = true): Record<string, number> {
+  const slow = getTropicalTransitDegrees(date, quiet);
+  const fast = getFastTransitDegrees(date, quiet);
+  return { ...slow, ...fast };
+}
+
+/** Retorna a casa natal onde uma longitude eclíptica cai. */
+export function getHouseForLongitude(
+  longitude: number,
+  natalHouses: Array<{ house: number; cuspDegree: number; sign?: string; ruler?: string }>
+): NatalHouseMatch | null {
+  if (!natalHouses || natalHouses.length === 0) return null;
+
+  const normalizedLon = ((longitude % 360) + 360) % 360;
+  const sorted = [...natalHouses].sort((a, b) => a.cuspDegree - b.cuspDegree);
+
+  let match = sorted[sorted.length - 1];
+  for (const h of sorted) {
+    if (h.cuspDegree <= normalizedLon) {
+      match = h;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    house: match.house,
+    sign: match.sign || SIGN_NAMES[Math.floor(match.cuspDegree / 30)],
+    cuspDegree: match.cuspDegree,
+    ruler: match.ruler || "?",
+  };
+}
+
+/** Longitude média do nodo lunar (ascendente). Erro < 1° para o século XXI. */
+function getMeanLunarNode(jde: number): number {
+  const T = (jde - 2451545.0) / 36525; // séculos julianos desde J2000.0
+  let N = 125.044555 - 1934.1361849 * T + 0.0020756 * T * T - 0.00000215 * T * T * T;
+  return ((N % 360) + 360) % 360;
+}
+
+/** Varre os próximos `days` dias a partir de `startDate` e retorna eventos cósmicos maiores. */
+export function getUpcomingCosmicEvents(
+  startDate: Date = new Date(),
+  days: number = 30
+): UpcomingEvent[] {
+  const events: UpcomingEvent[] = [];
+  const stepDays = 0.5; // passo de 12h
+  const totalSteps = Math.ceil(days / stepDays);
+
+  const PLANETS_FOR_INGRESS = [
+    "Sol", "Mercúrio", "Vênus", "Marte", "Júpiter", "Saturno", "Urano", "Netuno", "Plutão"
+  ];
+
+  const msInDay = 1000 * 60 * 60 * 24;
+  const baseTime = startDate.getTime();
+
+  let previous: { date: Date; positions: Record<string, number>; phase: number } | null = null;
+
+  for (let i = 0; i <= totalSteps; i++) {
+    const currentDate = new Date(baseTime + i * stepDays * msInDay);
+    const positions = getAllPlanetPositions(currentDate);
+
+    // Fase lunar para detectar Lua Nova e Cheia
+    const moon = positions["Lua"] ?? 0;
+    const sun = positions["Sol"] ?? 0;
+    let phase = (moon - sun + 360) % 360;
+
+    if (previous) {
+      // ── Ingressos planetários (exceto Lua) ──
+      for (const planet of PLANETS_FOR_INGRESS) {
+        const prevLon = previous.positions[planet];
+        const currLon = positions[planet];
+        if (prevLon == null || currLon == null) continue;
+
+        const prevSignIdx = Math.floor(((prevLon % 360) + 360) % 360 / 30);
+        const currSignIdx = Math.floor(((currLon % 360) + 360) % 360 / 30);
+
+        if (prevSignIdx !== currSignIdx) {
+          const midpointDate = new Date((previous.date.getTime() + currentDate.getTime()) / 2);
+          const sign = SIGN_NAMES[currSignIdx];
+          const longitude = currSignIdx * 30; // aproximação na cúspide
+          events.push({
+            event: `${planet} entra em ${sign}`,
+            date: midpointDate.toISOString(),
+            type: "ingress",
+            planet,
+            sign,
+            longitude,
+          });
+        }
+      }
+
+      // ── Lua Nova e Cheia ──
+      const prevPhase = previous.phase;
+
+      // Cheia: fase cruza 180°
+      if (prevPhase < 180 && phase >= 180) {
+        const midpointDate = new Date((previous.date.getTime() + currentDate.getTime()) / 2);
+        const sign = SIGN_NAMES[Math.floor((sun + 180) % 360 / 30)];
+        const longitude = (sun + 180) % 360;
+        const node = getMeanLunarNode(julian.CalendarGregorianToJD(
+          midpointDate.getFullYear(), midpointDate.getMonth() + 1, midpointDate.getDate()
+        ));
+        const moonAtFull = (sun + 180) % 360;
+        const distToNode = Math.abs(((moonAtFull - node) % 360 + 360) % 360);
+        const isEclipse = distToNode < 12;
+        events.push({
+          event: isEclipse ? `Eclipse Lunar em ${sign}` : `Lua Cheia em ${sign}`,
+          date: midpointDate.toISOString(),
+          type: isEclipse ? "lunar_eclipse" : "full_moon",
+          planet: "Lua",
+          sign,
+          longitude,
+        });
+      }
+
+      // Nova: fase dá a volta em 360° (cruza 0)
+      if (prevPhase > phase && (prevPhase > 300 || phase < 60)) {
+        const midpointDate = new Date((previous.date.getTime() + currentDate.getTime()) / 2);
+        const sign = SIGN_NAMES[Math.floor(sun / 30)];
+        const longitude = sun % 360;
+        const node = getMeanLunarNode(julian.CalendarGregorianToJD(
+          midpointDate.getFullYear(), midpointDate.getMonth() + 1, midpointDate.getDate()
+        ));
+        const distToNode = Math.abs(((sun - node) % 360 + 360) % 360);
+        const isEclipse = distToNode < 12;
+        events.push({
+          event: isEclipse ? `Eclipse Solar em ${sign}` : `Lua Nova em ${sign}`,
+          date: midpointDate.toISOString(),
+          type: isEclipse ? "solar_eclipse" : "new_moon",
+          planet: isEclipse ? "Sol" : "Lua",
+          sign,
+          longitude,
+        });
+      }
+    }
+
+    previous = { date: currentDate, positions, phase };
+  }
+
+  // Remove duplicatas e ordena por data
+  const seen = new Set<string>();
+  const unique = events.filter(e => {
+    const key = `${e.type}|${e.planet}|${e.sign}|${e.date.slice(0, 10)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  unique.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return unique;
 }

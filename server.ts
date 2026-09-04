@@ -31,7 +31,7 @@ import { getPlanetGlyphConfig, PLANET_GLYPHS } from "./src/lib/planetGlyphs";
 import { synthesizeMeditation } from "./src/server/ttsService";
 import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
-import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects } from "./src/server/transitEngine";
+import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents } from "./src/server/transitEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -361,6 +361,7 @@ async function createApp(): Promise<express.Application> {
     "/checkout/infinitepay",
     "/coupons/validate",
     "/analytics/track",
+    "/chat/upcoming-events",
   ]);
 
   app.use("/api", (req: any, res: any, next: any) => {
@@ -387,25 +388,15 @@ async function createApp(): Promise<express.Application> {
         });
       }
 
-      const cleanEnv = (val: any): string | undefined => {
-        if (!val) return undefined;
-        const str = String(val).trim();
-        if (str === "" || str === "null" || str === "undefined") {
-          return undefined;
-        }
-        return str;
-      };
-
-      const tempUrl = cleanEnv(process.env.SUPABASE_URL) || cleanEnv(process.env.VITE_SUPABASE_URL);
-      const tempKey = cleanEnv(process.env.SUPABASE_ANON_KEY) || cleanEnv(process.env.VITE_SUPABASE_ANON_KEY) || cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
-
-      if (!tempUrl || !tempKey) {
+      // Como o middleware de auth já validou o token e userId,
+      // usamos service role para conseguir ler o chart mesmo com RLS
+      // limitando o acesso à linha do próprio usuário.
+      const tempSupabase = getSupabaseAdmin();
+      if (!tempSupabase) {
         return res.status(500).json({
           error: "Credenciais do Supabase não configuradas."
         });
       }
-
-      const tempSupabase = createClient(tempUrl, tempKey);
 
       const { data: chart, error } = await tempSupabase
         .from('user_chart')
@@ -414,6 +405,7 @@ async function createApp(): Promise<express.Application> {
         .single();
 
       if (error || !chart) {
+        console.log("[load-chart] Chart não encontrado para userId:", userId, error?.message || "");
         return res.json({ exists: false });
       }
 
@@ -751,10 +743,24 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
+  // API Route: Próximos eventos cósmicos para o chat
+  app.get("/api/chat/upcoming-events", async (req, res) => {
+    try {
+      const events = getUpcomingCosmicEvents(new Date(), 30);
+      return res.json({ events });
+    } catch (err: any) {
+      console.error("Erro ao calcular eventos cósmicos:", err);
+      return res.status(500).json({
+        error: "Erro ao calcular eventos cósmicos.",
+        details: err?.message || String(err),
+      });
+    }
+  });
+
   // API Route: Chat Astrológico — Oráculo Pessoal
   app.post("/api/chat", async (req, res) => {
     try {
-      const { userId, message, mode, history } = req.body;
+      const { userId, message, mode, history, transitContext } = req.body;
 
       if (!userId || typeof userId !== "string") {
         return res.status(400).json({ error: "userId é obrigatório." });
@@ -862,7 +868,8 @@ async function createApp(): Promise<express.Application> {
         astrologicalProfile,
         message.trim(),
         chartMode,
-        Array.isArray(history) ? history : []
+        Array.isArray(history) ? history : [],
+        transitContext || undefined
       );
 
       // Incrementa o contador
@@ -3246,10 +3253,6 @@ async function createApp(): Promise<express.Application> {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
-      define: {
-        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
-        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
-      },
     });
     app.use(vite.middlewares);
   } else if (!process.env.VERCEL) {
