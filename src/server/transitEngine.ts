@@ -1,5 +1,20 @@
 import { julian, planetposition, solar, moonposition } from "astronomia";
-import planetData from "astronomia/data";
+import * as planetDataRaw from "astronomia/data";
+
+// Compatibilidade: em build CJS o esbuild envolve o default do astronomia/data;
+// em ESM/dev o default já é o objeto com os dados.
+function resolveAstronomiaData(raw: any) {
+  const candidate = raw?.default ?? raw;
+  if (candidate && typeof candidate.vsop87Dearth === "object") {
+    return candidate;
+  }
+  if (raw?.default?.default && typeof raw.default.default.vsop87Dearth === "object") {
+    return raw.default.default;
+  }
+  return raw;
+}
+
+const planetData = resolveAstronomiaData(planetDataRaw);
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
