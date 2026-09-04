@@ -16,6 +16,39 @@ function resolveAstronomiaData(raw: any) {
 
 const planetData = resolveAstronomiaData(planetDataRaw);
 
+function normalizeAngle(angle: number): number {
+  return ((angle % 360) + 360) % 360;
+}
+
+function shortestDelta(from: number, to: number): number {
+  const d = normalizeAngle(to - from);
+  return d > 180 ? d - 360 : d;
+}
+
+/** Interpola linearmente a data em que a longitude cruza o alvo entre duas amostras. */
+function lerpCrossingDate(
+  prevDate: Date,
+  currDate: Date,
+  prevValue: number,
+  currValue: number,
+  target: number
+): Date {
+  const delta = shortestDelta(prevValue, currValue);
+  if (delta === 0) return new Date((prevDate.getTime() + currDate.getTime()) / 2);
+  let fraction = (shortestDelta(prevValue, target)) / delta;
+  if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) {
+    fraction = 0.5;
+  }
+  const t = prevDate.getTime() + fraction * (currDate.getTime() - prevDate.getTime());
+  return new Date(t);
+}
+
+/** Interpola linearmente a longitude de um ponto em uma data cruzada. */
+function lerpValue(prevValue: number, currValue: number, fraction: number): number {
+  const delta = shortestDelta(prevValue, currValue);
+  return normalizeAngle(prevValue + fraction * delta);
+}
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface TransitAspect {
@@ -479,16 +512,16 @@ export function getUpcomingCosmicEvents(
         const currSignIdx = Math.floor(((currLon % 360) + 360) % 360 / 30);
 
         if (prevSignIdx !== currSignIdx) {
-          const midpointDate = new Date((previous.date.getTime() + currentDate.getTime()) / 2);
+          const cusp = currSignIdx * 30;
+          const crossingDate = lerpCrossingDate(previous.date, currentDate, prevLon, currLon, cusp);
           const sign = SIGN_NAMES[currSignIdx];
-          const longitude = currSignIdx * 30; // aproximação na cúspide
           events.push({
             event: `${planet} entra em ${sign}`,
-            date: midpointDate.toISOString(),
+            date: crossingDate.toISOString(),
             type: "ingress",
             planet,
             sign,
-            longitude,
+            longitude: cusp,
           });
         }
       }
@@ -498,18 +531,23 @@ export function getUpcomingCosmicEvents(
 
       // Cheia: fase cruza 180°
       if (prevPhase < 180 && phase >= 180) {
-        const midpointDate = new Date((previous.date.getTime() + currentDate.getTime()) / 2);
-        const sign = SIGN_NAMES[Math.floor((sun + 180) % 360 / 30)];
-        const longitude = (sun + 180) % 360;
-        const node = getMeanLunarNode(julian.CalendarGregorianToJD(
-          midpointDate.getFullYear(), midpointDate.getMonth() + 1, midpointDate.getDate()
-        ));
-        const moonAtFull = (sun + 180) % 360;
+        const crossingDate = lerpCrossingDate(previous.date, currentDate, prevPhase, phase, 180);
+        const fraction = (crossingDate.getTime() - previous.date.getTime()) / (currentDate.getTime() - previous.date.getTime());
+        const sunAtCross = lerpValue(previous.positions["Sol"] ?? 0, sun, fraction);
+        const moonAtFull = (sunAtCross + 180) % 360;
+        const sign = SIGN_NAMES[Math.floor(moonAtFull / 30)];
+        const longitude = moonAtFull;
+        const jde = julian.CalendarGregorianToJD(
+          crossingDate.getFullYear(),
+          crossingDate.getMonth() + 1,
+          crossingDate.getDate() + crossingDate.getHours() / 24
+        );
+        const node = getMeanLunarNode(jde);
         const distToNode = Math.abs(((moonAtFull - node) % 360 + 360) % 360);
         const isEclipse = distToNode < 12;
         events.push({
           event: isEclipse ? `Eclipse Lunar em ${sign}` : `Lua Cheia em ${sign}`,
-          date: midpointDate.toISOString(),
+          date: crossingDate.toISOString(),
           type: isEclipse ? "lunar_eclipse" : "full_moon",
           planet: "Lua",
           sign,
@@ -517,19 +555,25 @@ export function getUpcomingCosmicEvents(
         });
       }
 
-      // Nova: fase dá a volta em 360° (cruza 0)
+      // Nova: fase dá a volta em 360° (cruza 0 / 360)
       if (prevPhase > phase && (prevPhase > 300 || phase < 60)) {
-        const midpointDate = new Date((previous.date.getTime() + currentDate.getTime()) / 2);
-        const sign = SIGN_NAMES[Math.floor(sun / 30)];
-        const longitude = sun % 360;
-        const node = getMeanLunarNode(julian.CalendarGregorianToJD(
-          midpointDate.getFullYear(), midpointDate.getMonth() + 1, midpointDate.getDate()
-        ));
-        const distToNode = Math.abs(((sun - node) % 360 + 360) % 360);
+        const crossingDate = lerpCrossingDate(previous.date, currentDate, prevPhase, phase, 360);
+        const fraction = (crossingDate.getTime() - previous.date.getTime()) / (currentDate.getTime() - previous.date.getTime());
+        const sunAtCross = lerpValue(previous.positions["Sol"] ?? 0, sun, fraction);
+        const moonAtNew = sunAtCross % 360;
+        const sign = SIGN_NAMES[Math.floor(moonAtNew / 30)];
+        const longitude = moonAtNew;
+        const jde = julian.CalendarGregorianToJD(
+          crossingDate.getFullYear(),
+          crossingDate.getMonth() + 1,
+          crossingDate.getDate() + crossingDate.getHours() / 24
+        );
+        const node = getMeanLunarNode(jde);
+        const distToNode = Math.abs(((moonAtNew - node) % 360 + 360) % 360);
         const isEclipse = distToNode < 12;
         events.push({
           event: isEclipse ? `Eclipse Solar em ${sign}` : `Lua Nova em ${sign}`,
-          date: midpointDate.toISOString(),
+          date: crossingDate.toISOString(),
           type: isEclipse ? "solar_eclipse" : "new_moon",
           planet: isEclipse ? "Sol" : "Lua",
           sign,
