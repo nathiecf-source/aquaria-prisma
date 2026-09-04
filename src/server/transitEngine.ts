@@ -91,7 +91,7 @@ export interface TransitPayload {
 export interface UpcomingEvent {
   event: string;
   date: string; // ISO date string
-  type: "ingress" | "new_moon" | "full_moon" | "solar_eclipse" | "lunar_eclipse";
+  type: "ingress" | "new_moon" | "full_moon" | "solar_eclipse" | "lunar_eclipse" | "current";
   planet?: string;
   sign: string;
   longitude: number;
@@ -221,7 +221,7 @@ export function getTropicalTransitDegrees(date: Date, quiet = false): Record<str
   return positions;
 }
 
-const SIGN_NAMES = [
+export const SIGN_NAMES = [
   "Áries","Touro","Gêmeos","Câncer","Leão","Virgem",
   "Libra","Escorpião","Sagitário","Capricórnio","Aquário","Peixes"
 ];
