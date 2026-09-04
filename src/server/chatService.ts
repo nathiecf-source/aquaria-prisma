@@ -25,9 +25,11 @@ export async function generateChatResponse(
   const contextText = formatNatalContext(profile, mode, userName);
 
   let transitContextText: string | undefined;
+  let eventHouseNumber: number | undefined;
   if (transitContext && profile.tropical_natal?.houses) {
     try {
       const house = getHouseForLongitude(transitContext.longitude, profile.tropical_natal.houses);
+      eventHouseNumber = house?.house;
       const eventDate = new Date(transitContext.date).toLocaleDateString("pt-BR", {
         day: "2-digit",
         month: "long",
@@ -40,7 +42,10 @@ export async function generateChatResponse(
       transitContextText = `A consulente está perguntando sobre o evento cósmico: "${transitContext.event}".`;
       transitContextText += `\nData aproximada: ${eventDate}.`;
       transitContextText += `\nO evento envolve ${transitContext.planet ? `o planeta ${transitContext.planet}` : "um corpo celeste"} em ${transitContext.sign}, longitude ${transitContext.longitude.toFixed(2)}°.`;
-      transitContextText += `\nO servidor calculou que este ponto zodiacal cai na ${houseDescription}.`;
+      transitContextText += `\nA CASA ASTROLÓGICA ATIVADA POR ESTE EVENTO É A ${houseDescription.toUpperCase()}.`;
+      transitContextText += `\n\nREGRA ABSOLUTA: a resposta deve tratar este trânsito como ativando EXCLUSIVAMENTE a ${eventHouseNumber ?? "?"}ª Casa do mapa natal.`;
+      transitContextText += ` Não escreva que o evento cai em outra casa, mesmo que o planeta evento forme aspectos com planetas natais localizados em outras casas.`;
+      transitContextText += ` As casas dos planetas natais aspectados são pano de fundo; a casa central e prioritária é sempre a ${eventHouseNumber ?? "?"}ª Casa.`;
       transitContextText += `\nFaça uma leitura terapêutica focada em como a energia deste evento ativa os temas dessa casa e signo, sem jargões esotéricos, com a abordagem analítica e aprofundada da Aquar.IA. Ao final, conclua com uma pergunta reflexiva que convide a consulente a perceber como esse movimento aparece no dia a dia.`;
 
       // Enriquece com os aspectos exatos do planeta do evento na data
@@ -54,9 +59,9 @@ export async function generateChatResponse(
 
       if (relevant.length > 0) {
         const aspectsText = relevant
-          .map((t) => `${t.planeta_transito} em ${t.aspecto.toLowerCase()} com ${t.planeta_natal} (casa natal ${t.casa_natal ?? "?"})`)
+          .map((t) => `${t.planeta_transito} em ${t.aspecto.toLowerCase()} com ${t.planeta_natal}`)
           .join("; ");
-        transitContextText += `\n\nNa data do evento, ${eventPlanet ? `o ${eventPlanet}` : "o corpo celeste em destaque"} forma estes aspectos com planetas natais: ${aspectsText}. Use-os como pano de fundo, mas a leitura central deve ser sobre a casa astrológica afetada.`;
+        transitContextText += `\n\nNa data do evento, ${eventPlanet ? `o ${eventPlanet}` : "o corpo celeste em destaque"} forma estes aspectos com planetas natais: ${aspectsText}. Esses aspectos são pano de fundo, mas a leitura central e obrigatória continua sendo a ${eventHouseNumber ?? "?"}ª Casa.`;
       }
     } catch (err) {
       console.warn("[ChatService] Falha ao calcular contexto de trânsito:", err);
@@ -69,11 +74,15 @@ export async function generateChatResponse(
     .map((msg) => `${msg.role === "user" ? "Consulente" : "Aquar.IA"}: ${msg.text}`)
     .join("\n");
 
+  const questionLine = eventHouseNumber
+    ? `Pergunta da consulente (o evento "${transitContext?.event}" ativa a ${eventHouseNumber}ª Casa do mapa natal): "${message}"`
+    : `Pergunta da consulente: "${message}"`;
+
   const prompt = [
     formattedHistory
       ? `--- INÍCIO DO HISTÓRICO DA CONVERSA ATUAL ---\n${formattedHistory}\n--- FIM DO HISTÓRICO DA CONVERSA ATUAL ---`
       : "",
-    `Pergunta da consulente: "${message}"`,
+    questionLine,
   ]
     .filter(Boolean)
     .join("\n\n");
