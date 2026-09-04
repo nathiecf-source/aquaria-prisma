@@ -10,21 +10,15 @@ const SERVICES = [
   {
     title: "Leitura Astrológica Pontual",
     duration: "1h20 de duração",
-    price: "R$ 280,00",
-    installment: "6x R$ 50,63",
   },
   {
     title: "Leitura Astrológica Profunda",
     duration: "2h de duração",
-    price: "R$ 420,00",
-    installment: "6x R$ 75,95",
   },
   {
     title: "Mentoria Alquímica",
     duration: "1 encontro de 2h por 3 meses",
-    description: "Leitura profunda e transmutação de crenças",
-    price: "R$ 1.080,00",
-    installment: "6x R$ 195,30",
+    description: "Leitura profunda e mapeamento de bloqueios e potenciais",
   },
 ];
 
@@ -64,23 +58,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({ onClose }) => {
                 {service.duration}
                 {service.description ? ` • ${service.description}` : ""}
               </p>
-              <div className="mt-2 flex items-baseline gap-3">
-                <span className="text-base font-semibold text-[#3c352d]">{service.price}</span>
-                <span className="text-xs text-[#8c7f70]">em até {service.installment}</span>
-              </div>
+
             </div>
           ))}
         </div>
 
         <div className="mt-8 text-center">
           <a
-            href="https://wa.me/5562999571990?text=Ol%C3%A1%2C%20vim%20pela%20Aquar.IA%20Prisma%2C%20e%20gostaria%20de%20agendar%20uma%20consulta%20astrol%C3%B3gica%20com%20Nathie"
+            href="https://wa.me/5562999571990?text=Ol%C3%A1%2C%20vim%20pela%20Aquar.IA%20Prisma%20e%20gostaria%20de%20consultar%20os%20valores%20das%20leituras."
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#3c352d] text-[#f4f1eb] text-xs uppercase tracking-[0.15em] rounded-lg hover:bg-[#5c4d66] transition-colors cursor-pointer"
           >
             <CalendarHeart className="w-4 h-4" />
-            Agendar Consulta com Nathie
+            Consultar Valores
           </a>
         </div>
 
