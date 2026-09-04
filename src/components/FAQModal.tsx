@@ -49,7 +49,7 @@ export const FAQModal: React.FC<FAQModalProps> = ({ onClose }) => {
           <div>
             <h3 className="font-serif text-[#5c4d66] mb-1">Como funciona o meu período de acesso à Aquar.IA?</h3>
             <p>
-              Ao adquirir o Passe Inicial, você garante 6 meses de acesso irrestrito aos seus Ciclos Planetários, à navegação por toda interface e ao Oráculo do Chat. Faltando 15 dias para o término do período, você receberá um convite na interface para manter seu acesso ativo via mensalidade flexível ou renovação semestral. Você também pode optar pela assinatura completa anual, com um valor de desconto especial.
+              Ao adquirir o Passe de Expansão, você garante 6 ou 12 meses — dependendo do plano que adquiriu — de acesso irrestrito aos seus Ciclos Planetários, à navegação por toda interface e ao Oráculo do Chat. Faltando 15 dias para o término do período, você receberá um convite na interface para manter seu acesso ativo via mensalidade, que pode ser cancelada a qualquer momento.
             </p>
           </div>
 
@@ -63,7 +63,7 @@ export const FAQModal: React.FC<FAQModalProps> = ({ onClose }) => {
           <div>
             <h3 className="font-serif text-[#5c4d66] mb-1">Caso eu não renove a assinatura, perco acesso às minhas leituras?</h3>
             <p>
-              Sim, você retorna para o plano básico com as leituras liberadas para todos os usuários. Caso você queira ter as leituras da interface guardadas para si sem renovar o plano, é liberado que copie e salve ou imprima por sua própria conta. Você poderá baixar as conversas com o chat em PDF e também suas notas do diário alquímico, além das 7 meditações.
+              Sim, você retorna para o plano básico com as leituras liberadas para todos os usuários. Caso você queira ter as leituras da interface guardadas para si sem renovar o plano, é liberado que copie e salve ou imprima por sua própria conta. Você poderá baixar as conversas com o chat em PDF e o áudio das 7 meditações.
             </p>
           </div>
 
