@@ -23,32 +23,6 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
         </p>
 
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-[#8c7f70]">
-          <a
-            href="https://www.instagram.com/aquaria.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="@aquaria.app"
-            className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
-          >
-            <Instagram className="w-3.5 h-3.5" />
-            <span>@aquaria.app</span>
-          </a>
-
-          <span className="hidden sm:inline text-[#e6e2d8]">•</span>
-
-          <a
-            href="https://www.instagram.com/nathieterapeuta"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Idealizadora @nathieterapeuta"
-            className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
-          >
-            <Instagram className="w-3.5 h-3.5" />
-            <span>@nathieterapeuta</span>
-          </a>
-
-          <span className="hidden sm:inline text-[#e6e2d8]">•</span>
-
           <button
             onClick={() => setShowAbout(true)}
             className="hover:text-[#3c352d] transition-colors cursor-pointer"
