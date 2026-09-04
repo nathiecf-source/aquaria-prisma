@@ -31,7 +31,7 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
             className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
           >
             <Instagram className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">@aquaria.app</span>
+            <span>@aquaria.app</span>
           </a>
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
@@ -44,7 +44,7 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
             className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
           >
             <Instagram className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">@nathieterapeuta</span>
+            <span>@nathieterapeuta</span>
           </a>
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
@@ -117,6 +117,32 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
           >
             Agendar consulta
           </button>
+
+          <span className="hidden sm:inline text-[#e6e2d8]">•</span>
+
+          <a
+            href="https://www.instagram.com/aquaria.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="@aquaria.app"
+            className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
+          >
+            <Instagram className="w-3.5 h-3.5" />
+            <span>@aquaria.app</span>
+          </a>
+
+          <span className="hidden sm:inline text-[#e6e2d8]">•</span>
+
+          <a
+            href="https://www.instagram.com/nathieterapeuta"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Idealizadora @nathieterapeuta"
+            className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
+          >
+            <Instagram className="w-3.5 h-3.5" />
+            <span>@nathieterapeuta</span>
+          </a>
         </nav>
       </footer>
 
