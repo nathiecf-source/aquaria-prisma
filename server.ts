@@ -1660,7 +1660,7 @@ async function createApp(): Promise<express.Application> {
 
       // Mixar com música de fundo instrumental
       console.log(`[MEDITATION] Mixando com música de fundo...`);
-      const audioBuffer = await mixWithBackgroundMusic(narrationBuffer);
+      const audioBuffer = await mixWithBackgroundMusic(narrationBuffer, supabase);
 
       // Upload para Supabase Storage
       const filePath = `${userId}/${pathId}/${hash}.mp3`;
