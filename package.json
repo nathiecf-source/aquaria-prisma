@@ -20,8 +20,10 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "astronomia": "^4.2.0",
+    "autoprefixer": "^10.4.21",
     "circular-natal-horoscope-js": "^1.1.0",
     "dotenv": "^17.4.2",
+    "esbuild": "^0.25.0",
     "express": "^4.21.2",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
@@ -38,6 +40,7 @@
     "rehype-sanitize": "^6.0.0",
     "resend": "^6.26.0",
     "serverless-http": "^3.2.0",
+    "tailwindcss": "^4.1.14",
     "tz-lookup": "^6.1.25",
     "vite": "^6.2.3"
   },
@@ -46,12 +49,8 @@
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^22.14.0",
     "@types/tz-lookup": "^6.1.2",
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
-    "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "typescript": "~5.8.2"
   },
   "allowScripts": {
     "ffmpeg-static@5.3.0": true
