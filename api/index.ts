@@ -1,7 +1,4 @@
-import { createApp } from "../server";
+import { app } from "../server";
+import serverless from "serverless-http";
 
-const { default: serverless } = await import("serverless-http");
-const app = await createApp();
-const handler = serverless(app);
-
-export default handler;
+export default serverless(app);

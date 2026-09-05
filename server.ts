@@ -12,9 +12,16 @@ dotenv.config({
   override: true
 });
 
-// Ao rodar o bundle CJS (npm run start / Vercel), import.meta.url não existe.
-// Nesse caso, forçamos NODE_ENV=production para não subir Vite em produção.
-if ((typeof import.meta === "undefined" || !import.meta.url || typeof import.meta.url !== "string") && !process.env.NODE_ENV) {
+// Força NODE_ENV=production quando o bundle compilado for executado (npm run start / Vercel),
+// evitando subir o Vite em produção. Em dev (tsx server.ts) o arquivo termina em .ts.
+if (
+  !process.env.NODE_ENV &&
+  (
+    typeof import.meta === "undefined" ||
+    typeof import.meta.url !== "string" ||
+    (process.argv[1] && process.argv[1].endsWith(".mjs"))
+  )
+) {
   process.env.NODE_ENV = "production";
 }
 
@@ -3267,18 +3274,16 @@ async function createApp(): Promise<express.Application> {
   return app;
 }
 
-async function startServer() {
-  const app = await createApp();
+const app = await createApp();
+
+export default app;
+export { app, createApp };
+
+// Inicia o servidor localmente (npm run dev / npm run start).
+// No Vercel, o entrypoint `api/index.ts` importa o `app` e o expõe via serverless-http.
+if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1") {
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[AQUAR.IA Server] Cérebro online em http://localhost:${PORT}`);
   });
-}
-
-export { createApp };
-
-// Inicia o servidor localmente (npm run dev / npm run start).
-// No Vercel, o entrypoint `api/index.ts` chama `createApp()` via serverless-http.
-if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1") {
-  startServer();
 }
