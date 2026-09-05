@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { pathToFileURL } from "url";
 
 // Load environment variables immediately before any other imports
 // .env.local overrides .env for local secrets
@@ -3332,10 +3333,22 @@ async function createApp(): Promise<express.Application> {
 export { createApp };
 export default createApp;
 
-// Inicia o servidor localmente (npm run dev / npm run start).
-// No Vercel, o entrypoint `api/index.ts` importa `createApp` e cria o app por conta própria,
-// evitando side-effects e top-level await durante a importação do módulo.
-if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1") {
+// Detecta se este módulo é o entrypoint real (npm start / npm run dev).
+// Em Vercel, o entrypoint é api/index.ts, então process.argv[1] aponta para
+// o launcher da Vercel e não para o bundle do server.ts. Isso evita que
+// o servidor tente chamar app.listen() dentro do container serverless.
+function isMainModule(): boolean {
+  if (typeof process === "undefined" || !process.argv?.[1]) return false;
+  if (typeof import.meta === "undefined" || !import.meta.url) return false;
+  try {
+    const mainUrl = pathToFileURL(process.argv[1]).href;
+    return import.meta.url === mainUrl;
+  } catch {
+    return false;
+  }
+}
+
+if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1" && isMainModule()) {
   createApp().then((app) => {
     const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     app.listen(PORT, "0.0.0.0", () => {
