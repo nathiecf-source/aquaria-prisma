@@ -3,14 +3,24 @@ import path from "path";
 
 // Load environment variables immediately before any other imports
 // .env.local overrides .env for local secrets
-dotenv.config({
-  path: path.resolve(process.cwd(), '.env'),
-  override: true
-});
-dotenv.config({
-  path: path.resolve(process.cwd(), '.env.local'),
-  override: true
-});
+// Arquivos podem não existir no ambiente Vercel, então ignoramos erros de leitura.
+try {
+  dotenv.config({
+    path: path.resolve(process.cwd(), ".env"),
+    override: true,
+  });
+} catch (err: any) {
+  console.warn("[dotenv] .env não carregado:", err?.message || err);
+}
+
+try {
+  dotenv.config({
+    path: path.resolve(process.cwd(), ".env.local"),
+    override: true,
+  });
+} catch (err: any) {
+  console.warn("[dotenv] .env.local não carregado:", err?.message || err);
+}
 
 // Força NODE_ENV=production quando o bundle compilado for executado (npm run start / Vercel),
 // evitando subir o Vite em produção. Em dev (tsx server.ts) o arquivo termina em .ts.
@@ -3319,16 +3329,20 @@ async function createApp(): Promise<express.Application> {
   return app;
 }
 
-const app = await createApp();
-
-export default app;
-export { app, createApp };
+export { createApp };
+export default createApp;
 
 // Inicia o servidor localmente (npm run dev / npm run start).
-// No Vercel, o entrypoint `api/index.ts` importa o `app` e o expõe via serverless-http.
+// No Vercel, o entrypoint `api/index.ts` importa `createApp` e cria o app por conta própria,
+// evitando side-effects e top-level await durante a importação do módulo.
 if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1") {
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[AQUAR.IA Server] Cérebro online em http://localhost:${PORT}`);
+  createApp().then((app) => {
+    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[AQUAR.IA Server] Cérebro online em http://localhost:${PORT}`);
+    });
+  }).catch((err: any) => {
+    console.error("[AQUAR.IA Server] Falha ao iniciar servidor local:", err);
+    process.exit(1);
   });
 }
