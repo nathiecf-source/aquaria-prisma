@@ -37,6 +37,7 @@ const newBlock = `  if (cachedPayload) {
         ayanamsa: 1, // Lahiri
         house_system: "equal"
       });
+      
     } catch (err: any) {`;
 
 code = code.replace(oldBlock, newBlock);
