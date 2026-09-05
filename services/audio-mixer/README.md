@@ -51,35 +51,57 @@ npm run dev
 
 ## Deploy no Google Cloud Run
 
-1. Autentique no Google Cloud e escolha o projeto:
+### Pré-requisitos
 
-```bash
-gcloud auth login
-gcloud config set project SEU_PROJECT_ID
-```
-
-2. Habilite as APIs necessárias:
+- `gcloud` CLI instalado e autenticado (`gcloud auth login` ou service account).
+- Projeto `aquaria-audio` selecionado: `gcloud config set project aquaria-audio`.
+- APIs habilitadas:
 
 ```bash
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
 ```
 
-3. Construa e envie a imagem:
+### Gerar o secret
 
-```bash
-REGION=southamerica-east1
-REPO=aquaria
-IMAGE=gcr.io/SEU_PROJECT_ID/aquaria-audio-mixer
+Crie um arquivo `.env` em `services/audio-mixer/.env` com:
 
-gcloud builds submit --tag $IMAGE
+```dotenv
+AUDIO_MIXER_SECRET=seu_token_aqui
 ```
 
-4. Deploy no Cloud Run:
+Ou use o `.env` já gerado no projeto.
+
+### Usando o script de deploy (recomendado)
+
+No Windows (PowerShell):
+
+```powershell
+cd services/audio-mixer
+.\deploy.ps1
+```
+
+No Linux/macOS/WSL:
 
 ```bash
+cd services/audio-mixer
+chmod +x deploy.sh
+./deploy.sh
+```
+
+Os scripts executam `gcloud builds submit` e `gcloud run deploy` automaticamente.
+
+### Deploy manual
+
+```bash
+cd services/audio-mixer
+
+IMAGE=gcr.io/aquaria-audio/aquaria-audio-mixer
+
+gcloud builds submit --tag $IMAGE
+
 gcloud run deploy aquaria-audio-mixer \
   --image $IMAGE \
-  --region $REGION \
+  --region southamerica-east1 \
   --platform managed \
   --allow-unauthenticated \
   --set-env-vars AUDIO_MIXER_SECRET=SEU_TOKEN_AQUI \
@@ -88,11 +110,13 @@ gcloud run deploy aquaria-audio-mixer \
   --port 8080
 ```
 
-5. Anote a URL gerada (algo como `https://aquaria-audio-mixer-xxx-uc.a.run.app`).
+### Configurar no Vercel
 
-6. Configure no Vercel:
+1. Anote a URL gerada (algo como `https://aquaria-audio-mixer-xxx-rsa.a.run.app`).
+2. No painel da Vercel, adicione as variáveis de ambiente:
    - `AUDIO_MIXER_URL` = URL do Cloud Run
    - `AUDIO_MIXER_SECRET` = mesmo token usado no deploy
+3. Re-deploy a aplicação na Vercel.
 
 ## Notas
 
