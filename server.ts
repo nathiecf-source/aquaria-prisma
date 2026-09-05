@@ -50,7 +50,16 @@ const cleanEnvVar = (val: any): string | undefined => {
 function getSupabaseAdmin() {
   const supabaseUrl = cleanEnvVar(process.env.SUPABASE_URL) || cleanEnvVar(process.env.VITE_SUPABASE_URL);
   const supabaseKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || cleanEnvVar(process.env.SUPABASE_ANON_KEY) || cleanEnvVar(process.env.VITE_SUPABASE_ANON_KEY);
-  if (!supabaseUrl || !supabaseKey) return null;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("[getSupabaseAdmin] Supabase não configurado:", {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasSupabaseKey: !!supabaseKey,
+      envKeys: Object.keys(process.env).filter((k) => k.includes("SUPABASE")),
+    });
+    return null;
+  }
+
   return createClient(supabaseUrl, supabaseKey);
 }
 
@@ -133,6 +142,7 @@ async function requireAuth(req: any, res: any, next: any): Promise<void> {
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
+    console.error("[Auth] Supabase admin não disponível. Verifique as variáveis de ambiente no Vercel.");
     return res.status(500).json({ error: "Supabase não configurado." });
   }
 
@@ -2064,11 +2074,6 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
-  // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
-
   // ============================================================
   // InfinitePay Checkout
   // ============================================================
@@ -2678,6 +2683,31 @@ async function createApp(): Promise<express.Application> {
   // Admin Panel API
   // ============================================================
 
+  // GET /api/health - diagnóstico de variáveis de ambiente e conexão básica
+  app.get("/api/health", (req, res) => {
+    const supabaseUrl = !!(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+    const supabaseKey = !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
+    const supabase = getSupabaseAdmin();
+
+    res.json({
+      ok: supabase !== null,
+      env: {
+        node_env: process.env.NODE_ENV,
+        vercel: process.env.VERCEL,
+        supabase_url: supabaseUrl,
+        supabase_key: supabaseKey,
+        gemini: !!process.env.GEMINI_API_KEY,
+        tts: !!process.env.GOOGLE_TTS_CREDENTIALS_JSON,
+        resend: !!process.env.RESEND_API_KEY,
+        audio_mixer_url: !!process.env.AUDIO_MIXER_URL,
+        audio_mixer_secret: !!process.env.AUDIO_MIXER_SECRET,
+      },
+      available_env_keys: Object.keys(process.env).filter((k) =>
+        ["SUPABASE", "GEMINI", "GOOGLE", "RESEND", "AUDIO_MIXER", "NODE_ENV", "VERCEL"].some((prefix) => k.startsWith(prefix) || k.includes(prefix))
+      ),
+    });
+  });
+
   // GET /api/settings - configurações globais públicas (read-only)
   app.get("/api/settings", async (req, res) => {
     try {
@@ -3270,6 +3300,21 @@ async function createApp(): Promise<express.Application> {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Middleware global de erro — captura exceções não tratadas e loga stack
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("[Express Error]", {
+      path: req.path,
+      method: req.method,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    if (res.headersSent) return next(err);
+    res.status(500).json({
+      error: "Erro interno no servidor.",
+      details: err?.message || String(err),
+    });
+  });
 
   return app;
 }
