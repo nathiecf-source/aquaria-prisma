@@ -14,7 +14,7 @@ dotenv.config({
 
 // Ao rodar o bundle CJS (npm run start / Vercel), import.meta.url não existe.
 // Nesse caso, forçamos NODE_ENV=production para não subir Vite em produção.
-if ((!import.meta.url || typeof import.meta.url !== "string") && !process.env.NODE_ENV) {
+if ((typeof import.meta === "undefined" || !import.meta.url || typeof import.meta.url !== "string") && !process.env.NODE_ENV) {
   process.env.NODE_ENV = "production";
 }
 
