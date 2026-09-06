@@ -632,7 +632,12 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
     }
   }
   const ashta = record(horoscope.ashtakavarga) || {};
-  return { birthData, tropical_natal: tropical, tropical_transits: [], vedic_natal: { planets: mapped.planets, drishti: [] }, vedic_specifics: specifics, vedic_balas: { shadbala: shad, ashtakavarga: ashta }, vedic_timing: mapTiming(result, currentDateStr), vedic_vargas: mapVargas(result.jhora), dataSource: `${fromCache ? "cache:" : ""}${result.meta.source}:${result.meta.status}` };
+  const timing = mapTiming(result, currentDateStr);
+  const nakshatraFor = (planet: string) => mapped.planets.find((item) => item.name === planet)?.nakshatra || "";
+  timing.mahadashaNakshatra = nakshatraFor(timing.mahadasha);
+  timing.antardashaNakshatra = nakshatraFor(timing.antardasha);
+  timing.pratyantardashaNakshatra = nakshatraFor(timing.pratyantardasha);
+  return { birthData, tropical_natal: tropical, tropical_transits: [], vedic_natal: { planets: mapped.planets, drishti: [] }, vedic_specifics: specifics, vedic_balas: { shadbala: shad, ashtakavarga: ashta }, vedic_timing: timing, vedic_vargas: mapVargas(result.jhora), dataSource: `${fromCache ? "cache:" : ""}${result.meta.source}:${result.meta.status}` };
 }
 
 export function calculateHighlights(profile: CompleteAstrologicalProfile): string[] {

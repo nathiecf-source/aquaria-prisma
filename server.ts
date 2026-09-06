@@ -1587,8 +1587,11 @@ async function createApp(): Promise<express.Application> {
       const readingId = `dasha-${userId}-${maha}-${antar}-${pratyan}`;
 
       const pratyantardashaEnd = vedicTiming.pratyantardashaEnd;
-      const expiresAt = pratyantardashaEnd
-        ? new Date(`${pratyantardashaEnd}T23:59:59.999Z`)
+      const parsedDashaEnd = pratyantardashaEnd
+        ? new Date(String(pratyantardashaEnd).trim().replace(" ", "T") + (/Z$|[+-]\d{2}:?\d{2}$/.test(String(pratyantardashaEnd)) ? "" : "Z"))
+        : null;
+      const expiresAt = parsedDashaEnd && Number.isFinite(parsedDashaEnd.getTime())
+        ? parsedDashaEnd
         : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       const cached = await getCachedReading(userId, readingId);
