@@ -10,15 +10,6 @@ interface AspectReading {
   interpretation: string;
 }
 
-interface VedicStrengthReading {
-  shadbalaPercentage: number;
-  classification: string;
-  sideralSign: string;
-  sideralHouse: number;
-  karaka: string | null;
-  interpretation: string;
-}
-
 interface PlanetReadingData {
   title: string;
   energySubtitle: string;
@@ -26,7 +17,6 @@ interface PlanetReadingData {
   shadowText?: string;
   aspectReadings?: AspectReading[];
   fonte_astrologica: string;
-  vedicStrength?: VedicStrengthReading;
 }
 
 interface PlanetReadingPanelProps {
@@ -70,7 +60,6 @@ const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [aspectsExpanded, setAspectsExpanded] = React.useState(true);
-  const [vedicExpanded, setVedicExpanded] = React.useState(true);
 
   const config = getPlanetGlyphConfig(planetId);
   const position = resolveHeaderPosition(profile, config);
@@ -211,32 +200,6 @@ const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
                 </div>
               )}
             </div>
-
-            {reading.vedicStrength && !config.isAngle && (
-              <div className="border-t border-[#8c7f70]/10 pt-4">
-                <button
-                  onClick={() => setVedicExpanded(prev => !prev)}
-                  className="w-full flex items-center justify-between"
-                >
-                  <p className="font-mono text-[9px] text-[#8c6239] uppercase tracking-[0.2em]">
-                    ✦ Força Védica ({reading.vedicStrength.classification})
-                  </p>
-                  <ChevronDown className={`w-3.5 h-3.5 text-[#8c6239] transition-transform ${vedicExpanded ? "rotate-180" : ""}`} />
-                </button>
-
-                {vedicExpanded && (
-                  <div className="mt-3 rounded-xl border border-[#8c6239]/10 bg-[#f4f1eb] px-4 py-3.5">
-                    <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-[0.15em] mb-1.5">
-                      Casa {reading.vedicStrength.sideralHouse} Sideral em {reading.vedicStrength.sideralSign}
-                      {reading.vedicStrength.karaka ? ` • ${reading.vedicStrength.karaka}` : ""}
-                    </p>
-                    <p className="font-sans text-[12.5px] text-[#3c352d] leading-relaxed">
-                      {reading.vedicStrength.interpretation}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
           </>
         ) : null}
       </div>

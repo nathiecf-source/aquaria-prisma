@@ -2422,19 +2422,6 @@ const planetAspectReadingSchema = {
   required: ["planet1", "planet2", "type", "orb", "interpretation"]
 };
 
-const planetVedicStrengthSchema = {
-  type: Type.OBJECT,
-  properties: {
-    shadbalaPercentage: { type: Type.NUMBER },
-    classification: { type: Type.STRING },
-    sideralSign: { type: Type.STRING },
-    sideralHouse: { type: Type.NUMBER },
-    karaka: { type: Type.STRING },
-    interpretation: { type: Type.STRING }
-  },
-  required: ["shadbalaPercentage", "classification", "sideralSign", "sideralHouse", "interpretation"]
-};
-
 export const planetReadingSchema = {
   type: Type.OBJECT,
   properties: {
@@ -2443,8 +2430,7 @@ export const planetReadingSchema = {
     functionText: { type: Type.STRING },
     shadowText: { type: Type.STRING },
     aspectReadings: { type: Type.ARRAY, items: planetAspectReadingSchema },
-    fonte_astrologica: { type: Type.STRING },
-    vedicStrength: planetVedicStrengthSchema
+    fonte_astrologica: { type: Type.STRING }
   },
   required: ["title", "energySubtitle", "functionText", "shadowText", "fonte_astrologica"]
 };
@@ -2521,49 +2507,6 @@ export async function generatePlanetReading(profile: CompleteAstrologicalProfile
   const fichamentoFunction = fichamento.functionText;
   const fichamentoShadow = fichamento.shadowText;
 
-  // Dados védicos para a aba "Força Védica" (apenas planetas, não ângulos)
-  let vedicDataText = "";
-  if (!config.isAngle) {
-    const rawShad = profile.vedic_balas?.shadbala?.[config.canonicalName];
-    const vedicPlanet = profile.vedic_natal?.planets?.find((p: any) => p.name === config.canonicalName);
-    const sideralSign = vedicPlanet?.sign || "";
-    const sideralHouse = typeof vedicPlanet?.house === "number" ? vedicPlanet.house : null;
-
-    let shadbalaPercentage: number | null = null;
-    if (typeof rawShad === "number") {
-      shadbalaPercentage = Math.round(rawShad * 100);
-    } else if (sideralSign && sideralHouse !== null) {
-      // Padrão seguro: se o planeta existe no mapa védico mas o shadbala falhou, use 100%
-      shadbalaPercentage = 100;
-    }
-
-    const karakas = (profile.vedic_specifics?.karakas || {}) as Record<string, string>;
-    const karaka = karakas.atmakaraka === config.canonicalName
-      ? "Atmakaraka"
-      : karakas.amatyakaraka === config.canonicalName
-        ? "Amatyakaraka"
-        : karakas.darakaraka === config.canonicalName
-          ? "Darakaraka"
-          : null;
-
-    console.log(`[PLANET READING ${config.canonicalName}] rawShad:`, rawShad, "| sideralSign:", sideralSign, "| sideralHouse:", sideralHouse, "| shadbalaPercentage:", shadbalaPercentage);
-
-    if (shadbalaPercentage !== null && sideralSign && sideralHouse !== null) {
-      const classification = shadbalaPercentage > 110
-        ? "Recurso Abundante / Expressão Direta"
-        : shadbalaPercentage >= 90
-          ? "Expressão Equilibrada / Atuação conforme demanda"
-          : "Expressão Subterrânea / Pede Cultivo Consciente";
-      vedicDataText = `
-[DADOS VÉDICOS — FORÇA DO PLANETA]
-Planeta: ${config.canonicalName}
-Vitalidade (Shadbala): ${shadbalaPercentage}% (${classification})
-Ancoragem Védica: Casa ${sideralHouse} Sideral em ${sideralSign}
-Karaka: ${karaka || "não aplicável"}
-`;
-    }
-  }
-
   const systemInstruction = `Você é uma analista psíquica e astróloga evolutiva, parte do algoritmo central da plataforma AQUAR.IA. Sua função é gerar a leitura tropical de um ponto específico do mapa natal (planeta, nodo ou ângulo) quando o usuário clica no seu glifo nas "Engrenagens Celestes". O tom deve ser o mesmo das leituras de Casa já existentes: de mestre, poético, acessível e psicologicamente refinado — sem jargões banais.
 
 ${getGenderFlexionInstruction(gender)}
@@ -2578,7 +2521,6 @@ ${positionText}
 
 [DADOS TÉCNICOS — ASPECTOS ATIVOS]
 ${aspectsListText}
-${vedicDataText}
 
 [FICHAMENTO ALQUÍMICO — BASE DE CONHECIMENTO OBRIGATÓRIA]
 Use o seguinte fichamento como chancela determinística para a função e para a oitava de aprendizado do ponto. Não invente conceitos fora desta base.
@@ -2600,22 +2542,7 @@ ${dignityToneNote}
    - Se não houver aspectos ativos, retorne "aspectReadings" como array vazio.
 4. "title": nome do ponto + signo (ex.: "${config.label} em ${sign}").
 5. "energySubtitle": frase curta (máx. 1 linha) que sintetize o tom central dessa posição.
-6. "fonte_astrologica": repita os dados técnicos reais usados (posição e aspectos) de forma sucinta.
-7. "vedicStrength" (SOMENTE se [DADOS VÉDICOS — FORÇA DO PLANETA] foi fornecido acima; para ângulos ou se a seção não estiver presente, omita este campo): gere um objeto com "shadbalaPercentage" (número), "classification" (string exata da classificação acima), "sideralSign", "sideralHouse" (número), "karaka" (string do karaka ou null) e "interpretation" (máx. 3 linhas). A interpretação deve ser direta, falar com "você", unir a vitalidade do Shadbala com o pedido prático da casa/signo sideral e, se houver Karaka, explicar brevemente o papel desse planeta como karaka no mapa. Não use jargão técnico extenso.${vedicDataText ? `
-
-[EXEMPLO DE VEDICSTRENGTH]
-Se os dados fornecidos fossem: Sol, Shadbala 125%, Casa 10 Sideral em Leão, sem Karaka.
-Então:
-"vedicStrength": {
-  "shadbalaPercentage": 125,
-  "classification": "Recurso Abundante / Expressão Direta",
-  "sideralSign": "Leão",
-  "sideralHouse": 10,
-  "karaka": null,
-  "interpretation": "Sua energia de propósito e presença é um pilar natural. O posicionamento na Casa 10 Sideral pede que você coloque essa visibilidade a serviço da sua carreira e autoridade, assumindo a responsabilidade de liderar sem se esconder nos bastidores."
-}` : ""}`;
-
-  console.log(`[PLANET READING ${config.canonicalName}] vedicDataText preenchido:`, vedicDataText ? "SIM" : "NÃO");
+6. "fonte_astrologica": repita os dados técnicos reais usados (posição e aspectos) de forma sucinta.`;
 
   const userMessage = `Gere a leitura tropical completa de ${config.canonicalName} seguindo estritamente o schema e as diretrizes do sistema.`;
 

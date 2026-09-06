@@ -1282,7 +1282,7 @@ async function createApp(): Promise<express.Application> {
         return res.status(403).json({ error: "Este ponto astrológico está bloqueado para o plano FREE." });
       }
 
-      const readingId = `planeta-v3-${planetId}-tropical`;
+      const readingId = `planeta-v4-${planetId}-tropical`;
       const cached = await getCachedReading(userId, readingId);
       if (cached) {
         return res.json({ reading: cached, cached: true });
@@ -1296,8 +1296,6 @@ async function createApp(): Promise<express.Application> {
         console.error("[PLANET READING] Falha ao fazer parse do JSON:", parseErr, "\nTexto:", readingText.slice(0, 500));
         throw new Error("Resposta do Gemini não é um JSON válido.");
       }
-      const vedicInfo = parsedReading?.vedicStrength ?? null;
-      console.log("[PLANET READING] vedicStrength:", vedicInfo ? "presente" : "ausente", JSON.stringify(vedicInfo ?? null).slice(0, 200));
       await saveReading(userId, readingId, "planeta-tropical", parsedReading);
       return res.json({ reading: parsedReading, cached: false });
     } catch (err: any) {
