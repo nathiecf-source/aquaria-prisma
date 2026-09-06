@@ -129,8 +129,14 @@ export function formatNatalContext(
     if (profile.vedic_vargas) {
       lines.push("");
       lines.push("-- VARGAS --");
-      lines.push(`- Navamsa (D9): ${JSON.stringify(profile.vedic_vargas.d9Navamsa)}`);
-      lines.push(`- Dasamsa (D10): ${JSON.stringify(profile.vedic_vargas.d10Dasamsa)}`);
+      const charts = profile.vedic_vargas.charts || {};
+      Object.entries(charts).forEach(([chart, positions]) => {
+        lines.push(`- ${chart}: ${JSON.stringify(positions)}`);
+      });
+      if (!Object.keys(charts).length) {
+        lines.push(`- Navamsa (D9): ${JSON.stringify(profile.vedic_vargas.d9Navamsa)}`);
+        lines.push(`- Dasamsa (D10): ${JSON.stringify(profile.vedic_vargas.d10Dasamsa)}`);
+      }
     }
 
     if (profile.vedic_balas?.shadbala) {

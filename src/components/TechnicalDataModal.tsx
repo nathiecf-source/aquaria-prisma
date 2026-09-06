@@ -50,19 +50,13 @@ export default function TechnicalDataModal({
   const lagnaSign = profile.vedic_specifics?.lagna || "Áries";
   const lagnaIndex = SIGNS_ORDER.indexOf(lagnaSign);
 
-  // We build Vedic Houses dynamically from Lagna Sign (Equal House system)
-  // Shift tropical Ascendant cusp degree by roughly Ayanamsha (~24.0 degrees)
-  const ayanamsha = 24.0;
-  const tropicalLagnaDegree = tropicalHouses?.[0]?.cuspDegree ?? 0;
-  const sideralLagnaDegree = (tropicalLagnaDegree - ayanamsha + 30) % 30;
-
+  // JHora supplies exact planetary houses; do not manufacture sidereal cusp degrees.
   const vedicHouses = Array.from({ length: 12 }, (_, i) => {
     const houseNum = i + 1;
-    const signName = SIGNS_ORDER[(lagnaIndex + i) % 12];
     return {
       house: houseNum,
-      sign: signName,
-      cuspDegree: sideralLagnaDegree
+      sign: SIGNS_ORDER[(lagnaIndex + i) % 12],
+      cuspDegree: null as number | null
     };
   });
 
@@ -191,7 +185,7 @@ export default function TechnicalDataModal({
                                   {houseObj.sign}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-[#8c7f70] font-medium">
-                                  {formatDegree(houseObj.cuspDegree)}
+                                  {houseObj.cuspDegree == null ? "—" : formatDegree(houseObj.cuspDegree)}
                                 </td>
                               </tr>
                             ))}
@@ -279,7 +273,7 @@ export default function TechnicalDataModal({
                                   )}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-[#8c7f70] font-medium">
-                                  {formatDegree(houseObj.cuspDegree)}
+                                  {houseObj.cuspDegree == null ? "—" : formatDegree(houseObj.cuspDegree)}
                                 </td>
                               </tr>
                             ))}

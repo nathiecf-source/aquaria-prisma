@@ -93,9 +93,11 @@ export async function calculateProfectionLord(
   // Condição 2: se vazio, buscar Revolução Solar
   if (lords.length === 0 && options.allowSolarReturnFetch !== false) {
     const currentYear = referenceDate.getFullYear();
-    solarReturnYear = currentYear;
+    const [, birthMonth, birthDay] = birthData.birthDate.split("-").map(Number);
+    const birthdayThisYear = new Date(currentYear, birthMonth - 1, birthDay, 23, 59, 59);
+    solarReturnYear = referenceDate <= birthdayThisYear ? currentYear - 1 : currentYear;
     try {
-      solarReturn = await fetchSolarReturnChart(birthData, currentYear);
+      solarReturn = await fetchSolarReturnChart(birthData, solarReturnYear, profile.tropical_natal);
       const rsPlanets = solarReturn?.planets || [];
       const rsLords = rsPlanets
         .filter((p) => PROFECTION_PLANETS.has(p.name) && !POINTS.test(p.name) && p.sign === sign)
@@ -111,7 +113,7 @@ export async function calculateProfectionLord(
         source = "solar-return";
       }
     } catch (err: any) {
-      console.warn("[PROFECTION] Falha ao buscar Revolução Solar na ProKerala:", err?.message || err);
+      console.warn("[PROFECTION] Falha ao calcular Revolução Solar local:", err?.message || err);
       solarReturn = undefined;
     }
   }

@@ -58,20 +58,37 @@ const cleanEnvVar = (val: any): string | undefined => {
   return str;
 };
 
-function getSupabaseAdmin() {
-  const supabaseUrl = cleanEnvVar(process.env.SUPABASE_URL) || cleanEnvVar(process.env.VITE_SUPABASE_URL);
-  const supabaseKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || cleanEnvVar(process.env.SUPABASE_ANON_KEY) || cleanEnvVar(process.env.VITE_SUPABASE_ANON_KEY);
+let supabaseAdmin: ReturnType<typeof createClient> | null | undefined;
+
+function getSupabaseAdmin(): any {
+  if (supabaseAdmin !== undefined) return supabaseAdmin;
+
+  const urlSource = cleanEnvVar(process.env.SUPABASE_URL) ? "SUPABASE_URL" : cleanEnvVar(process.env.VITE_SUPABASE_URL) ? "VITE_SUPABASE_URL" : null;
+  const keySource = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) ? "SUPABASE_SERVICE_ROLE_KEY" : cleanEnvVar(process.env.SUPABASE_ANON_KEY) ? "SUPABASE_ANON_KEY" : cleanEnvVar(process.env.VITE_SUPABASE_ANON_KEY) ? "VITE_SUPABASE_ANON_KEY" : null;
+  const supabaseUrl = urlSource ? cleanEnvVar(process.env[urlSource]) : undefined;
+  const supabaseKey = keySource ? cleanEnvVar(process.env[keySource]) : undefined;
+
+  console.info("[getSupabaseAdmin] Configuração:", {
+    configured: !!(supabaseUrl && supabaseKey),
+    urlSource,
+    keySource,
+    usesServiceRole: keySource === "SUPABASE_SERVICE_ROLE_KEY",
+  });
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error("[getSupabaseAdmin] Supabase não configurado:", {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasSupabaseKey: !!supabaseKey,
-      envKeys: Object.keys(process.env).filter((k) => k.includes("SUPABASE")),
-    });
-    return null;
+    console.error("[getSupabaseAdmin] Supabase não configurado.");
+    supabaseAdmin = null;
+    return supabaseAdmin;
   }
 
-  return createClient(supabaseUrl, supabaseKey);
+  try {
+    supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    return supabaseAdmin;
+  } catch (error: any) {
+    console.error("[getSupabaseAdmin] Falha ao criar cliente:", { message: error?.message });
+    supabaseAdmin = null;
+    return supabaseAdmin;
+  }
 }
 
 async function getSystemSettings(supabase: any): Promise<{ chat_active: boolean; checkout_active: boolean; banner_active: boolean; banner_text: string; chamado_active: boolean; chamado_expires_at: string | null; chamado_features: string[]; chamado_banner_text: string }> {
@@ -378,6 +395,12 @@ async function createApp(): Promise<express.Application> {
 
   // Middleware for parsing JSON
   app.use(express.json());
+  app.use((req: any, res: any, next: any) => {
+    const requestId = req.headers["x-request-id"] || crypto.randomUUID();
+    req.requestId = String(requestId);
+    res.setHeader("x-request-id", req.requestId);
+    next();
+  });
 
   // Auth middleware para endpoints /api/*. Exceções: saúde, settings, webhooks,
   // checkout (gerencia próprio token), analytics (gerencia próprio token) e cupons.
@@ -439,7 +462,9 @@ async function createApp(): Promise<express.Application> {
 
       return res.json({
         exists: true,
-        raw: chart.prokerala_raw_data,
+        raw: chart.raw_data,
+        astrology_provider: chart.astrology_provider,
+        astrology_cache_completeness: chart.astrology_cache_completeness,
         birth_date: chart.birth_date,
         birth_time: chart.birth_time,
         latitude: chart.latitude,
@@ -2694,28 +2719,46 @@ async function createApp(): Promise<express.Application> {
   // Admin Panel API
   // ============================================================
 
-  // GET /api/health - diagnóstico de variáveis de ambiente e conexão básica
-  app.get("/api/health", (req, res) => {
-    const supabaseUrl = !!(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
-    const supabaseKey = !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
+  // GET /api/health - diagnóstico mascarado de configuração e conexão básica
+  app.get("/api/health", async (req: any, res) => {
+    const required = {
+      SUPABASE_URL: !!cleanEnvVar(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL),
+      SUPABASE_SERVICE_ROLE_KEY: !!cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      VITE_SUPABASE_URL: !!cleanEnvVar(process.env.VITE_SUPABASE_URL),
+      VITE_SUPABASE_ANON_KEY: !!cleanEnvVar(process.env.VITE_SUPABASE_ANON_KEY),
+    };
+    const optional = {
+      JHORA_API_URL: { configured: !!cleanEnvVar(process.env.JHORA_API_URL), using_default: !cleanEnvVar(process.env.JHORA_API_URL) },
+      ASTROLOGY_API_KEY: !!cleanEnvVar(process.env.ASTROLOGY_API_KEY),
+      GEMINI_API_KEY: !!cleanEnvVar(process.env.GEMINI_API_KEY),
+      GOOGLE_TTS_CREDENTIALS_JSON: !!cleanEnvVar(process.env.GOOGLE_TTS_CREDENTIALS_JSON),
+      RESEND_API_KEY: !!cleanEnvVar(process.env.RESEND_API_KEY),
+      AUDIO_MIXER_URL: !!cleanEnvVar(process.env.AUDIO_MIXER_URL),
+      AUDIO_MIXER_SECRET: !!cleanEnvVar(process.env.AUDIO_MIXER_SECRET),
+    };
     const supabase = getSupabaseAdmin();
-
-    res.json({
-      ok: supabase !== null,
-      env: {
-        node_env: process.env.NODE_ENV,
-        vercel: process.env.VERCEL,
-        supabase_url: supabaseUrl,
-        supabase_key: supabaseKey,
-        gemini: !!process.env.GEMINI_API_KEY,
-        tts: !!process.env.GOOGLE_TTS_CREDENTIALS_JSON,
-        resend: !!process.env.RESEND_API_KEY,
-        audio_mixer_url: !!process.env.AUDIO_MIXER_URL,
-        audio_mixer_secret: !!process.env.AUDIO_MIXER_SECRET,
-      },
-      available_env_keys: Object.keys(process.env).filter((k) =>
-        ["SUPABASE", "GEMINI", "GOOGLE", "RESEND", "AUDIO_MIXER", "NODE_ENV", "VERCEL"].some((prefix) => k.startsWith(prefix) || k.includes(prefix))
-      ),
+    let database = { ok: false, error: supabase ? "probe_failed" : "not_configured" };
+    if (supabase) {
+      try {
+        const probe = supabase.from("system_settings").select("key").limit(1);
+        const result: any = await Promise.race([
+          probe,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
+        ]);
+        database = { ok: !result.error, error: result.error ? "query_failed" : "" };
+      } catch (error: any) {
+        database = { ok: false, error: error?.message === "timeout" ? "timeout" : "query_failed" };
+      }
+    }
+    const missingRequired = Object.entries(required).filter(([, present]) => !present).map(([name]) => name);
+    return res.status(missingRequired.length === 0 && database.ok ? 200 : 503).json({
+      ok: missingRequired.length === 0 && database.ok,
+      request_id: req.requestId,
+      runtime: { node_env: process.env.NODE_ENV || null, vercel: process.env.VERCEL === "1" },
+      required,
+      optional,
+      database,
+      missing_required: missingRequired,
     });
   });
 
@@ -3315,6 +3358,7 @@ async function createApp(): Promise<express.Application> {
   // Middleware global de erro — captura exceções não tratadas e loga stack
   app.use((err: any, req: any, res: any, next: any) => {
     console.error("[Express Error]", {
+      requestId: req.requestId,
       path: req.path,
       method: req.method,
       message: err?.message,
@@ -3323,7 +3367,8 @@ async function createApp(): Promise<express.Application> {
     if (res.headersSent) return next(err);
     res.status(500).json({
       error: "Erro interno no servidor.",
-      details: err?.message || String(err),
+      request_id: req.requestId,
+      ...(process.env.NODE_ENV !== "production" ? { details: err?.message || String(err) } : {}),
     });
   });
 
