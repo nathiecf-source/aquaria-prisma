@@ -2591,7 +2591,7 @@ ${dignityToneNote}
 4. "title": nome do ponto + signo (ex.: "${config.label} em ${sign}").
 5. "energySubtitle": frase curta (máx. 1 linha) que sintetize o tom central dessa posição.
 6. "fonte_astrologica": repita os dados técnicos reais usados (posição e aspectos) de forma sucinta.
-7. "vedicStrength" (SOMENTE se [DADOS VÉDICOS — FORÇA DO PLANETA] foi fornecido; para ângulos, omita este campo): gere um objeto com "shadbalaPercentage" (número), "classification" (string exata da classificação acima), "sideralSign", "sideralHouse" (número), "karaka" (string do karaka ou null) e "interpretation" (máx. 3 linhas). A interpretação deve ser direta, falar com "você", unir a vitalidade do Shadbala com o pedido prático da casa/signo sideral e, se houver Karaka, explicar brevemente o papel desse planeta como karaka no mapa. Não use jargão técnico extenso.
+7. "vedicStrength" (SOMENTE se [DADOS VÉDICOS — FORÇA DO PLANETA] foi fornecido acima; para ângulos ou se a seção não estiver presente, omita este campo): gere um objeto com "shadbalaPercentage" (número), "classification" (string exata da classificação acima), "sideralSign", "sideralHouse" (número), "karaka" (string do karaka ou null) e "interpretation" (máx. 3 linhas). A interpretação deve ser direta, falar com "você", unir a vitalidade do Shadbala com o pedido prático da casa/signo sideral e, se houver Karaka, explicar brevemente o papel desse planeta como karaka no mapa. Não use jargão técnico extenso.${vedicDataText ? `
 
 [EXEMPLO DE VEDICSTRENGTH]
 Se os dados fornecidos fossem: Sol, Shadbala 125%, Casa 10 Sideral em Leão, sem Karaka.
@@ -2603,7 +2603,9 @@ Então:
   "sideralHouse": 10,
   "karaka": null,
   "interpretation": "Sua energia de propósito e presença é um pilar natural. O posicionamento na Casa 10 Sideral pede que você coloque essa visibilidade a serviço da sua carreira e autoridade, assumindo a responsabilidade de liderar sem se esconder nos bastidores."
-}`;
+}` : ""}`;
+
+  console.log(`[PLANET READING ${config.canonicalName}] vedicDataText preenchido:`, vedicDataText ? "SIM" : "NÃO");
 
   const userMessage = `Gere a leitura tropical completa de ${config.canonicalName} seguindo estritamente o schema e as diretrizes do sistema.`;
 
@@ -4487,15 +4489,7 @@ Você é um analista astrológico terapêutico de abordagem junguiana que atua n
 - Fale diretamente com a pessoa usando "você". Não use nome próprio nem terceira pessoa.
 
 [FORMATO DE SAÍDA EXIGIDO]
-Retorne a análise formatada em Markdown, dividida em dois blocos:
-
-✦ Fluxos de Potência (Yogas)
-Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
-
-Para cada Yoga listado, estruture exatamente assim:
-[ Tag: NOME DO YOGA ] Título Terapêutico Criado por Você
-Tema: (uma linha curta resumindo o arquétipo)
-Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como usar esse recurso na prática)
+Retorne a análise formatada em Markdown, dividida em dois blocos, NA ORDEM ABAIXO:
 
 ✦ Pontos de Lapidação (Doshas)
 Padrões estruturais do mapa que exigem integração consciente, maturidade e limites.
@@ -4505,12 +4499,27 @@ Para cada Dosha listado, estruture exatamente assim:
 Tema: (uma linha curta resumindo o padrão)
 Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como integrar esse desafio na prática)
 
+✦ Fluxos de Potência (Yogas)
+Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
+
+Para cada Yoga listado, estruture exatamente assim:
+[ Tag: NOME DO YOGA ] Título Terapêutico Criado por Você
+Tema: (uma linha curta resumindo o arquétipo)
+Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como usar esse recurso na prática)
+
 [EXEMPLO DE CALIBRAÇÃO]
 Input simulado:
 yogas: ["Raja Yoga", "Gaja Kesari Yoga"]
 doshas: ["Kuja Dosha (Marte)"]
 
 Output esperado:
+✦ Pontos de Lapidação (Doshas)
+Padrões estruturais do mapa que exigem integração consciente, maturidade e limites.
+
+[ Tag: Kuja Dosha (Marte) ] Gestão de Limites & Assertividade nas Trocas
+Tema: Intensidade e necessidade de espaço pessoal nos relacionamentos.
+Síntese Terapêutica: Aponta para uma energia de ação muito viva dentro das parcerias. O aprendizado não é evitar o confronto por medo da ruptura, mas transformar o impulso em assertividade cristalina, comunicando o que você precisa sem cair em reatividade defensiva.
+
 ✦ Fluxos de Potência (Yogas)
 Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
 
@@ -4521,13 +4530,6 @@ Síntese Terapêutica: Há um alinhamento fluído entre sua identidade e a capac
 [ Tag: Gaja Kesari Yoga ] Sabedoria Emocional & Inteligência Relacional
 Tema: Conexão entre a mente emocional e a busca por sentido.
 Síntese Terapêutica: Confere uma intuição afiada e maturidade psíquica. É um recurso nativo para aconselhar, acolher e manter a clareza mental em momentos em que o ambiente externo está sob forte pressão. Sua empatia é uma bússola de decisões, não apenas um traço de personalidade.
-
-✦ Pontos de Lapidação (Doshas)
-Padrões estruturais do mapa que exigem integração consciente, maturidade e limites.
-
-[ Tag: Kuja Dosha (Marte) ] Gestão de Limites & Assertividade nas Trocas
-Tema: Intensidade e necessidade de espaço pessoal nos relacionamentos.
-Síntese Terapêutica: Aponta para uma energia de ação muito viva dentro das parcerias. O aprendizado não é evitar o confronto por medo da ruptura, mas transformar o impulso em assertividade cristalina, comunicando o que você precisa sem cair em reatividade defensiva.
 
 [DADOS DO USUÁRIO]
 ${getGenderFlexionInstruction(gender)}

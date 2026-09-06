@@ -1193,7 +1193,7 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      const readingId = `dinamicas-planetarias-${userId || "anon"}`;
+      const readingId = `dinamicas-planetarias-v2-${userId || "anon"}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached) {
         return res.json({ reading: cached, cached: true });
@@ -1271,8 +1271,15 @@ async function createApp(): Promise<express.Application> {
       }
 
       const readingText = await generatePlanetReading(profile, planetId);
-      const parsedReading = JSON.parse(readingText);
-      console.log("[PLANET READING] vedicStrength:", parsedReading.vedicStrength ? "presente" : "ausente", JSON.stringify(parsedReading.vedicStrength).slice(0, 200));
+      let parsedReading: any;
+      try {
+        parsedReading = JSON.parse(readingText);
+      } catch (parseErr) {
+        console.error("[PLANET READING] Falha ao fazer parse do JSON:", parseErr, "\nTexto:", readingText.slice(0, 500));
+        throw new Error("Resposta do Gemini não é um JSON válido.");
+      }
+      const vedicInfo = parsedReading?.vedicStrength ?? null;
+      console.log("[PLANET READING] vedicStrength:", vedicInfo ? "presente" : "ausente", JSON.stringify(vedicInfo ?? null).slice(0, 200));
       await saveReading(userId, readingId, "planeta-tropical", parsedReading);
       return res.json({ reading: parsedReading, cached: false });
     } catch (err: any) {
