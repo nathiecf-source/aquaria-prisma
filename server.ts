@@ -451,7 +451,7 @@ async function createApp(): Promise<express.Application> {
 
       const { data: chart, error } = await tempSupabase
         .from('user_chart')
-        .select('*')
+        .select('birth_date, birth_time, latitude, longitude, birth_data, astrology_provider, astrology_cache_completeness')
         .eq('user_id', userId)
         .single();
 
@@ -462,7 +462,6 @@ async function createApp(): Promise<express.Application> {
 
       return res.json({
         exists: true,
-        raw: chart.raw_data,
         astrology_provider: chart.astrology_provider,
         astrology_cache_completeness: chart.astrology_cache_completeness,
         birth_date: chart.birth_date,
