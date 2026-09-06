@@ -3168,18 +3168,18 @@ Para cada trânsito (repita este bloco completo para CADA trânsito recebido):
 O trânsito de **[Planeta Trânsito]** ([Breve definição poética do arquétipo do planeta, ex: a névoa que dissolve velhas certezas]) encontra [o seu / a sua] **[Planeta Natal] Natal** ([Breve definição do arquétipo do planeta natal, ex: a sua bússola interna de fé e expansão]). Esse cruzamento pode gerar um período de **[Descrever o choque psicológico/emocional sem citar casas astrológicas]**. Isso rapidamente ativa padrões de retenção no seu corpo. Observe agora: seu sistema está respondendo a esse campo de tensão? Há um aperto ou constrição em **[Sugerir área do corpo/sensação reflexa única para este trânsito]**?
 
 **A Geografia do Trânsito:**
-[Bloco independente — nunca como nota de rodapé.]
+[Bloco independente — nunca como nota de rodapé. Fale DIRETAMENTE com a pessoa usando "você". Não use o nome próprio nem a terceira pessoa.]
 O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de transito]** (Casa **[Número da casa de transito] Tropical**) e reverbera na sua esfera de **[Tema da casa natal]** (Casa **[Número da casa natal]**).
 
-No mapa sideral, este mesmo trânsito cai em **[Signo Sideral]** na **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes (divergência ativa), diferencie: a Casa Tropical mostra onde o foco psicológico/atenção do usuário está; a Casa Sideral mostra onde a vida cobra resultados práticos e onde o ambiente concreto reage.
+No mapa sideral, este mesmo trânsito cai em **[Signo Sideral]** na **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes, escreva diretamente a interpretação: "A Casa Tropical mostra que o foco psicológico deste trânsito é buscar [tema da casa tropical], enquanto a Casa Sideral mostra que este movimento nasce da necessidade estrutural por [tema da casa sideral]." Não explique a diferença técnica, apenas dê a interpretação viva e direta.
 
 **Terreno de Manifestação (Ashtakavarga):**
 Se a Força do Terreno (BAV) estiver disponível, escreva em uma única linha:
-"Força do Terreno: **[bavScore]** — **[bavTerrain]**." Depois, em uma nova linha, 1 frase curta traduzindo o que isso significa para a ação do usuário.
+"Força do Terreno: **[bavTerrain]**." Depois, em uma nova linha, 1 frase curta e direta falando com "você" sobre o que isso exige na prática.
 Se a Força do Terreno estiver Indisponível, omita essa linha completamente e escreva apenas a Força de Contribuição do Ambiente.
 
-Força de Contribuição do Ambiente: **[savScore]** — **[savStrength]**. Em uma nova linha, 1 frase curta traduzindo o que isso indica sobre as circunstâncias externas.
-Não liste números isoladamente; traduza esses indicadores como matéria, atrito ou facilidade concreta que o usuário encontrará na vida prática.
+Força de Contribuição do Ambiente: **[savStrength]**. Em uma nova linha, 1 frase curta e direta falando com "você" sobre o que as circunstâncias externas oferecem ou exigem.
+Não repita os números brutos; traduza apenas o rótulo (Árido/Neutro/Fértil ou escassa/limitada/equilibrada/favorecida/potente) como matéria, atrito ou facilidade concreta.
 
 **A Integração:**
 [Parágrafo de 3 a 5 frases — PROIBIDO usar frases de transição congeladas, genéricas ou repetitivas como 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar', ou qualquer variação dessas fórmulas. Cada frase deve fluir com coesão gramatical impecável. Comece diretamente com um insight não-dual EXCLUSIVO para esta exata combinação de planetas, nascido do cruzamento entre o que o planeta transitante dissolve/pressiona/expande E o que o planeta natal representa na psique. Em seguida, nomeie uma Virtude inventada especificamente para este contexto (ex: Discernimento Suave, Silêncio Fértil, Coragem Quieta) e aplique-a em 1 a 2 frases práticas e diretas no dia a dia. A transição entre o insight e a virtude deve ser orgânica e literária — jamais mecânica.]
@@ -3241,7 +3241,7 @@ Não liste números isoladamente; traduza esses indicadores como matéria, atrit
     const coHouseStr = t.transitCoHouse ? ` + co-ativa Casa ${t.transitCoHouse}` : "";
     const v = t.vedic_structural_terrain || {};
     const vedicStr = v.sideral_sign
-      ? ` | sideralSign: "${v.sideral_sign}" | sideralHouse: ${v.sideral_house} | bavScore: ${v.ashtakavarga_score ?? "Indisponível"} | bavTerrain: "${v.terrain_classification ?? "Indisponível"}" | savScore: ${v.sav_score ?? "Indisponível"} | savStrength: "${v.sav_classification ?? "Indisponível"}" | houseShift: ${v.divergences?.house_shift?.has_shift ? "true" : "false"}`
+      ? ` | sideralSign: "${v.sideral_sign}" | sideralHouse: ${v.sideral_house} | bavTerrain: "${v.terrain_classification ?? "Indisponível"}" | savStrength: "${v.sav_classification ?? "Indisponível"}" | houseShift: ${v.divergences?.house_shift?.has_shift ? "true" : "false"}`
       : "";
     return `- planet: "${t.planet}" | transitSign: "${t.transitSign || "?"}" | transitHouse: ${t.transitHouse}${coHouseStr} | planetaNatal: "${t.planetaNatal || ""}" | signoNatal: "${signoNatal}" | casaNatal: ${t.casaNatal ?? t.transitHouse} | regenteSignoTransito: "${regenteSignoTransito}" | regenteSignoNatal: "${regenteSignoNatal}" | casaDoRegenteNatal: ${casaDoRegenteNatal} | casaRegidaPeloTransitante: ${casaRegidaPeloTransitante} | aspecto: "${t.aspectToNatal}" | ritmo_tempo: "${t.ritmo_tempo || ""}"${vedicStr}`;
   };
