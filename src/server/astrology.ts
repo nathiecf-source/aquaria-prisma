@@ -663,28 +663,69 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   };
   const shadRaw = horoscope.shad_bala;
   const shad = record(shadRaw) || {};
+
+  function extractShadBalaRatio(entry: any): number | null {
+    if (typeof entry !== "object" || entry === null) return null;
+    // Caso primário: o JHora retorna um objeto com `ratio` direto
+    if (typeof entry.ratio === "number") return entry.ratio;
+    // Fallback: calcular a partir de total_rupas / minimum_required_rupas
+    const total = numeric(entry.total_rupas) ?? numeric(entry.total_virupas);
+    const minRequired = numeric(entry.minimum_required_rupas) ?? numeric(entry.minimum_required_virupas);
+    if (typeof total === "number" && typeof minRequired === "number" && minRequired > 0) {
+      return total / minRequired;
+    }
+    // Fallback legado: se o próprio entry for um número
+    if (typeof entry === "number") return entry;
+    return null;
+  }
+
   if (Array.isArray(shadRaw)) {
     shad.components = shadRaw;
-    // JHora costuma retornar o total na posição 6, com value sendo um array de 7 planetas
-    const totalValues = record(shadRaw[6])?.value;
-    if (Array.isArray(totalValues)) {
-      ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno"].forEach((planet, index) => {
-        if (typeof totalValues[index] === "number") shad[planet] = totalValues[index];
-      });
-    }
-    // Fallback: tente encontrar objetos com nome do planeta dentro do array
     shadRaw.forEach((entry: any) => {
-      if (entry && typeof entry === "object" && entry.name && typeof entry.value === "number") {
-        const translated = translatePlanetName(String(entry.name));
-        if (translated && !shad[translated]) shad[translated] = entry.value;
+      if (!entry || typeof entry !== "object") return;
+      const graha = entry.graha || entry.name || entry.planet || entry.Graha || entry.planet_name;
+      const translated = typeof graha === "string" ? translatePlanetName(String(graha)) : null;
+      const targetName = translated || (typeof graha === "string" ? graha : null);
+      if (targetName) {
+        const ratio = extractShadBalaRatio(entry);
+        if (typeof ratio === "number" && typeof shad[targetName] !== "number") shad[targetName] = ratio;
       }
     });
   }
+
   if (typeof shadRaw === "object" && !Array.isArray(shadRaw)) {
+    ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"].forEach((englishName) => {
+      const entry = shadRaw[englishName];
+      if (entry) {
+        const translated = translatePlanetName(englishName);
+        const ratio = extractShadBalaRatio(entry);
+        if (translated && typeof ratio === "number" && typeof shad[translated] !== "number") {
+          shad[translated] = ratio;
+        }
+      }
+    });
     ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno"].forEach((planet) => {
-      if (typeof shadRaw[planet] === "number" && typeof shad[planet] !== "number") shad[planet] = shadRaw[planet];
+      const entry = shadRaw[planet];
+      if (entry && typeof shad[planet] !== "number") {
+        const ratio = extractShadBalaRatio(entry);
+        if (typeof ratio === "number") shad[planet] = ratio;
+      }
     });
   }
+
+  // Fallback legado: índice 6 costumava ser o total em estruturas antigas
+  if (Array.isArray(shadRaw) && shadRaw[6]) {
+    const totalValues = record(shadRaw[6])?.value;
+    if (Array.isArray(totalValues)) {
+      ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno"].forEach((planet, index) => {
+        if (typeof totalValues[index] === "number" && typeof shad[planet] !== "number") {
+          shad[planet] = totalValues[index];
+        }
+      });
+    }
+  }
+
+  console.log("[SHADBALA PARSE] raw keys:", Object.keys(shadRaw || {}), "| shad:", { Sol: shad.Sol, Lua: shad.Lua, Marte: shad.Marte, Mercúrio: shad.Mercúrio, Júpiter: shad.Júpiter, Vênus: shad.Vênus, Saturno: shad.Saturno });
   const ashta = record(horoscope.ashtakavarga) || {};
   const timing = mapTiming(result, currentDateStr);
   const nakshatraFor = (planet: string) => mapped.planets.find((item) => item.name === planet)?.nakshatra || "";

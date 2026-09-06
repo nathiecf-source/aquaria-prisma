@@ -1130,6 +1130,24 @@ async function createApp(): Promise<express.Application> {
         console.warn('[AQUAR.IA Backend] Chart não salvo:', chartSaveError);
       }
 
+      // 5.5. Gerar Dinâmicas Planetárias em background (não bloqueia o onboard)
+      if (activeUserId) {
+        (async () => {
+          const readingId = `dinamicas-planetarias-v2-${activeUserId}`;
+          const cached = await getCachedReading(activeUserId, readingId);
+          if (!cached) {
+            try {
+              console.log(`[AQUAR.IA Backend] Gerando Dinâmicas Planetárias em background para usuário: ${activeUserId}`);
+              const readingText = await generatePlanetaryDynamicsReading(astrologicalProfile);
+              await saveReading(activeUserId, readingId, "dinamicas-planetarias", { text: readingText });
+              console.log(`[AQUAR.IA Backend] Dinâmicas Planetárias salvas em background para usuário: ${activeUserId}`);
+            } catch (dynErr: any) {
+              console.error(`[AQUAR.IA Backend] Falha ao gerar Dinâmicas Planetárias em background para usuário ${activeUserId}:`, dynErr?.message || String(dynErr));
+            }
+          }
+        })();
+      }
+
       // 6. Send complete response to client
       return res.json({
         profile: astrologicalProfile,
@@ -1264,7 +1282,7 @@ async function createApp(): Promise<express.Application> {
         return res.status(403).json({ error: "Este ponto astrológico está bloqueado para o plano FREE." });
       }
 
-      const readingId = `planeta-v2-${planetId}-tropical`;
+      const readingId = `planeta-v3-${planetId}-tropical`;
       const cached = await getCachedReading(userId, readingId);
       if (cached) {
         return res.json({ reading: cached, cached: true });

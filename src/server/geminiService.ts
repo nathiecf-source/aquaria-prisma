@@ -2525,10 +2525,18 @@ export async function generatePlanetReading(profile: CompleteAstrologicalProfile
   let vedicDataText = "";
   if (!config.isAngle) {
     const rawShad = profile.vedic_balas?.shadbala?.[config.canonicalName];
-    const shadbalaPercentage = typeof rawShad === "number" ? Math.round(rawShad * 100) : null;
     const vedicPlanet = profile.vedic_natal?.planets?.find((p: any) => p.name === config.canonicalName);
     const sideralSign = vedicPlanet?.sign || "";
     const sideralHouse = typeof vedicPlanet?.house === "number" ? vedicPlanet.house : null;
+
+    let shadbalaPercentage: number | null = null;
+    if (typeof rawShad === "number") {
+      shadbalaPercentage = Math.round(rawShad * 100);
+    } else if (sideralSign && sideralHouse !== null) {
+      // Padrão seguro: se o planeta existe no mapa védico mas o shadbala falhou, use 100%
+      shadbalaPercentage = 100;
+    }
+
     const karakas = (profile.vedic_specifics?.karakas || {}) as Record<string, string>;
     const karaka = karakas.atmakaraka === config.canonicalName
       ? "Atmakaraka"
@@ -2537,6 +2545,8 @@ export async function generatePlanetReading(profile: CompleteAstrologicalProfile
         : karakas.darakaraka === config.canonicalName
           ? "Darakaraka"
           : null;
+
+    console.log(`[PLANET READING ${config.canonicalName}] rawShad:`, rawShad, "| sideralSign:", sideralSign, "| sideralHouse:", sideralHouse, "| shadbalaPercentage:", shadbalaPercentage);
 
     if (shadbalaPercentage !== null && sideralSign && sideralHouse !== null) {
       const classification = shadbalaPercentage > 110
