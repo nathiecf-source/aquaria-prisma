@@ -597,3 +597,140 @@ export function getUpcomingCosmicEvents(
   unique.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   return unique;
 }
+
+// ─── Camada Sideral/Védica para os Ciclos Planetários ─────────────────────────
+
+/** Ordem das linhas do Bhinna Ashtakavarga (BAV) retornado pelo JHora. */
+const BAV_PLANET_ORDER = ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno", "Ascendente"];
+
+/** Fórmula de Lahiri para o ayanamsha do ano civil (mesma constante usada em geminiService.ts). */
+function computeLahiriAyanamsha(year: number): number {
+  return 23.853056 + (year - 2000) * 0.0139697;
+}
+
+function getSignIndex(sign: string): number {
+  return SIGN_NAMES.indexOf(sign);
+}
+
+function tropicalToSideral(longitude: number, ayanamsha: number): number {
+  return normalizeAngle(longitude - ayanamsha);
+}
+
+/** Calcula a casa védica Whole Sign a partir do signo sideral do trânsito e do Ascendente sideral natal. */
+function getVedicHouse(sideralTransitSign: number, sideralAscendantSign: number): number {
+  return ((sideralTransitSign - sideralAscendantSign + 12) % 12) + 1;
+}
+
+export interface AshtakavargaScore {
+  bav: number | null;
+  sav: number | null;
+}
+
+/** Extrai BAV do planeta transitante e SAV do signo sideral a partir da matriz JHora. */
+export function getAshtakavargaScore(
+  ashtakavarga: any,
+  planetName: string,
+  sideralSignIndex: number
+): AshtakavargaScore {
+  const binna = ashtakavarga?.binna_ashtaka_varga;
+  const samudhaya = ashtakavarga?.samudhaya_ashtaka_varga;
+  const row = BAV_PLANET_ORDER.indexOf(planetName);
+
+  const bav =
+    Array.isArray(binna) && row >= 0 && Array.isArray(binna[row]) && typeof binna[row][sideralSignIndex] === "number"
+      ? binna[row][sideralSignIndex]
+      : null;
+
+  const sav =
+    Array.isArray(samudhaya) && typeof samudhaya[sideralSignIndex] === "number"
+      ? samudhaya[sideralSignIndex]
+      : null;
+
+  return { bav, sav };
+}
+
+export function classifyBavTerrain(score: number | null): string {
+  if (score === null) return "Indisponível";
+  if (score <= 2) return "Árido";
+  if (score <= 4) return "Neutro";
+  return "Fértil";
+}
+
+export function classifySavStrength(score: number | null): string {
+  if (score === null) return "Indisponível";
+  if (score < 24) return "escassa";
+  if (score <= 27) return "limitada";
+  if (score <= 30) return "equilibrada";
+  if (score <= 33) return "favorecida";
+  return "potente";
+}
+
+export interface VedicTransitTerrain {
+  sideral_sign: string;
+  sideral_house: number;
+  ashtakavarga_score: number | null;
+  terrain_classification: string;
+  sav_score: number | null;
+  sav_classification: string;
+  divergences: {
+    house_shift: {
+      has_shift: boolean;
+      tropical_house: number;
+      vedic_house: number;
+      interpretation_key: string;
+    };
+    planet_aspect_shift: {
+      has_shift: boolean;
+    };
+  };
+}
+
+/**
+ * Calcula o terreno sideral/védico de um planeta em trânsito.
+ * Usa o Ascendente sideral natal (profile.vedic_specifics.lagna) e a longitude tropical do trânsito.
+ * Retorna null se o Ascendente védico não estiver disponível.
+ */
+export function getVedicTransitTerrain(
+  profile: any,
+  planetName: string,
+  tropicalLongitude: number,
+  tropicalHouse: number,
+  today: Date = new Date()
+): VedicTransitTerrain | null {
+  const lagnaSign = profile?.vedic_specifics?.lagna;
+  if (!lagnaSign) return null;
+
+  const sideralAscendantSign = getSignIndex(lagnaSign);
+  if (sideralAscendantSign < 0) return null;
+
+  const ayanamsha = computeLahiriAyanamsha(today.getFullYear());
+  const sideralLongitude = tropicalToSideral(tropicalLongitude, ayanamsha);
+  const sideralSignIndex = Math.floor(sideralLongitude / 30);
+  const sideralSign = SIGN_NAMES[sideralSignIndex] ?? "?";
+  const sideralHouse = getVedicHouse(sideralSignIndex, sideralAscendantSign);
+
+  const { bav, sav } = getAshtakavargaScore(profile?.vedic_balas?.ashtakavarga, planetName, sideralSignIndex);
+
+  const hasShift = tropicalHouse !== sideralHouse;
+  const interpretationKey = hasShift
+    ? `Foco psicológico voltado para a Casa ${tropicalHouse} (Tropical), mas a sustentação material e o ambiente concreto reagem na Casa ${sideralHouse} (Sideral).`
+    : "O foco interior e o terreno material estão alinhados na mesma casa.";
+
+  return {
+    sideral_sign: sideralSign,
+    sideral_house: sideralHouse,
+    ashtakavarga_score: bav,
+    terrain_classification: classifyBavTerrain(bav),
+    sav_score: sav,
+    sav_classification: classifySavStrength(sav),
+    divergences: {
+      house_shift: {
+        has_shift: hasShift,
+        tropical_house: tropicalHouse,
+        vedic_house: sideralHouse,
+        interpretation_key: interpretationKey,
+      },
+      planet_aspect_shift: { has_shift: false },
+    },
+  };
+}

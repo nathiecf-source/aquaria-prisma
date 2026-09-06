@@ -49,7 +49,7 @@ import { getPlanetGlyphConfig, PLANET_GLYPHS } from "./src/lib/planetGlyphs";
 import { synthesizeMeditation } from "./src/server/ttsService";
 import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
-import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents } from "./src/server/transitEngine";
+import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "./src/server/transitEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -1429,6 +1429,9 @@ async function createApp(): Promise<express.Application> {
           const casaDoRegenteNatal: number | undefined = regenteObj?.house;
           const casaRegidaPeloTransitante: number | undefined = natalHousesMap.find((h: any) => h.ruler === t.planeta_transito)?.house;
 
+          // Camada sideral/védica para o bloco "Geografia do Trânsito"
+          const vedicTerrain = getVedicTransitTerrain(profile, t.planeta_transito, t.grau_transito, transitHouse);
+
           return {
             planet: t.planeta_transito,
             transitSign,
@@ -1441,6 +1444,7 @@ async function createApp(): Promise<express.Application> {
             ritmo_tempo: t.ritmo_tempo,
             casaDoRegenteNatal,
             casaRegidaPeloTransitante,
+            vedic_structural_terrain: vedicTerrain,
           };
         });
 

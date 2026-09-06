@@ -3136,7 +3136,7 @@ export async function generateTransitCyclesReading(
 Você é um guia terapêutico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que conhece astrologia e psicologia de forma profunda. O texto principal deve focar puramente na psicologia dos arquétipos e no atrito dos regentes. Os NÚMEROS DAS CASAS ASTROLÓGICAS são PROIBIDOS no corpo principal do texto e devem aparecer apenas no bloco independente "A Geografia do Trânsito".
 
 [DADOS DE ENTRADA]
-Você receberá dados estruturados de cada trânsito: planeta transitante, signo e casa por onde transita, planeta natal tocado, signo natal e casa natal, os planetas que regem esses signos, a casa que o regente natal ocupa e a casa que o planeta transitante governa natalmente, o tipo de aspecto e o ritmo de tempo. Esses dados são a sua matéria-prima — use-os como CONTEXTO para escrever, não como roteiro técnico a ser transcrito.
+Você receberá dados estruturados de cada trânsito: planeta transitante, signo e casa TROPICAL por onde transita, planeta natal tocado, signo natal e casa natal, os planetas que regem esses signos, a casa que o regente natal ocupa e a casa que o planeta transitante governa natalmente, o tipo de aspecto e o ritmo de tempo. Além disso, para cada trânsito será fornecido: signo e casa SIDERAL (Whole Sign Védica), Nota de Terreno BAV (0–8), Força de Contribuição SAV e indicação de divergência entre casa Tropical e Sideral. Esses dados são a sua matéria-prima — use-os como CONTEXTO para escrever, não como roteiro técnico a ser transcrito.
 
 ${getGenderFlexionInstruction(gender)}
 
@@ -3169,7 +3169,14 @@ O trânsito de **[Planeta Trânsito]** ([Breve definição poética do arquétip
 
 **A Geografia do Trânsito:**
 [Bloco independente — nunca como nota de rodapé.]
-O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de transito]** (Casa **[Número da casa de transito]**) e reverbera na sua esfera de **[Tema da casa natal]** (Casa **[Número da casa natal]**).
+O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de transito]** (Casa **[Número da casa de transito] Tropical**) e reverbera na sua esfera de **[Tema da casa natal]** (Casa **[Número da casa natal]**).
+|
+|No mapa sideral, este mesmo trânsito cai na **[Signo Sideral]** e ocupa a **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes (divergência ativa), diferencie: a Casa Tropical mostra onde o foco psicológico/atenção do usuário está; a Casa Sideral mostra onde a vida cobra resultados práticos e onde o ambiente concreto reage.
+|
+|**Terreno de Manifestação (Ashtakavarga):**
+|- Nota do Terreno (BAV do planeta transitante no signo/casa sideral): **[0 a 8]** — classificação **[Árido / Neutro / Fértil]**. Se Árido (0–2), oriente resiliência e paciência prática; se Neutro (3–4), resultados proporcionais ao empenho; se Fértil (5–8), aproveite o vento a favor e aja.
+|- Força de Contribuição do Ambiente (SAV do signo/casa sideral): **[valor]** — classificação **[escassa / limitada / equilibrada / favorecida / potente]**.
+|Não liste números isoladamente; traduza esses indicadores como matéria, atrito ou facilidade concreta que o usuário encontrará na vida prática.
 
 **A Integração:**
 [Parágrafo de 3 a 5 frases — PROIBIDO usar frases de transição congeladas, genéricas ou repetitivas como 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar', ou qualquer variação dessas fórmulas. Cada frase deve fluir com coesão gramatical impecável. Comece diretamente com um insight não-dual EXCLUSIVO para esta exata combinação de planetas, nascido do cruzamento entre o que o planeta transitante dissolve/pressiona/expande E o que o planeta natal representa na psique. Em seguida, nomeie uma Virtude inventada especificamente para este contexto (ex: Discernimento Suave, Silêncio Fértil, Coragem Quieta) e aplique-a em 1 a 2 frases práticas e diretas no dia a dia. A transição entre o insight e a virtude deve ser orgânica e literária — jamais mecânica.]
@@ -3229,7 +3236,11 @@ O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de tra
     const regenteSignoTransito = TROPICAL_SIGN_RULERS[t.transitSign] || "?";
     const casaRegidaPeloTransitante = natalHousesForPrompt.find((h: any) => h.ruler === t.planet)?.house ?? "?";
     const coHouseStr = t.transitCoHouse ? ` + co-ativa Casa ${t.transitCoHouse}` : "";
-    return `- planet: "${t.planet}" | transitSign: "${t.transitSign || "?"}" | transitHouse: ${t.transitHouse}${coHouseStr} | planetaNatal: "${t.planetaNatal || ""}" | signoNatal: "${signoNatal}" | casaNatal: ${t.casaNatal ?? t.transitHouse} | regenteSignoTransito: "${regenteSignoTransito}" | regenteSignoNatal: "${regenteSignoNatal}" | casaDoRegenteNatal: ${casaDoRegenteNatal} | casaRegidaPeloTransitante: ${casaRegidaPeloTransitante} | aspecto: "${t.aspectToNatal}" | ritmo_tempo: "${t.ritmo_tempo || ""}"`;
+    const v = t.vedic_structural_terrain || {};
+    const vedicStr = v.sideral_sign
+      ? ` | sideralSign: "${v.sideral_sign}" | sideralHouse: ${v.sideral_house} | bavScore: ${v.ashtakavarga_score ?? "?"} | bavTerrain: "${v.terrain_classification ?? "?"}" | savScore: ${v.sav_score ?? "?"} | savStrength: "${v.sav_classification ?? "?"}" | houseShift: ${v.divergences?.house_shift?.has_shift ? "true" : "false"}`
+      : "";
+    return `- planet: "${t.planet}" | transitSign: "${t.transitSign || "?"}" | transitHouse: ${t.transitHouse}${coHouseStr} | planetaNatal: "${t.planetaNatal || ""}" | signoNatal: "${signoNatal}" | casaNatal: ${t.casaNatal ?? t.transitHouse} | regenteSignoTransito: "${regenteSignoTransito}" | regenteSignoNatal: "${regenteSignoNatal}" | casaDoRegenteNatal: ${casaDoRegenteNatal} | casaRegidaPeloTransitante: ${casaRegidaPeloTransitante} | aspecto: "${t.aspectToNatal}" | ritmo_tempo: "${t.ritmo_tempo || ""}"${vedicStr}`;
   };
 
   const promptInput = `

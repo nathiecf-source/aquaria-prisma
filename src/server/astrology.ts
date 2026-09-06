@@ -46,6 +46,26 @@ export interface TropicalNatal {
   aspects: Aspect[];
 }
 
+export interface VedicStructuralTerrain {
+  sideral_sign: string;
+  sideral_house: number;
+  ashtakavarga_score: number; // BAV do planeta transitante no signo sideral
+  terrain_classification: string; // Árido / Neutro / Fértil
+  sav_score: number;
+  sav_classification: string; // escassa / limitada / equilibrada / favorecida / potente
+  divergences: {
+    house_shift: {
+      has_shift: boolean;
+      tropical_house: number;
+      vedic_house: number;
+      interpretation_key: string;
+    };
+    planet_aspect_shift: {
+      has_shift: boolean;
+    };
+  };
+}
+
 export interface TropicalTransit {
   planet: string;
   transitSign: string;
@@ -58,6 +78,7 @@ export interface TropicalTransit {
   ritmo_tempo?: string;
   casaDoRegenteNatal?: number;        // casa onde o regente do signo natal reside
   casaRegidaPeloTransitante?: number; // casa regida natalmente pelo planeta transitante
+  vedic_structural_terrain?: VedicStructuralTerrain;
 }
 
 export interface VedicNatalPlanet {
