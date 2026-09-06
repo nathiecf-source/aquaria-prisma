@@ -3422,18 +3422,17 @@ Use os nomes exatos dos planetas e estrelas ativos do usuário fornecidos em PER
   }
 
   const parseIso = (iso: string) => {
-    if (!iso || !iso.includes("-")) return null;
-    const [y, m, d] = iso.split("-").map(Number);
-    return { y, m, d };
+    const match = iso?.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
   };
 
   const yearsBetween = (startIso: string, endIso: string) => {
     const start = parseIso(startIso);
     const end = parseIso(endIso);
     if (!start || !end) return 0;
-    let years = end.y - start.y;
-    if (end.m < start.m || (end.m === start.m && end.d < start.d)) years -= 1;
-    return years;
+    const elapsedYears = (Date.UTC(end.y, end.m - 1, end.d) - Date.UTC(start.y, start.m - 1, start.d)) / (365.2425 * 24 * 60 * 60 * 1000);
+    return Math.max(0, Math.round(elapsedYears));
   };
 
   const mahadashaDurationYears = yearsBetween(mahadashaStart, mahadashaEnd);
@@ -3749,9 +3748,9 @@ function correctDashaPhaseParagraph(
   ];
 
   const parseIso = (iso: string) => {
-    if (!iso || !iso.includes("-")) return null;
-    const [y, m, d] = iso.split("-").map(Number);
-    return { y, m, d };
+    const match = iso?.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
   };
 
   const formatMonthYear = (iso: string) => {
@@ -3770,9 +3769,8 @@ function correctDashaPhaseParagraph(
     const start = parseIso(startIso);
     const end = parseIso(endIso);
     if (!start || !end) return 0;
-    let years = end.y - start.y;
-    if (end.m < start.m || (end.m === start.m && end.d < start.d)) years -= 1;
-    return years;
+    const elapsedYears = (Date.UTC(end.y, end.m - 1, end.d) - Date.UTC(start.y, start.m - 1, start.d)) / (365.2425 * 24 * 60 * 60 * 1000);
+    return Math.max(0, Math.round(elapsedYears));
   };
 
   const mahadashaDurationYears = yearsBetween(mahadashaStart, mahadashaEnd);

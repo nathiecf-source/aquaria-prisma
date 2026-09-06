@@ -540,7 +540,7 @@ function providerDateTimestamp(value: string): number {
   return match ? Date.UTC(+match[3], +match[2] - 1, +match[1], +(match[4] || 0), +(match[5] || 0)) : NaN;
 }
 
-function mapTiming(result: AstrologyProviderResult, currentDateStr: string): VedicTiming {
+export function mapTiming(result: AstrologyProviderResult, currentDateStr: string): VedicTiming {
   const periods = result.jhora ? getVimsottariDasha(result.jhora) || [] : result.astrologyapi?.majorDasha || [];
   if (!periods.length) return { ...EMPTY_TIMING };
   const target = new Date(`${currentDateStr}T12:00:00Z`).getTime();
@@ -556,15 +556,29 @@ function mapTiming(result: AstrologyProviderResult, currentDateStr: string): Ved
     else break;
   }
   const current = normalized[index];
-  const next = normalized[index + 1];
-  const end = current.end || next?.start || "";
+  const samePrefix = (period: typeof current, depth: number) => period.names.slice(0, depth).join("|") === current.names.slice(0, depth).join("|");
+  const blockStart = (depth: number) => {
+    let startIndex = index;
+    while (startIndex > 0 && samePrefix(normalized[startIndex - 1], depth)) startIndex--;
+    return normalized[startIndex]?.start || "";
+  };
+  const blockEndIndex = (depth: number) => {
+    let endIndex = index + 1;
+    while (endIndex < normalized.length && samePrefix(normalized[endIndex], depth)) endIndex++;
+    return endIndex;
+  };
+  const mahaEndIndex = blockEndIndex(1);
+  const antarEndIndex = blockEndIndex(2);
+  const nextPrat = normalized[index + 1];
+  const nextAntar = normalized[antarEndIndex];
+  const nextMaha = normalized[mahaEndIndex];
   return {
     ...EMPTY_TIMING,
     mahadasha: current.names[0] || "", antardasha: current.names[1] || "", pratyantardasha: current.names[2] || "",
-    mahadashaStart: current.start, antardashaStart: current.start, pratyantardashaStart: current.start,
-    mahadashaEnd: end, antardashaEnd: end, pratyantardashaEnd: end,
-    nextMahadasha: next?.names[0] || "", nextAntardasha: next?.names[1] || "", nextPratyantardasha: next?.names[2] || "",
-    nextMahadashaStart: next?.start || "", nextAntardashaStart: next?.start || "", nextPratyantardashaStart: next?.start || "",
+    mahadashaStart: blockStart(1), antardashaStart: blockStart(2), pratyantardashaStart: current.start,
+    mahadashaEnd: nextMaha?.start || current.end || "", antardashaEnd: nextAntar?.start || current.end || "", pratyantardashaEnd: nextPrat?.start || current.end || "",
+    nextMahadasha: nextMaha?.names[0] || "", nextAntardasha: nextAntar?.names[1] || "", nextPratyantardasha: nextPrat?.names[2] || "",
+    nextMahadashaStart: nextMaha?.start || "", nextAntardashaStart: nextAntar?.start || "", nextPratyantardashaStart: nextPrat?.start || "",
     startDate: normalized[0]?.start || "", endDate: normalized.at(-1)?.end || normalized.at(-1)?.start || "",
   };
 }

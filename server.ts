@@ -1584,7 +1584,7 @@ async function createApp(): Promise<express.Application> {
       const maha = normalizeKey(vedicTiming.mahadasha || "desconhecido");
       const antar = normalizeKey(vedicTiming.antardasha || "desconhecido");
       const pratyan = normalizeKey(vedicTiming.pratyantardasha || "desconhecido");
-      const readingId = `dasha-${userId}-${maha}-${antar}-${pratyan}`;
+      const readingId = `dasha-v2-${userId}-${maha}-${antar}-${pratyan}`;
 
       const pratyantardashaEnd = vedicTiming.pratyantardashaEnd;
       const parsedDashaEnd = pratyantardashaEnd
