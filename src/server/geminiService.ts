@@ -3170,13 +3170,16 @@ O trânsito de **[Planeta Trânsito]** ([Breve definição poética do arquétip
 **A Geografia do Trânsito:**
 [Bloco independente — nunca como nota de rodapé.]
 O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de transito]** (Casa **[Número da casa de transito] Tropical**) e reverbera na sua esfera de **[Tema da casa natal]** (Casa **[Número da casa natal]**).
-|
-|No mapa sideral, este mesmo trânsito cai na **[Signo Sideral]** e ocupa a **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes (divergência ativa), diferencie: a Casa Tropical mostra onde o foco psicológico/atenção do usuário está; a Casa Sideral mostra onde a vida cobra resultados práticos e onde o ambiente concreto reage.
-|
-|**Terreno de Manifestação (Ashtakavarga):**
-|- Nota do Terreno (BAV do planeta transitante no signo/casa sideral): **[0 a 8]** — classificação **[Árido / Neutro / Fértil]**. Se Árido (0–2), oriente resiliência e paciência prática; se Neutro (3–4), resultados proporcionais ao empenho; se Fértil (5–8), aproveite o vento a favor e aja.
-|- Força de Contribuição do Ambiente (SAV do signo/casa sideral): **[valor]** — classificação **[escassa / limitada / equilibrada / favorecida / potente]**.
-|Não liste números isoladamente; traduza esses indicadores como matéria, atrito ou facilidade concreta que o usuário encontrará na vida prática.
+
+No mapa sideral, este mesmo trânsito cai em **[Signo Sideral]** na **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes (divergência ativa), diferencie: a Casa Tropical mostra onde o foco psicológico/atenção do usuário está; a Casa Sideral mostra onde a vida cobra resultados práticos e onde o ambiente concreto reage.
+
+**Terreno de Manifestação (Ashtakavarga):**
+Se a Força do Terreno (BAV) estiver disponível, escreva em uma única linha:
+"Força do Terreno: **[bavScore]** — **[bavTerrain]**." Depois, em uma nova linha, 1 frase curta traduzindo o que isso significa para a ação do usuário.
+Se a Força do Terreno estiver Indisponível, omita essa linha completamente e escreva apenas a Força de Contribuição do Ambiente.
+
+Força de Contribuição do Ambiente: **[savScore]** — **[savStrength]**. Em uma nova linha, 1 frase curta traduzindo o que isso indica sobre as circunstâncias externas.
+Não liste números isoladamente; traduza esses indicadores como matéria, atrito ou facilidade concreta que o usuário encontrará na vida prática.
 
 **A Integração:**
 [Parágrafo de 3 a 5 frases — PROIBIDO usar frases de transição congeladas, genéricas ou repetitivas como 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar', ou qualquer variação dessas fórmulas. Cada frase deve fluir com coesão gramatical impecável. Comece diretamente com um insight não-dual EXCLUSIVO para esta exata combinação de planetas, nascido do cruzamento entre o que o planeta transitante dissolve/pressiona/expande E o que o planeta natal representa na psique. Em seguida, nomeie uma Virtude inventada especificamente para este contexto (ex: Discernimento Suave, Silêncio Fértil, Coragem Quieta) e aplique-a em 1 a 2 frases práticas e diretas no dia a dia. A transição entre o insight e a virtude deve ser orgânica e literária — jamais mecânica.]
@@ -3238,7 +3241,7 @@ O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de tra
     const coHouseStr = t.transitCoHouse ? ` + co-ativa Casa ${t.transitCoHouse}` : "";
     const v = t.vedic_structural_terrain || {};
     const vedicStr = v.sideral_sign
-      ? ` | sideralSign: "${v.sideral_sign}" | sideralHouse: ${v.sideral_house} | bavScore: ${v.ashtakavarga_score ?? "?"} | bavTerrain: "${v.terrain_classification ?? "?"}" | savScore: ${v.sav_score ?? "?"} | savStrength: "${v.sav_classification ?? "?"}" | houseShift: ${v.divergences?.house_shift?.has_shift ? "true" : "false"}`
+      ? ` | sideralSign: "${v.sideral_sign}" | sideralHouse: ${v.sideral_house} | bavScore: ${v.ashtakavarga_score ?? "Indisponível"} | bavTerrain: "${v.terrain_classification ?? "Indisponível"}" | savScore: ${v.sav_score ?? "Indisponível"} | savStrength: "${v.sav_classification ?? "Indisponível"}" | houseShift: ${v.divergences?.house_shift?.has_shift ? "true" : "false"}`
       : "";
     return `- planet: "${t.planet}" | transitSign: "${t.transitSign || "?"}" | transitHouse: ${t.transitHouse}${coHouseStr} | planetaNatal: "${t.planetaNatal || ""}" | signoNatal: "${signoNatal}" | casaNatal: ${t.casaNatal ?? t.transitHouse} | regenteSignoTransito: "${regenteSignoTransito}" | regenteSignoNatal: "${regenteSignoNatal}" | casaDoRegenteNatal: ${casaDoRegenteNatal} | casaRegidaPeloTransitante: ${casaRegidaPeloTransitante} | aspecto: "${t.aspectToNatal}" | ritmo_tempo: "${t.ritmo_tempo || ""}"${vedicStr}`;
   };
