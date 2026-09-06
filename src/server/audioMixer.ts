@@ -1,7 +1,14 @@
 import crypto from "crypto";
 
-const MIXER_URL = process.env.AUDIO_MIXER_URL;
-const MIXER_SECRET = process.env.AUDIO_MIXER_SECRET;
+export interface AudioMixResult {
+  buffer: Buffer;
+  mixed: boolean;
+  reason?: "not_configured" | "temp_upload_failed" | "mixer_failed";
+}
+
+export function isAudioMixerConfigured(): boolean {
+  return !!process.env.AUDIO_MIXER_URL?.trim();
+}
 
 function getBackgroundMusicUrl(): string {
   if (process.env.BACKGROUND_MUSIC_URL) {
@@ -31,10 +38,12 @@ function getBackgroundMusicUrl(): string {
 export async function mixWithBackgroundMusic(
   narrationBuffer: Buffer,
   supabase: any
-): Promise<Buffer> {
-  if (!MIXER_URL) {
+): Promise<AudioMixResult> {
+  const mixerUrl = process.env.AUDIO_MIXER_URL?.trim();
+  const mixerSecret = process.env.AUDIO_MIXER_SECRET?.trim();
+  if (!mixerUrl) {
     console.warn("[AudioMixer] AUDIO_MIXER_URL não configurado. Retornando narração sem trilha.");
-    return narrationBuffer;
+    return { buffer: narrationBuffer, mixed: false, reason: "not_configured" };
   }
 
   const sessionId = crypto.randomUUID();
@@ -51,18 +60,18 @@ export async function mixWithBackgroundMusic(
 
     if (tempUploadError) {
       console.warn("[AudioMixer] Falha no upload temporário:", tempUploadError);
-      return narrationBuffer;
+      return { buffer: narrationBuffer, mixed: false, reason: "temp_upload_failed" };
     }
 
     const { data: urlData } = supabase.storage.from("meditations").getPublicUrl(tempPath);
     const narrationUrl = urlData.publicUrl;
     const backgroundUrl = getBackgroundMusicUrl();
 
-    const response = await fetch(`${MIXER_URL.replace(/\/$/, "")}/mix`, {
+    const response = await fetch(`${mixerUrl.replace(/\/$/, "")}/mix`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(MIXER_SECRET ? { "x-mixer-secret": MIXER_SECRET } : {}),
+        ...(mixerSecret ? { "x-mixer-secret": mixerSecret } : {}),
       },
       body: JSON.stringify({
         narrationUrl,
@@ -73,6 +82,7 @@ export async function mixWithBackgroundMusic(
           fadeOutSeconds: 4,
         },
       }),
+      signal: AbortSignal.timeout(280000),
     });
 
     if (!response.ok) {
@@ -81,10 +91,10 @@ export async function mixWithBackgroundMusic(
     }
 
     const mixedArray = await response.arrayBuffer();
-    return Buffer.from(mixedArray);
+    return { buffer: Buffer.from(mixedArray), mixed: true };
   } catch (err: any) {
-    console.error("[AudioMixer] Erro ao mixar externamente:", err);
-    return narrationBuffer;
+    console.error("[AudioMixer] Erro ao mixar externamente:", { message: err?.message });
+    return { buffer: narrationBuffer, mixed: false, reason: "mixer_failed" };
   } finally {
     await supabase.storage.from("meditations").remove([tempPath]).catch(() => {});
   }

@@ -1664,7 +1664,11 @@ async function createApp(): Promise<express.Application> {
         return res.status(400).json({ error: "userId, pathId, sourceText e pathTitle são obrigatórios." });
       }
 
-      const hash = crypto.createHash("sha256").update(sourceText).digest("hex");
+      const sourceHash = crypto.createHash("sha256").update(sourceText).digest("hex");
+      const mixedHash = crypto.createHash("sha256").update(`${sourceHash}|mixed-v1`).digest("hex");
+      const narrationHash = crypto.createHash("sha256").update(`${sourceHash}|narration-v1`).digest("hex");
+      const mixerConfigured = !!process.env.AUDIO_MIXER_URL?.trim();
+      const expectedHash = mixerConfigured ? mixedHash : narrationHash;
 
       // Conectar ao Supabase com service_role
       const cleanEnv = (val: any): string | undefined => {
@@ -1685,12 +1689,12 @@ async function createApp(): Promise<express.Application> {
       // Verificar cache: se já existe áudio para este caminho/usuário com mesmo hash
       const { data: existing } = await supabase
         .from("user_paths")
-        .select("meditation_audio_url, source_text_hash, journal_text")
+        .select("meditation_audio_url, source_text_hash, journal_text, meditation_script")
         .eq("user_id", userId)
         .eq("path_id", pathId)
         .single();
 
-      if (existing?.meditation_audio_url && existing.source_text_hash === hash) {
+      if (existing?.meditation_audio_url && existing.source_text_hash === expectedHash) {
         return res.json({
           audioUrl: existing.meditation_audio_url,
           journalText: existing.journal_text || "",
@@ -1698,24 +1702,34 @@ async function createApp(): Promise<express.Application> {
         });
       }
 
-      // Gerar roteiro SSML via Gemini
-      console.log(`[MEDITATION] Gerando roteiro para ${pathId} (user: ${userId})...`);
-      const ssml = await generateMeditationScript(sourceText, pathTitle, gender || "feminino", gender_preference, pathId);
+      let ssml = existing?.meditation_script || "";
+      let narrationBuffer: Buffer | null = null;
+      if (mixerConfigured && existing?.meditation_audio_url && existing.source_text_hash === narrationHash) {
+        const existingNarration = await fetch(existing.meditation_audio_url);
+        if (existingNarration.ok) {
+          narrationBuffer = Buffer.from(await existingNarration.arrayBuffer());
+          console.log("[MEDITATION] Reutilizando narração de contingência para tentar a mixagem.");
+        }
+      }
 
-      // Converter SSML em MP3 via Google Cloud TTS
-      console.log(`[MEDITATION] Sintetizando áudio TTS...`);
-      const narrationBuffer = await synthesizeMeditation(ssml);
+      if (!narrationBuffer) {
+        console.log(`[MEDITATION] Gerando roteiro para ${pathId} (user: ${userId})...`);
+        ssml = await generateMeditationScript(sourceText, pathTitle, gender || "feminino", gender_preference, pathId);
+        console.log(`[MEDITATION] Sintetizando áudio TTS...`);
+        narrationBuffer = await synthesizeMeditation(ssml);
+      }
 
-      // Mixar com música de fundo instrumental
       console.log(`[MEDITATION] Mixando com música de fundo...`);
-      const audioBuffer = await mixWithBackgroundMusic(narrationBuffer, supabase);
+      const mixResult = await mixWithBackgroundMusic(narrationBuffer, supabase);
+      const finalHash = mixResult.mixed ? mixedHash : narrationHash;
+      console.log(`[MEDITATION] Resultado da mixagem: ${mixResult.mixed ? "mixed" : `narration (${mixResult.reason})`}`);
 
       // Upload para Supabase Storage
-      const filePath = `${userId}/${pathId}/${hash}.mp3`;
+      const filePath = `${userId}/${pathId}/${finalHash}.mp3`;
       const { error: uploadError } = await supabase
         .storage
         .from("meditations")
-        .upload(filePath, audioBuffer, {
+        .upload(filePath, mixResult.buffer, {
           contentType: "audio/mpeg",
           upsert: true,
         });
@@ -1741,7 +1755,7 @@ async function createApp(): Promise<express.Application> {
           path_id: pathId,
           path_title: pathTitle,
           source_text: sourceText,
-          source_text_hash: hash,
+          source_text_hash: finalHash,
           meditation_script: ssml,
           meditation_audio_url: audioUrl,
           generated_at: new Date().toISOString(),
@@ -2737,6 +2751,7 @@ async function createApp(): Promise<express.Application> {
       RESEND_API_KEY: !!cleanEnvVar(process.env.RESEND_API_KEY),
       AUDIO_MIXER_URL: !!cleanEnvVar(process.env.AUDIO_MIXER_URL),
       AUDIO_MIXER_SECRET: !!cleanEnvVar(process.env.AUDIO_MIXER_SECRET),
+      BACKGROUND_MUSIC_URL: !!cleanEnvVar(process.env.BACKGROUND_MUSIC_URL),
     };
     const supabase = getSupabaseAdmin();
     let database = { ok: false, error: supabase ? "probe_failed" : "not_configured" };
