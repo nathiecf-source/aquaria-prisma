@@ -1272,6 +1272,7 @@ async function createApp(): Promise<express.Application> {
 
       const readingText = await generatePlanetReading(profile, planetId);
       const parsedReading = JSON.parse(readingText);
+      console.log("[PLANET READING] vedicStrength:", parsedReading.vedicStrength ? "presente" : "ausente", JSON.stringify(parsedReading.vedicStrength).slice(0, 200));
       await saveReading(userId, readingId, "planeta-tropical", parsedReading);
       return res.json({ reading: parsedReading, cached: false });
     } catch (err: any) {

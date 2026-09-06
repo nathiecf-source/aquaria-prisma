@@ -618,22 +618,6 @@ export default function AstrologyMandala({
     .finally(() => setIsFetchingRapidActivations(false));
   };
 
-  const fetchPlanetaryDynamics = () => {
-    if (!profile || !userProfile?.id || isFetchingDynamics) return;
-    setIsFetchingDynamics(true);
-    fetch("/api/generate-planetary-dynamics", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, userId: userProfile.id })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.reading?.text) setDynamicsText(data.reading.text);
-    })
-    .catch(err => console.error("Erro Dinâmicas Planetárias:", err))
-    .finally(() => setIsFetchingDynamics(false));
-  };
-
   const handleOpenTransits = () => {
     setIsPanelOpen(false);
     setIsPlanetPanelOpen(false);
@@ -661,12 +645,30 @@ export default function AstrologyMandala({
       setPaywallFeature("dynamics");
       return;
     }
-    const willOpen = !isDynamicsOpen;
-    setIsDynamicsOpen(willOpen);
-    if (willOpen && profile && dynamicsText === null) {
+    setIsDynamicsOpen(prev => !prev);
+  };
+
+  const fetchPlanetaryDynamics = React.useCallback(() => {
+    if (!profile || !userProfile?.id || isFetchingDynamics || dynamicsText !== null) return;
+    setIsFetchingDynamics(true);
+    fetch("/api/generate-planetary-dynamics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, userId: userProfile.id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.reading?.text) setDynamicsText(data.reading.text);
+    })
+    .catch(err => console.error("Erro Dinâmicas Planetárias:", err))
+    .finally(() => setIsFetchingDynamics(false));
+  }, [profile, userProfile?.id, isFetchingDynamics, dynamicsText]);
+
+  React.useEffect(() => {
+    if (isDynamicsOpen && dynamicsText === null && !isFetchingDynamics && userProfile?.id) {
       fetchPlanetaryDynamics();
     }
-  };
+  }, [isDynamicsOpen, dynamicsText, isFetchingDynamics, userProfile?.id, fetchPlanetaryDynamics]);
 
   // 3. Interatividade (Função executada ao clicar):
   const handleElementClick = (elementId: string, elementType: string) => {
