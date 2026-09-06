@@ -2591,7 +2591,19 @@ ${dignityToneNote}
 4. "title": nome do ponto + signo (ex.: "${config.label} em ${sign}").
 5. "energySubtitle": frase curta (máx. 1 linha) que sintetize o tom central dessa posição.
 6. "fonte_astrologica": repita os dados técnicos reais usados (posição e aspectos) de forma sucinta.
-7. "vedicStrength" (SOMENTE se [DADOS VÉDICOS — FORÇA DO PLANETA] foi fornecido; para ângulos, omita este campo): gere um objeto com "shadbalaPercentage" (número), "classification" (string exata da classificação acima), "sideralSign", "sideralHouse" (número), "karaka" (string do karaka ou null) e "interpretation" (máx. 3 linhas). A interpretação deve ser direta, falar com "você", unir a vitalidade do Shadbala com o pedido prático da casa/signo sideral e, se houver Karaka, explicar brevemente o papel desse planeta como karaka no mapa. Não use jargão técnico extenso.`;
+7. "vedicStrength" (SOMENTE se [DADOS VÉDICOS — FORÇA DO PLANETA] foi fornecido; para ângulos, omita este campo): gere um objeto com "shadbalaPercentage" (número), "classification" (string exata da classificação acima), "sideralSign", "sideralHouse" (número), "karaka" (string do karaka ou null) e "interpretation" (máx. 3 linhas). A interpretação deve ser direta, falar com "você", unir a vitalidade do Shadbala com o pedido prático da casa/signo sideral e, se houver Karaka, explicar brevemente o papel desse planeta como karaka no mapa. Não use jargão técnico extenso.
+
+[EXEMPLO DE VEDICSTRENGTH]
+Se os dados fornecidos fossem: Sol, Shadbala 125%, Casa 10 Sideral em Leão, sem Karaka.
+Então:
+"vedicStrength": {
+  "shadbalaPercentage": 125,
+  "classification": "Recurso Abundante / Expressão Direta",
+  "sideralSign": "Leão",
+  "sideralHouse": 10,
+  "karaka": null,
+  "interpretation": "Sua energia de propósito e presença é um pilar natural. O posicionamento na Casa 10 Sideral pede que você coloque essa visibilidade a serviço da sua carreira e autoridade, assumindo a responsabilidade de liderar sem se esconder nos bastidores."
+}`;
 
   const userMessage = `Gere a leitura tropical completa de ${config.canonicalName} seguindo estritamente o schema e as diretrizes do sistema.`;
 

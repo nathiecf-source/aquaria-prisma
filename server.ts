@@ -1264,7 +1264,7 @@ async function createApp(): Promise<express.Application> {
         return res.status(403).json({ error: "Este ponto astrológico está bloqueado para o plano FREE." });
       }
 
-      const readingId = `planeta-${planetId}-tropical`;
+      const readingId = `planeta-v2-${planetId}-tropical`;
       const cached = await getCachedReading(userId, readingId);
       if (cached) {
         return res.json({ reading: cached, cached: true });

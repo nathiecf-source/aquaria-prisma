@@ -665,12 +665,25 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   const shad = record(shadRaw) || {};
   if (Array.isArray(shadRaw)) {
     shad.components = shadRaw;
+    // JHora costuma retornar o total na posição 6, com value sendo um array de 7 planetas
     const totalValues = record(shadRaw[6])?.value;
     if (Array.isArray(totalValues)) {
       ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno"].forEach((planet, index) => {
         if (typeof totalValues[index] === "number") shad[planet] = totalValues[index];
       });
     }
+    // Fallback: tente encontrar objetos com nome do planeta dentro do array
+    shadRaw.forEach((entry: any) => {
+      if (entry && typeof entry === "object" && entry.name && typeof entry.value === "number") {
+        const translated = translatePlanetName(String(entry.name));
+        if (translated && !shad[translated]) shad[translated] = entry.value;
+      }
+    });
+  }
+  if (typeof shadRaw === "object" && !Array.isArray(shadRaw)) {
+    ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno"].forEach((planet) => {
+      if (typeof shadRaw[planet] === "number" && typeof shad[planet] !== "number") shad[planet] = shadRaw[planet];
+    });
   }
   const ashta = record(horoscope.ashtakavarga) || {};
   const timing = mapTiming(result, currentDateStr);
