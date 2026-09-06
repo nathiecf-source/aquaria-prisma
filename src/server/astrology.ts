@@ -118,6 +118,8 @@ export interface VedicSpecifics {
   upapadaLag_na: string;
   dhanaYogas: string[];
   karmaYoga: string;
+  yogas: string[];
+  doshas: string[];
   dusthanas: { house: number; ruler: string; status: string }[];
   maranKarakaSthana: string[];
 }
@@ -651,9 +653,13 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   const yogaText = (value: unknown) => Array.isArray(value) ? `${value[1] || "Yoga"}: ${value[3] || value[2] || ""}` : String(value || "");
   const dhanaYogas = Object.entries(yogaList).filter(([key, value]) => /dhana|wealth|prosper/i.test(`${key} ${yogaText(value)}`)).map(([, value]) => yogaText(value));
   const karmaYoga = Object.entries(yogaList).find(([key]) => /karma/i.test(key));
+  const allYogas = Object.entries(yogaList).map(([, value]) => yogaText(value)).filter(Boolean);
+  const doshaList = record(horoscope.doshas) || {};
+  const doshaText = (value: unknown) => Array.isArray(value) ? value.filter(v => typeof v === "string").join(": ") : String(value || "");
+  const allDoshas = Object.entries(doshaList).map(([, value]) => doshaText(value)).filter(Boolean);
   const specifics: VedicSpecifics = {
     lagna, lagnaNakshatra: mapped.ascNakshatra, lagnesha: signRulers[lagna] || "", suryaLagna: mapped.planets.find(p => p.name === "Sol")?.sign || "", chandraLagna: mapped.planets.find(p => p.name === "Lua")?.sign || "", janmaNakshatra: mapped.planets.find(p => p.name === "Lua")?.nakshatra || "",
-    karakas: mapCharaKarakas(charaKarakas), dharmaTrikona: "", arudhaLag_na: arudhaEntry("Arudha Lagna"), arudhaPadas: Object.fromEntries(Object.entries(arudhaPadhas).filter(([key]) => key.startsWith("D-1-")).map(([key, value]) => [key, String(value)])), upapadaLag_na: arudhaEntry("Upapada Lagna"), dhanaYogas, karmaYoga: karmaYoga ? yogaText(karmaYoga[1]) : "", dusthanas: [], maranKarakaSthana: [],
+    karakas: mapCharaKarakas(charaKarakas), dharmaTrikona: "", arudhaLag_na: arudhaEntry("Arudha Lagna"), arudhaPadas: Object.fromEntries(Object.entries(arudhaPadhas).filter(([key]) => key.startsWith("D-1-")).map(([key, value]) => [key, String(value)])), upapadaLag_na: arudhaEntry("Upapada Lagna"), dhanaYogas, karmaYoga: karmaYoga ? yogaText(karmaYoga[1]) : "", yogas: allYogas, doshas: allDoshas, dusthanas: [], maranKarakaSthana: [],
   };
   const shadRaw = horoscope.shad_bala;
   const shad = record(shadRaw) || {};

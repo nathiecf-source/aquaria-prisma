@@ -2422,6 +2422,19 @@ const planetAspectReadingSchema = {
   required: ["planet1", "planet2", "type", "orb", "interpretation"]
 };
 
+const planetVedicStrengthSchema = {
+  type: Type.OBJECT,
+  properties: {
+    shadbalaPercentage: { type: Type.NUMBER },
+    classification: { type: Type.STRING },
+    sideralSign: { type: Type.STRING },
+    sideralHouse: { type: Type.NUMBER },
+    karaka: { type: Type.STRING },
+    interpretation: { type: Type.STRING }
+  },
+  required: ["shadbalaPercentage", "classification", "sideralSign", "sideralHouse", "interpretation"]
+};
+
 export const planetReadingSchema = {
   type: Type.OBJECT,
   properties: {
@@ -2430,7 +2443,8 @@ export const planetReadingSchema = {
     functionText: { type: Type.STRING },
     shadowText: { type: Type.STRING },
     aspectReadings: { type: Type.ARRAY, items: planetAspectReadingSchema },
-    fonte_astrologica: { type: Type.STRING }
+    fonte_astrologica: { type: Type.STRING },
+    vedicStrength: planetVedicStrengthSchema
   },
   required: ["title", "energySubtitle", "functionText", "shadowText", "fonte_astrologica"]
 };
@@ -2507,6 +2521,39 @@ export async function generatePlanetReading(profile: CompleteAstrologicalProfile
   const fichamentoFunction = fichamento.functionText;
   const fichamentoShadow = fichamento.shadowText;
 
+  // Dados védicos para a aba "Força Védica" (apenas planetas, não ângulos)
+  let vedicDataText = "";
+  if (!config.isAngle) {
+    const rawShad = profile.vedic_balas?.shadbala?.[config.canonicalName];
+    const shadbalaPercentage = typeof rawShad === "number" ? Math.round(rawShad * 100) : null;
+    const vedicPlanet = profile.vedic_natal?.planets?.find((p: any) => p.name === config.canonicalName);
+    const sideralSign = vedicPlanet?.sign || "";
+    const sideralHouse = typeof vedicPlanet?.house === "number" ? vedicPlanet.house : null;
+    const karakas = (profile.vedic_specifics?.karakas || {}) as Record<string, string>;
+    const karaka = karakas.atmakaraka === config.canonicalName
+      ? "Atmakaraka"
+      : karakas.amatyakaraka === config.canonicalName
+        ? "Amatyakaraka"
+        : karakas.darakaraka === config.canonicalName
+          ? "Darakaraka"
+          : null;
+
+    if (shadbalaPercentage !== null && sideralSign && sideralHouse !== null) {
+      const classification = shadbalaPercentage > 110
+        ? "Recurso Abundante / Expressão Direta"
+        : shadbalaPercentage >= 90
+          ? "Expressão Equilibrada / Atuação conforme demanda"
+          : "Expressão Subterrânea / Pede Cultivo Consciente";
+      vedicDataText = `
+[DADOS VÉDICOS — FORÇA DO PLANETA]
+Planeta: ${config.canonicalName}
+Vitalidade (Shadbala): ${shadbalaPercentage}% (${classification})
+Ancoragem Védica: Casa ${sideralHouse} Sideral em ${sideralSign}
+Karaka: ${karaka || "não aplicável"}
+`;
+    }
+  }
+
   const systemInstruction = `Você é uma analista psíquica e astróloga evolutiva, parte do algoritmo central da plataforma AQUAR.IA. Sua função é gerar a leitura tropical de um ponto específico do mapa natal (planeta, nodo ou ângulo) quando o usuário clica no seu glifo nas "Engrenagens Celestes". O tom deve ser o mesmo das leituras de Casa já existentes: de mestre, poético, acessível e psicologicamente refinado — sem jargões banais.
 
 ${getGenderFlexionInstruction(gender)}
@@ -2521,6 +2568,7 @@ ${positionText}
 
 [DADOS TÉCNICOS — ASPECTOS ATIVOS]
 ${aspectsListText}
+${vedicDataText}
 
 [FICHAMENTO ALQUÍMICO — BASE DE CONHECIMENTO OBRIGATÓRIA]
 Use o seguinte fichamento como chancela determinística para a função e para a oitava de aprendizado do ponto. Não invente conceitos fora desta base.
@@ -2542,7 +2590,8 @@ ${dignityToneNote}
    - Se não houver aspectos ativos, retorne "aspectReadings" como array vazio.
 4. "title": nome do ponto + signo (ex.: "${config.label} em ${sign}").
 5. "energySubtitle": frase curta (máx. 1 linha) que sintetize o tom central dessa posição.
-6. "fonte_astrologica": repita os dados técnicos reais usados (posição e aspectos) de forma sucinta.`;
+6. "fonte_astrologica": repita os dados técnicos reais usados (posição e aspectos) de forma sucinta.
+7. "vedicStrength" (SOMENTE se [DADOS VÉDICOS — FORÇA DO PLANETA] foi fornecido; para ângulos, omita este campo): gere um objeto com "shadbalaPercentage" (número), "classification" (string exata da classificação acima), "sideralSign", "sideralHouse" (número), "karaka" (string do karaka ou null) e "interpretation" (máx. 3 linhas). A interpretação deve ser direta, falar com "você", unir a vitalidade do Shadbala com o pedido prático da casa/signo sideral e, se houver Karaka, explicar brevemente o papel desse planeta como karaka no mapa. Não use jargão técnico extenso.`;
 
   const userMessage = `Gere a leitura tropical completa de ${config.canonicalName} seguindo estritamente o schema e as diretrizes do sistema.`;
 
@@ -3173,12 +3222,10 @@ O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de tra
 
 No mapa sideral, este mesmo trânsito cai em **[Signo Sideral]** na **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes, escreva diretamente a interpretação: "A Casa Tropical mostra que o foco psicológico deste trânsito é buscar [tema da casa tropical], enquanto a Casa Sideral mostra que este movimento nasce da necessidade estrutural por [tema da casa sideral]." Não explique a diferença técnica, apenas dê a interpretação viva e direta.
 
-**Terreno de Manifestação (Ashtakavarga):**
-Se a Força do Terreno (BAV) estiver disponível, escreva em uma única linha:
-"Força do Terreno: **[bavTerrain]**." Depois, em uma nova linha, 1 frase curta e direta falando com "você" sobre o que isso exige na prática.
+Ainda dentro deste mesmo bloco, o Terreno de Manifestação (Ashtakavarga) se apresenta assim:
+Se a Força do Terreno (BAV) estiver disponível, escreva em uma única linha: "Força do Terreno: [bavTerrain]." Depois, em uma nova linha, 1 frase curta e direta falando com "você" sobre o que isso exige na prática.
 Se a Força do Terreno estiver Indisponível, omita essa linha completamente e escreva apenas a Força de Contribuição do Ambiente.
-
-Força de Contribuição do Ambiente: **[savStrength]**. Em uma nova linha, 1 frase curta e direta falando com "você" sobre o que as circunstâncias externas oferecem ou exigem.
+Força de Contribuição do Ambiente: [savStrength]. Em uma nova linha, 1 frase curta e direta falando com "você" sobre o que as circunstâncias externas oferecem ou exigem.
 Não repita os números brutos; traduza apenas o rótulo (Árido/Neutro/Fértil ou escassa/limitada/equilibrada/favorecida/potente) como matéria, atrito ou facilidade concreta.
 
 **A Integração:**
@@ -4407,6 +4454,98 @@ Ao longo da semana, observe os pensamentos sem precisar organizá-los de imediat
     return (response.text || "").trim();
   } catch (error) {
     cleanLogError("[Gemini API] Falha na geração das Ativações Rápidas", error);
+    throw error;
+  }
+}
+
+export async function generatePlanetaryDynamicsReading(profile: CompleteAstrologicalProfile): Promise<string> {
+  const gender = getEffectiveGender(profile);
+  const yogas = profile.vedic_specifics?.yogas || [];
+  const doshas = profile.vedic_specifics?.doshas || [];
+
+  const systemInstruction = `[PAPEL DO SISTEMA]
+Você é um analista astrológico terapêutico de abordagem junguiana que atua na plataforma Aquar.IA. Sua função é traduzir Yogas (combinações planetárias de potência) e Doshas (combinações planetárias de desafio estrutural) da astrologia védica para uma linguagem psicológica contemporânea, elegante e focada na autonomia do usuário.
+
+[REGRAS DE TRADUÇÃO E TOM — MUITO IMPORTANTE]
+- Proibição de Fatalismo: é estritamente proibido o uso de termos punitivos, deterministas ou kármicos negativos (ex: "maldição", "sofrimento", "azar", "destruição", "mau").
+- Reframing Terapêutico:
+  - Traduza "Yogas" como "Fluxos de Potência", "Recursos Nativos" ou "Áreas de Expansão".
+  - Traduza "Doshas" como "Pontos de Lapidação", "Foco de Consciência" ou "Convite à Maturidade".
+- Objetividade: seja conciso. A leitura deve caber em cards expansíveis de interface, indo direto ao ponto sem introduções longas.
+- Fale diretamente com a pessoa usando "você". Não use nome próprio nem terceira pessoa.
+
+[FORMATO DE SAÍDA EXIGIDO]
+Retorne a análise formatada em Markdown, dividida em dois blocos:
+
+✦ Fluxos de Potência (Yogas)
+Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
+
+Para cada Yoga listado, estruture exatamente assim:
+[ Tag: NOME DO YOGA ] Título Terapêutico Criado por Você
+Tema: (uma linha curta resumindo o arquétipo)
+Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como usar esse recurso na prática)
+
+✦ Pontos de Lapidação (Doshas)
+Padrões estruturais do mapa que exigem integração consciente, maturidade e limites.
+
+Para cada Dosha listado, estruture exatamente assim:
+[ Tag: NOME DO DOSHA ] Título Terapêutico Criado por Você
+Tema: (uma linha curta resumindo o padrão)
+Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como integrar esse desafio na prática)
+
+[EXEMPLO DE CALIBRAÇÃO]
+Input simulado:
+yogas: ["Raja Yoga", "Gaja Kesari Yoga"]
+doshas: ["Kuja Dosha (Marte)"]
+
+Output esperado:
+✦ Fluxos de Potência (Yogas)
+Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
+
+[ Tag: Raja Yoga ] Autoridade & Reconhecimento Organizado
+Tema: Sinergia entre expressão pessoal e liderança.
+Síntese Terapêutica: Há um alinhamento fluído entre sua identidade e a capacidade de estruturar projetos no mundo. Quando você aplica método e consistência, o ambiente tende a responder com abertura de portas e respeito à sua autoridade. Evite a autossabotagem de se esconder nos bastidores.
+
+[ Tag: Gaja Kesari Yoga ] Sabedoria Emocional & Inteligência Relacional
+Tema: Conexão entre a mente emocional e a busca por sentido.
+Síntese Terapêutica: Confere uma intuição afiada e maturidade psíquica. É um recurso nativo para aconselhar, acolher e manter a clareza mental em momentos em que o ambiente externo está sob forte pressão. Sua empatia é uma bússola de decisões, não apenas um traço de personalidade.
+
+✦ Pontos de Lapidação (Doshas)
+Padrões estruturais do mapa que exigem integração consciente, maturidade e limites.
+
+[ Tag: Kuja Dosha (Marte) ] Gestão de Limites & Assertividade nas Trocas
+Tema: Intensidade e necessidade de espaço pessoal nos relacionamentos.
+Síntese Terapêutica: Aponta para uma energia de ação muito viva dentro das parcerias. O aprendizado não é evitar o confronto por medo da ruptura, mas transformar o impulso em assertividade cristalina, comunicando o que você precisa sem cair em reatividade defensiva.
+
+[DADOS DO USUÁRIO]
+${getGenderFlexionInstruction(gender)}
+
+Yogas identificados no mapa:
+${yogas.length ? yogas.map((y, i) => `${i + 1}. ${y}`).join("\n") : "Nenhum Yoga identificado."}
+
+Doshas identificados no mapa:
+${doshas.length ? doshas.map((d, i) => `${i + 1}. ${d}`).join("\n") : "Nenhum Dosha identificado."}
+
+[REGRAS FINAIS]
+- Não use emojis (exceto os ✦ dos títulos de bloco, que já estão no modelo).
+- Não crie introduções ou conclusões fora dos dois blocos.
+- Cada Síntese Terapêutica deve ser distinta e aplicável à vida real da pessoa.
+- Texto em português brasileiro, markdown simples.`;
+
+  try {
+    const client = getGeminiClient();
+    const response = await callGeminiWithRetry(client, {
+      model: "gemini-3.5-flash-lite",
+      contents: `Gere a leitura de Dinâmicas Planetárias usando os Yogas e Doshas fornecidos, seguindo rigorosamente o formato de saída com os dois blocos ✦ Fluxos de Potência (Yogas) e ✦ Pontos de Lapidação (Doshas).`,
+      config: {
+        systemInstruction,
+        temperature: 0.55,
+        maxOutputTokens: 3072,
+      },
+    });
+    return (response.text || "").trim();
+  } catch (error) {
+    cleanLogError("[Gemini API] Falha na geração das Dinâmicas Planetárias", error);
     throw error;
   }
 }

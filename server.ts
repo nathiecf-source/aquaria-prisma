@@ -41,7 +41,7 @@ import { Resend } from "resend";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "./src/server/geminiService";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "./src/server/geminiService";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -1176,6 +1176,36 @@ async function createApp(): Promise<express.Application> {
       console.error("Erro ao gerar leitura do caminho:", err);
       return res.status(500).json({
         error: "Erro ao gerar leitura do caminho.",
+        details: err?.message || String(err)
+      });
+    }
+  });
+
+  // API Route: Generate Planetary Dynamics Reading (Yogas/Doshas, sob demanda, com cache em user_readings)
+  app.post("/api/generate-planetary-dynamics", async (req, res) => {
+    try {
+      const { profile, userId } = req.body;
+      if (!profile) {
+        return res.status(400).json({ error: "Perfil astrológico é obrigatório." });
+      }
+
+      if (!(await requireFeatureAccess(req, res, "dinamicas-planetarias"))) {
+        return;
+      }
+
+      const readingId = `dinamicas-planetarias-${userId || "anon"}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached) {
+        return res.json({ reading: cached, cached: true });
+      }
+
+      const readingText = await generatePlanetaryDynamicsReading(profile);
+      await saveReading(userId, readingId, "dinamicas-planetarias", { text: readingText });
+      return res.json({ reading: { text: readingText }, cached: false });
+    } catch (err: any) {
+      console.error("Erro ao gerar Dinâmicas Planetárias:", err);
+      return res.status(500).json({
+        error: "Erro ao gerar Dinâmicas Planetárias.",
         details: err?.message || String(err)
       });
     }

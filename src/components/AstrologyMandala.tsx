@@ -11,6 +11,7 @@ import MinhaExperienciaTab from "./MinhaExperienciaTab";
 import { PaywallBarrier } from "./PaywallBarrier";
 import { Accordion } from "./Accordion";
 import PlanetGlyphBar from "./PlanetGlyphBar";
+import { PlanetaryDynamicsPanel } from "./PlanetaryDynamicsPanel";
 import { hasPlusAccess, hasChamadoFeature } from "../lib/access";
 import ChamadoTimer from "./ChamadoTimer";
 import PlanetReadingPanel from "./PlanetReadingPanel";
@@ -506,7 +507,10 @@ export default function AstrologyMandala({
   const [rapidActivationsData, setRapidActivationsData] = React.useState<any>(null);
   const [isFetchingRapidActivations, setIsFetchingRapidActivations] = React.useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = React.useState(false);
-  const [paywallFeature, setPaywallFeature] = React.useState<"transits" | "insights" | "planets" | "caminhos" | null>(null);
+  const [isDynamicsOpen, setIsDynamicsOpen] = React.useState(false);
+  const [isFetchingDynamics, setIsFetchingDynamics] = React.useState(false);
+  const [dynamicsText, setDynamicsText] = React.useState<string | null>(null);
+  const [paywallFeature, setPaywallFeature] = React.useState<"transits" | "insights" | "planets" | "caminhos" | "dynamics" | null>(null);
 
   const [selectedPlanetId, setSelectedPlanetId] = React.useState<string | null>(null);
   const [isPlanetPanelOpen, setIsPlanetPanelOpen] = React.useState(false);
@@ -614,9 +618,26 @@ export default function AstrologyMandala({
     .finally(() => setIsFetchingRapidActivations(false));
   };
 
+  const fetchPlanetaryDynamics = () => {
+    if (!profile || !userProfile?.id || isFetchingDynamics) return;
+    setIsFetchingDynamics(true);
+    fetch("/api/generate-planetary-dynamics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, userId: userProfile.id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.reading?.text) setDynamicsText(data.reading.text);
+    })
+    .catch(err => console.error("Erro Dinâmicas Planetárias:", err))
+    .finally(() => setIsFetchingDynamics(false));
+  };
+
   const handleOpenTransits = () => {
     setIsPanelOpen(false);
     setIsPlanetPanelOpen(false);
+    setIsDynamicsOpen(false);
     if (!hasChamadoFeature(userProfile, "ciclos")) {
       setPaywallFeature("transits");
       return;
@@ -628,6 +649,22 @@ export default function AstrologyMandala({
       if (transitsText === null) fetchTransits();
       if (profectionData === null) fetchProfection();
       if (rapidActivationsData === null) fetchRapidActivations();
+    }
+  };
+
+  const handleOpenDynamics = () => {
+    setIsPanelOpen(false);
+    setIsPlanetPanelOpen(false);
+    setIsTransitsModalOpen(false);
+    setIsInsightsOpen(false);
+    if (!hasChamadoFeature(userProfile, "dinamicas-planetarias")) {
+      setPaywallFeature("dynamics");
+      return;
+    }
+    const willOpen = !isDynamicsOpen;
+    setIsDynamicsOpen(willOpen);
+    if (willOpen && profile && dynamicsText === null) {
+      fetchPlanetaryDynamics();
     }
   };
 
@@ -654,6 +691,7 @@ export default function AstrologyMandala({
     setIsPanelOpen(true);
     setIsDiretrizModalOpen(false);
     setIsPlanetPanelOpen(false);
+    setIsDynamicsOpen(false);
 
     // Leituras de Casa (Dinâmica Psíquica / Védico / Síntese) agora são buscadas
     // sob demanda por aba dentro do próprio ReadingPanel (ver seu useEffect de activeTab),
@@ -853,6 +891,7 @@ export default function AstrologyMandala({
     setIsPlanetPanelOpen(true);
     setIsTransitsModalOpen(false);
     setIsInsightsOpen(false);
+    setIsDynamicsOpen(false);
     setIsDiretrizModalOpen(false);
     setIsPanelOpen(false);
   };
@@ -954,6 +993,13 @@ export default function AstrologyMandala({
                   Ciclos Ativos
                 </button>
                 <button
+                  id="tour-btn-dinamicas-planetarias"
+                  onClick={handleOpenDynamics}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-[#5c4d66]/10 text-[#5c4d66] hover:bg-[#5c4d66] hover:text-[#f4f1eb] transition-all text-[9px] font-mono tracking-wider uppercase cursor-pointer"
+                >
+                  Dinâmicas Planetárias
+                </button>
+                <button
                   id="tour-btn-minha-experiencia"
                   onClick={() => {
                     if (subscriptionTier === "FREE") {
@@ -963,6 +1009,7 @@ export default function AstrologyMandala({
                       setIsInsightsOpen(true);
                       setIsTransitsModalOpen(false);
                       setIsPlanetPanelOpen(false);
+                      setIsDynamicsOpen(false);
                     }
                   }}
                   className="flex items-center gap-1 px-2 py-1 rounded bg-[#5c4d66]/10 text-[#5c4d66] hover:bg-[#5c4d66] hover:text-[#f4f1eb] transition-all text-[9px] font-mono tracking-wider uppercase cursor-pointer"
@@ -993,7 +1040,7 @@ export default function AstrologyMandala({
       {/* Mandala Wrapper */}
       <div
         className={`transition-all duration-500 ease-in-out flex flex-col items-center justify-center origin-center ${
-          (isPanelOpen || isDiretrizModalOpen || isTransitsModalOpen || isInsightsOpen || isPlanetPanelOpen)
+          (isPanelOpen || isDiretrizModalOpen || isTransitsModalOpen || isInsightsOpen || isPlanetPanelOpen || isDynamicsOpen)
             ? "w-full lg:max-w-2xl lg:scale-[0.82] lg:-translate-x-[21vw]"
             : "w-full max-w-3xl scale-100 translate-x-0"
         }`}
@@ -2203,6 +2250,20 @@ export default function AstrologyMandala({
         />
       </RightPanelDrawer>
 
+      {/* Dynamics Panel — drawer lateral (Dinâmicas Planetárias) */}
+      <RightPanelDrawer
+        isOpen={isDynamicsOpen}
+        onClose={() => setIsDynamicsOpen(false)}
+        title="Dinâmicas Planetárias"
+      >
+        <PlanetaryDynamicsPanel
+          isOpen={isDynamicsOpen}
+          isLoading={isFetchingDynamics}
+          text={dynamicsText}
+          onRefresh={fetchPlanetaryDynamics}
+        />
+      </RightPanelDrawer>
+
       {/* Insights Panel — drawer lateral (Minha Experiência) */}
       <RightPanelDrawer
         isOpen={isInsightsOpen}
@@ -2282,7 +2343,9 @@ export default function AstrologyMandala({
                 ? "Engrenagens Celestes"
                 : paywallFeature === "caminhos"
                   ? "PASSE DE EXPANSÃO"
-                  : "Minha Experiência"
+                  : paywallFeature === "dynamics"
+                    ? "Dinâmicas Planetárias"
+                    : "Minha Experiência"
           }
           description={
             paywallFeature === "transits"
@@ -2291,7 +2354,9 @@ export default function AstrologyMandala({
                 ? "Desbloqueie a leitura tropical completa deste ponto astrológico, incluindo a teia de aspectos que ele forma com os demais planetas do seu mapa."
                 : paywallFeature === "caminhos"
                   ? "Desbloqueie os Caminhos de Potência e os Eixos Angulares para acessar as leituras profundas de cada direção da sua mandala."
-                  : "Guarde e revisite insights pessoais gerados nas suas leituras."
+                  : paywallFeature === "dynamics"
+                    ? `Seu mapa possui ${(profile?.vedic_specifics?.yogas || []).length} Fluxos de Potência e ${(profile?.vedic_specifics?.doshas || []).length} Pontos de Lapidação ativos. Assine o plano Premium para desbloquear sua matriz estrutural completa e entender os recursos ocultos da sua psique.`
+                    : "Guarde e revisite insights pessoais gerados nas suas leituras."
           }
         >
           <div className="hidden" />
