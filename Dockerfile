@@ -22,15 +22,13 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copia arquivos de dependencia
-COPY package.json package-lock.json* ./
-
-# Instala apenas dependencias de producao
-RUN npm install --omit=dev
+# Copia node_modules ja resolvidos do builder (evita reinstalar e conflitos de postinstall)
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copia artefatos do build
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
 
 # Variaveis de ambiente padrao
 ENV NODE_ENV=production
