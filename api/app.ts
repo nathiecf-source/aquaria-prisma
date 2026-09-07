@@ -3549,10 +3549,13 @@ async function createApp(): Promise<express.Application> {
   return app;
 }
 
+export { createApp };
+export default createApp;
+
 // Detecta se este módulo é o entrypoint real (npm start / npm run dev).
-// Em Vercel, o entrypoint é api/index.ts, então process.argv[1] aponta para
-// o launcher da Vercel e não para o bundle do server.ts. Isso evita que
-// o servidor tente chamar app.listen() dentro do container serverless.
+// Em Vercel, o entrypoint é api/index.ts, entao process.argv[1] aponta para
+// o launcher da Vercel e nao para o bundle. Isso evita que o servidor tente
+// chamar app.listen() dentro do container serverless.
 function isMainModule(): boolean {
   if (typeof process === "undefined" || !process.argv?.[1]) return false;
   if (typeof import.meta === "undefined" || !import.meta.url) return false;
@@ -3575,50 +3578,3 @@ if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1" && isMainModule
     process.exit(1);
   });
 }
-
-// Entrypoint serverless para a Vercel. Todas as rotas já estão registradas
-// em createApp() acima, então basta exportar o handler serverless-http.
-let handler: any;
-let handlerError: any;
-
-async function buildHandler() {
-  console.log("[Vercel] Inicializando handler...", {
-    node_env: process.env.NODE_ENV,
-    vercel: process.env.VERCEL,
-    cwd: process.cwd(),
-    keys: Object.keys(process.env).filter((k) =>
-      ["SUPABASE", "GEMINI", "GOOGLE", "RESEND", "AUDIO_MIXER", "NODE_ENV", "VERCEL"].some((p) => k.includes(p) || k.startsWith(p))
-    ),
-  });
-
-  try {
-    const { default: serverless } = await import("serverless-http");
-    const app = await createApp();
-    console.log("[Vercel] Express app criado com sucesso.");
-    return serverless(app);
-  } catch (err: any) {
-    console.error("[Vercel] Falha ao criar handler:", err);
-    handlerError = err;
-    return async (req: any, res: any) => {
-      res.statusCode = 500;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({
-        error: "Falha ao iniciar a API.",
-        details: err?.message || String(err),
-        stack: err?.stack,
-      }));
-    };
-  }
-}
-
-export default async (req: any, res: any) => {
-  if (!handler) {
-    handler = await buildHandler();
-  }
-
-  if (handlerError) {
-    console.error("[Vercel] Handler em estado de erro:", handlerError);
-  }
-
-  return handler(req, res);
-};
