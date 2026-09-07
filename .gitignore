@@ -6,6 +6,7 @@ coverage/
 *.log
 .env*
 env-vars.yaml
+build-log.txt
 !.env.example
 data/
 *.err
