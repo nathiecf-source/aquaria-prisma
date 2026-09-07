@@ -14,6 +14,12 @@ RUN npm install
 # Copia o restante do codigo
 COPY . .
 
+# Argumentos de build para variaveis Vite (sao injetadas no build do frontend)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 # Builda o frontend (Vite -> dist/) e o bundle do servidor (Express -> dist/server.mjs)
 RUN npm run build
 

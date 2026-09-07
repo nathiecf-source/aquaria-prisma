@@ -1,0 +1,37 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'VITE_SUPABASE_URL=${_VITE_SUPABASE_URL}'
+      - '--build-arg'
+      - 'VITE_SUPABASE_ANON_KEY=${_VITE_SUPABASE_ANON_KEY}'
+      - '-t'
+      - 'gcr.io/aquaria-app/aquaria:main'
+      - '.'
+    id: 'build'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/aquaria-app/aquaria:main']
+    id: 'push'
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'aquaria'
+      - '--image'
+      - 'gcr.io/aquaria-app/aquaria:main'
+      - '--region'
+      - 'southamerica-east1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--env-vars-file'
+      - '.env.deploy.yaml'
+    id: 'deploy'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
