@@ -1,4 +1,4 @@
-import { ReadingData } from "../data/mockReadings";
+import { ReadingData } from "../lib/mockReadings";
 
 const normalizeCoherenceDashboard = (text: string): string => text
   .replace(/\\n/g, "\n")

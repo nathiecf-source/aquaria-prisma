@@ -3,7 +3,7 @@ import BirthForm from "./components/BirthForm";
 import LoadingScreen from "./components/LoadingScreen";
 import ConfirmData from "./components/ConfirmData";
 import AstrologyMandala from "./components/AstrologyMandala";
-import { ReadingData } from "./data/mockReadings";
+import { ReadingData } from "./lib/mockReadings";
 import { AlertCircle, RefreshCw, Star, LogOut } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";

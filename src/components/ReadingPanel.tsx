@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Sparkles, BookOpen, Compass, ShieldAlert, Loader2 } from "lucide-react";
-import { ReadingData } from "../data/mockReadings";
+import { ReadingData } from "../lib/mockReadings";
 import { PaywallBarrier } from "./PaywallBarrier";
 import { hasPlusAccess, hasChamadoFeature } from "../lib/access";
 import { MeditationPlayer } from "./MeditationPlayer";

@@ -1,5 +1,5 @@
 import React from "react";
-import { getReadingForId, ReadingData } from "../data/mockReadings";
+import { getReadingForId, ReadingData } from "../lib/mockReadings";
 import ReadingPanel from "./ReadingPanel";
 import { ArrowLeft, User, X, Loader2 } from "lucide-react";
 import TechnicalDataModal from "./TechnicalDataModal";
