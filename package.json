@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx api/index.ts",
+    "dev": "tsx api/app.ts",
     "build:vercel": "vite build",
-    "build:server": "esbuild api/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs",
-    "build": "npm run build:vercel && npm run build:server",
+    "build:server": "esbuild api/app.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=api/server.mjs",
+    "build": "npm run build:server && npm run build:vercel",
     "vercel-build": "npm run build",
-    "start": "node dist/server.mjs",
+    "start": "node api/server.mjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "tsx --test src/server/*.test.ts"

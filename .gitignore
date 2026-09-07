@@ -11,6 +11,8 @@ data/
 assets/
 /*.cjs
 /*.mjs
+api/server.mjs
+api/server.mjs.map
 clear_cache.sql
 sql-script.sql
 project.tar.gz
