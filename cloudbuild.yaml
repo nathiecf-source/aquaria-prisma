@@ -30,7 +30,7 @@ steps:
       - '--port'
       - '8080'
       - '--env-vars-file'
-      - '.env.deploy.yaml'
+      - 'env-vars.yaml'
     id: 'deploy'
 
 options:
