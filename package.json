@@ -6,10 +6,9 @@
   "scripts": {
     "dev": "tsx api/app.ts",
     "build:vercel": "vite build",
-    "build:server": "esbuild api/app.ts --bundle --platform=node --format=esm --packages=external --minify --outfile=api/server.mjs",
-    "build": "npm run build:server && npm run build:vercel",
+    "build": "npm run build:vercel",
     "vercel-build": "npm run build",
-    "start": "node api/server.mjs",
+    "start": "tsx api/app.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "tsx --test src/server/*.test.ts"
