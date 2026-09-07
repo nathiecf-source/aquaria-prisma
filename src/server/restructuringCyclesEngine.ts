@@ -151,22 +151,25 @@ function ageAtDate(birthDateStr: string, date: Date): number {
   return years;
 }
 
-const CYCLE_DEFINITIONS: {
+interface CycleDefinition {
   planet: string;
   cycle: string;
-  aspect: number;
-  approximateAge: number;
-  upcomingAges?: number[];
-}[] = [
-  { planet: "Saturno", cycle: "Retorno de Saturno", aspect: 0, approximateAge: 29.5, upcomingAges: [29.5, 59, 88] },
-  { planet: "Saturno", cycle: "Quadratura de Saturno", aspect: 90, approximateAge: 7.25 },
-  { planet: "Saturno", cycle: "Oposição de Saturno", aspect: 180, approximateAge: 14.75 },
-  { planet: "Urano", cycle: "Quadratura de Urano", aspect: 90, approximateAge: 21 },
-  { planet: "Urano", cycle: "Oposição de Urano", aspect: 180, approximateAge: 42 },
-  { planet: "Urano", cycle: "Retorno de Urano", aspect: 0, approximateAge: 84 },
-  { planet: "Netuno", cycle: "Quadratura de Netuno", aspect: 90, approximateAge: 42 },
-  { planet: "Plutão", cycle: "Quadratura de Plutão", aspect: 90, approximateAge: 60 },
+  aspect: number; // 0, 90, 180
+  orbitalPeriodYears: number;
+}
+
+const CYCLE_DEFINITIONS: CycleDefinition[] = [
+  { planet: "Saturno", cycle: "Retorno de Saturno", aspect: 0, orbitalPeriodYears: 29.5 },
+  { planet: "Saturno", cycle: "Quadratura de Saturno", aspect: 90, orbitalPeriodYears: 29.5 },
+  { planet: "Saturno", cycle: "Oposição de Saturno", aspect: 180, orbitalPeriodYears: 29.5 },
+  { planet: "Urano", cycle: "Quadratura de Urano", aspect: 90, orbitalPeriodYears: 84 },
+  { planet: "Urano", cycle: "Oposição de Urano", aspect: 180, orbitalPeriodYears: 84 },
+  { planet: "Urano", cycle: "Retorno de Urano", aspect: 0, orbitalPeriodYears: 84 },
+  { planet: "Netuno", cycle: "Quadratura de Netuno", aspect: 90, orbitalPeriodYears: 165 },
+  { planet: "Plutão", cycle: "Quadratura de Plutão", aspect: 90, orbitalPeriodYears: 248 },
 ];
+
+const NODAL_ORBITAL_PERIOD_YEARS = 18.6;
 
 function getNatalLongitude(points: NatalPoint[], name: string): number | null {
   return points.find(p => p.name === name)?.longitude ?? null;
@@ -176,23 +179,74 @@ function getNatalHouse(points: NatalPoint[], name: string): number {
   return points.find(p => p.name === name)?.house ?? 0;
 }
 
+function addYears(date: Date, years: number): Date {
+  const result = new Date(date.getTime());
+  result.setFullYear(result.getFullYear() + Math.floor(years));
+  const remainderMonths = (years - Math.floor(years)) * 12;
+  result.setMonth(result.getMonth() + Math.floor(remainderMonths));
+  const remainderDays = (remainderMonths - Math.floor(remainderMonths)) * 30;
+  result.setDate(result.getDate() + Math.round(remainderDays));
+  return result;
+}
+
 function findNextApproximateCycleDate(
   planet: string,
   natalLongitude: number,
   targetAspect: number,
-  referenceDate: Date
+  orbitalPeriodYears: number,
+  referenceDate: Date,
+  birthDate: string
 ): { startDate: Date; endDate: Date; peakDate: Date } | null {
-  // Scan forward up to 1 year for entering the orb window
-  for (let d = 0; d <= 365; d++) {
-    const date = new Date(referenceDate.getTime() + d * MS_PER_DAY);
-    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(date) : planetLongitudeAtDate(planet, date);
-    if (lon === null) continue;
-    const dist = angularDistance(lon, natalLongitude);
-    if (Math.abs(dist - targetAspect) <= ORB) {
-      return findAspectWindow(planet, natalLongitude, targetAspect, date, 365 * 2);
+  // Use orbital period to compute approximate future occurrences efficiently.
+  const birth = new Date(`${birthDate}T00:00:00`);
+  const firstOccurrenceAge = (targetAspect === 0)
+    ? orbitalPeriodYears
+    : (targetAspect === 180)
+      ? orbitalPeriodYears / 2
+      : orbitalPeriodYears / 4;
+  const period = targetAspect === 0 ? orbitalPeriodYears : orbitalPeriodYears / (targetAspect === 180 ? 2 : 4);
+
+  // Find the next future occurrence index
+  const nowAgeMs = referenceDate.getTime() - birth.getTime();
+  const firstAgeMs = firstOccurrenceAge * 365.25 * MS_PER_DAY;
+  if (period <= 0) return null;
+  const periodMs = period * 365.25 * MS_PER_DAY;
+
+  // Find smallest k such that firstAgeMs + k * periodMs > nowAgeMs
+  let k = 0;
+  if (firstAgeMs <= nowAgeMs) {
+    k = Math.floor((nowAgeMs - firstAgeMs) / periodMs) + 1;
+  }
+
+  let best: { startDate: Date; endDate: Date; peakDate: Date } | null = null;
+  // Try a few occurrences in case retrogrades shift the exact window
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const targetAgeMs = firstAgeMs + (k + attempt) * periodMs;
+    const centerDate = new Date(birth.getTime() + targetAgeMs);
+
+    // Refine by scanning +/- 90 days around the estimate
+    let refinedCenter: Date | null = null;
+    for (let d = -90; d <= 90; d++) {
+      const date = new Date(centerDate.getTime() + d * MS_PER_DAY);
+      const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(date) : planetLongitudeAtDate(planet, date);
+      if (lon === null) continue;
+      const dist = angularDistance(lon, natalLongitude);
+      if (Math.abs(dist - targetAspect) <= ORB) {
+        refinedCenter = date;
+        break;
+      }
+    }
+
+    if (!refinedCenter) continue;
+    const window = findAspectWindow(planet, natalLongitude, targetAspect, refinedCenter, 365 * 2);
+    if (window && window.startDate.getTime() > referenceDate.getTime()) {
+      if (!best || window.startDate.getTime() < best.startDate.getTime()) {
+        best = window;
+      }
     }
   }
-  return null;
+
+  return best;
 }
 
 function concurrentCyclesForHouse(cycles: RestructuringCycle[], house: number | undefined, excludeKey: string): string[] {
@@ -240,7 +294,7 @@ export function calculateRestructuringCycles(
         cycles.push(cycle);
       }
     } else {
-      const nextWindow = findNextApproximateCycleDate(def.planet, natalLon, def.aspect, referenceDate);
+      const nextWindow = findNextApproximateCycleDate(def.planet, natalLon, def.aspect, def.orbitalPeriodYears, referenceDate, profile.birthData.birthDate);
       if (nextWindow) {
         cycles.push({
           type: "proximo",
@@ -286,7 +340,7 @@ export function calculateRestructuringCycles(
         cycles.push(cycle);
       }
     } else {
-      const nextWindow = findNextApproximateCycleDate("Nodo Norte", northNodeLon, 0, referenceDate);
+      const nextWindow = findNextApproximateCycleDate("Nodo Norte", northNodeLon, 0, NODAL_ORBITAL_PERIOD_YEARS, referenceDate, profile.birthData.birthDate);
       if (nextWindow) {
         cycles.push({
           type: "proximo",
@@ -325,7 +379,7 @@ export function calculateRestructuringCycles(
           cycles.push(cycle);
         }
       } else {
-        const nextWindow = findNextApproximateCycleDate("Nodo Norte", northNodeLon, 180, referenceDate);
+        const nextWindow = findNextApproximateCycleDate("Nodo Norte", northNodeLon, 180, NODAL_ORBITAL_PERIOD_YEARS, referenceDate, profile.birthData.birthDate);
         if (nextWindow) {
           cycles.push({
             type: "proximo",
@@ -343,11 +397,11 @@ export function calculateRestructuringCycles(
     }
   }
 
+  const todayStr = formatDateISO(referenceDate);
+
   // Vedic Saturn cycles from JHora data
   const vedic = profile.vedic_saturn_transits;
   if (vedic) {
-    const todayStr = formatDateISO(referenceDate);
-
     function addVedicCycle(
       name: string,
       planet: string,
@@ -355,7 +409,6 @@ export function calculateRestructuringCycles(
       period: { startDate: string; endDate: string; description?: string }
     ) {
       const isActive = todayStr >= period.startDate && todayStr <= period.endDate;
-      const startInFuture = period.startDate >= todayStr && period.startDate <= formatDateISO(new Date(referenceDate.getTime() + 365 * MS_PER_DAY));
       cycles.push({
         type: isActive ? "ativo" : "proximo",
         tradition: "vedic",
@@ -403,12 +456,12 @@ export function calculateRestructuringCycles(
     }
   }
 
-  // Sort: active first, then by start date
-  return cycles.sort((a, b) => {
-    if (a.isActive && !b.isActive) return -1;
-    if (!a.isActive && b.isActive) return 1;
-    const aDate = a.startDate || "9999-12-31";
-    const bDate = b.startDate || "9999-12-31";
-    return aDate.localeCompare(bDate);
-  });
+  // Separate active and upcoming; keep only the 3 closest upcoming cycles
+  const active = cycles.filter(c => c.isActive);
+  const upcoming = cycles
+    .filter(c => !c.isActive && c.startDate && c.startDate >= todayStr)
+    .sort((a, b) => (a.startDate || "9999-12-31").localeCompare(b.startDate || "9999-12-31"))
+    .slice(0, 3);
+
+  return [...active, ...upcoming];
 }
