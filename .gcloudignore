@@ -1,0 +1,10 @@
+#!gcloud_ignore
+# Arquivos que nao precisam ir para o Cloud Build
+.git
+.gitignore
+node_modules
+dist
+.env
+.env.local
+.env.deploy.yaml
+build-log.txt
