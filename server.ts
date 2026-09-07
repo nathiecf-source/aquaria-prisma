@@ -337,6 +337,26 @@ async function saveReading(
   }
 }
 
+function getISOWeek(date: Date): number {
+  const tmp = new Date(date.getTime());
+  tmp.setHours(0, 0, 0, 0);
+  tmp.setDate(tmp.getDate() + 4 - ((tmp.getDay() + 6) % 7 || 7));
+  const yearStart = new Date(tmp.getFullYear(), 0, 1);
+  return Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function hashInput(input: unknown): string {
+  return crypto.createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 16);
+}
+
+function getNextSundayMidnight(date: Date): Date {
+  const d = new Date(date.getTime());
+  d.setHours(0, 0, 0, 0);
+  const daysUntilSunday = (7 - d.getDay()) % 7 || 7;
+  d.setDate(d.getDate() + daysUntilSunday);
+  return d;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Minha Evolução — mapeamento estático dos itens rastreáveis
 // ═══════════════════════════════════════════════════════════════
@@ -478,6 +498,44 @@ async function createApp(): Promise<express.Application> {
         error: "Erro ao carregar chart do Supabase.",
         details: err?.message || String(err)
       });
+    }
+  });
+
+  // API Route: Listar payloads de leituras salvas (para reidratação do frontend)
+  app.get("/api/user-readings", async (req, res) => {
+    try {
+      const userId = String(req.query.userId || "");
+      if (!userId) {
+        return res.status(400).json({ error: "userId é obrigatório." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { data, error } = await supabase
+        .from("user_readings")
+        .select("reading_id, reading_type, payload")
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("[user_readings] Erro ao listar leituras:", error.message);
+        return res.status(500).json({ error: "Erro ao buscar leituras salvas." });
+      }
+
+      const readings: Record<string, any> = {};
+      for (const row of (data || []) as any[]) {
+        const payload = row.payload || {};
+        const expiresAt = payload.expiresAt || payload.expires_at;
+        if (expiresAt && new Date() >= new Date(expiresAt)) continue;
+        readings[row.reading_id] = payload;
+      }
+
+      return res.json({ readings });
+    } catch (err: any) {
+      console.error("Erro em /api/user-readings:", err);
+      return res.status(500).json({ error: "Erro ao buscar leituras salvas.", details: err?.message || String(err) });
     }
   });
 
@@ -1384,13 +1442,29 @@ async function createApp(): Promise<express.Application> {
   // API Route: Generate Diretriz Ampla
   app.post("/api/generate-diretriz-ampla", async (req, res) => {
     try {
-      const { profile, userName, visualState } = req.body;
+      const { profile, userName, visualState, userId } = req.body;
       if (!profile || !userName || !visualState) {
         return res.status(400).json({ error: "Perfil, nome do usuário e visualState são obrigatórios." });
       }
 
+      // Cache estático baseado no perfil e no estado visual. Regeera se visualState mudar.
+      const stateHash = hashInput({
+        birthDate: profile.birthData?.birthDate,
+        birthTime: profile.birthData?.birthTime,
+        latitude: profile.birthData?.birthPlace?.latitude,
+        longitude: profile.birthData?.birthPlace?.longitude,
+        visualState,
+      });
+      const readingId = `diretriz-ampla-${stateHash}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached && cached.intro && Array.isArray(cached.blocks)) {
+        console.log(`[DIRETRIZ AMPLA] Cache hit ${readingId}`);
+        return res.json({ reading: cached, cached: true });
+      }
+
       const reading = await generateDiretrizAmpla(profile, userName, visualState);
-      return res.json({ reading });
+      await saveReading(userId, readingId, "diretriz-ampla", reading);
+      return res.json({ reading, cached: false });
     } catch (err: any) {
       console.error("Erro ao gerar Diretriz Ampla:", err);
       return res.status(500).json({
@@ -1413,6 +1487,19 @@ async function createApp(): Promise<express.Application> {
 
       if (!(await requireFeatureAccess(req, res, "ciclos"))) {
         return;
+      }
+
+      // Cache semanal da leitura: uma leitura por semana civil (YYYY-W##)
+      const now = new Date();
+      const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
+      const readingId = `transit-cycles-${weekKey}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached && typeof cached.reading === "string") {
+        console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
+        const restructuringCycles = Array.isArray(cached.restructuringCycles)
+          ? cached.restructuringCycles
+          : calculateRestructuringCycles(profile, now);
+        return res.json({ reading: cached.reading, restructuringCycles, cached: true });
       }
 
       // ── Motor de trânsitos interno (Etapa 4) ──
@@ -1518,7 +1605,10 @@ async function createApp(): Promise<express.Application> {
         console.warn("[RESTRUCTURING CYCLES] Falha ao calcular ciclos reestruturantes:", cyclesErr?.message);
       }
 
-      return res.json({ reading: readingText, restructuringCycles });
+      const payload = { reading: readingText, restructuringCycles, generatedAt: new Date().toISOString() };
+      await saveReading(userId, readingId, "transit-cycles", payload, getNextSundayMidnight(new Date()));
+
+      return res.json({ reading: readingText, restructuringCycles, cached: false });
     } catch (err: any) {
       console.error("Erro ao gerar Leitura de Trânsitos e Ciclos:", err);
       return res.status(500).json({

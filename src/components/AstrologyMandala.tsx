@@ -535,7 +535,7 @@ export default function AstrologyMandala({
       fetch("/api/generate-diretriz-ampla", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, userName, visualState })
+        body: JSON.stringify({ profile, userName, visualState, userId: userProfile?.id })
       })
       .then(res => res.json())
       .then(data => {

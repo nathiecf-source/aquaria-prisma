@@ -533,7 +533,7 @@ const SphereGroup: React.FC<{
   onActivate: (t: ActiveTransit | null) => void;
 }> = ({ house, transits, activeKey, startIndex, userId, onActivate }) => {
   const sphereName = HOUSE_SPHERES[house] || `Casa ${house}`;
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(false);
 
   return (
     <div className="mb-6">
@@ -591,23 +591,23 @@ const HOUSE_THEMES: Record<number, string> = {
 };
 
 const UPCOMING_CYCLE_TEXT: Record<string, string> = {
-  "Retorno de Saturno": "ciclo de revisão de estruturas, responsabilidades e legado pessoal.",
-  "Quadratura de Saturno": "teste de limites, ajuste de rota e consolidação de maturidade.",
-  "Oposição de Saturno": "meio do ciclo saturnino: revisão do que foi construído até aqui.",
-  "Quadratura de Urano": "impulso de ruptura, independência e mudança de direção.",
-  "Oposição de Urano": "crise de meia-idade uraniana: liberdade, renovação e autenticidade.",
-  "Retorno de Urano": "fechamento do grande ciclo uraniano de mudança.",
-  "Quadratura de Netuno": "dissolução de certezas e redifinição de visão de mundo.",
-  "Quadratura de Plutão": "transformação profunda, crise de poder e reconstrução.",
-  "Retorno Nodal": "reconexão com o camino de vida e com contratos kármicos.",
-  "Oposição Nodal": "eixo nodal invertido: revisão de padrões e realinhamento de destino.",
-  "Shani Sade Sati — Fase Ascendente": "início da reestruturação profunda de Saturno sobre a Lua.",
-  "Shani Sade Sati — Fase de Pico": "ponto máximo de maturação e responsabilização emocional.",
-  "Shani Sade Sati — Fase de Descida": "finalização do ciclo de reestruturação lunar.",
-  "Ardha-Ashtama Shani / Kantaka Shani da Lua": "tensão na base emocional, lar e relação com a mãe/patrimônio.",
-  "Ashtama Shani da Lua": "profunda transformação, desgaste e reviravoltas súbitas.",
-  "Kantaka Shani do Ascendente": "instabilidade na base de vida, carreira e estrutura externa.",
-  "Ashtama Shani do Ascendente": "impacto na vitalidade, saúde e processos burocráticos/heranças.",
+  "Retorno de Saturno": "período de revisão de estruturas, responsabilidades e legado pessoal.",
+  "Quadratura de Saturno": "período de teste de limites, ajuste de rota e consolidação de maturidade.",
+  "Oposição de Saturno": "período de revisão no meio do ciclo: o que foi construído pede avaliação.",
+  "Quadratura de Urano": "período de impulso para ruptura, independência e mudança de direção.",
+  "Oposição de Urano": "período de crise de meia-idade: liberdade, renovação e autenticidade.",
+  "Retorno de Urano": "período de fechamento de um grande ciclo de mudança e autonomia.",
+  "Quadratura de Netuno": "período de dissolução de certezas e redifinição de visão de mundo.",
+  "Quadratura de Plutão": "período de transformação profunda, crise de poder e reconstrução.",
+  "Retorno Nodal": "período de redefinição de direção, escolhas e prioridades de vida.",
+  "Oposição Nodal": "período de revisão e realinhamento entre o passado e o futuro.",
+  "Shani Sade Sati — Fase Ascendente": "início de uma fase de reestruturação emocional e responsabilização.",
+  "Shani Sade Sati — Fase de Pico": "ponto de maior pressão para maturidade emocional e reorganização interna.",
+  "Shani Sade Sati — Fase de Descida": "finalização de um ciclo profundo de aprendizado emocional.",
+  "Ardha-Ashtama Shani / Kantaka Shani da Lua": "ajuste na base emocional, lar e questões de segurança.",
+  "Ashtama Shani da Lua": "profunda transformação emocional, pedindo paciência e reconstrução gradual.",
+  "Kantaka Shani do Ascendente": "reajuste na base externa de vida, carreira e estruturas cotidianas.",
+  "Ashtama Shani do Ascendente": "período de reorganização de vitalidade, saúde e processos práticos.",
 };
 
 function activeCycleParagraph(cycle: RestructuringCycle): string {
@@ -618,23 +618,23 @@ function activeCycleParagraph(cycle: RestructuringCycle): string {
     : "";
 
   const templates: Record<string, string> = {
-    "Retorno de Saturno": `Você vive um Retorno de Saturno que ressoou na ${house}. É um tempo de auditoria de estruturas, responsabilidades e legado. O que foi construído sem alma pede reorganização; o que foi feito com compromisso, solidificação. ${concurrent}`,
+    "Retorno de Saturno": `Você vive um Retorno de Saturno que ressoa na ${house}. É um tempo de auditoria de estruturas, responsabilidades e legado. O que foi construído sem alma pede reorganização; o que foi feito com compromisso, solidificação. ${concurrent}`,
     "Quadratura de Saturno": `A Quadratura de Saturno ativa a ${house}, trazendo testes de limites e ajustes de rota. A fricção pede paciência e realismo, não autopunição. ${concurrent}`,
-    "Oposição de Saturno": `A Oposição de Saturno ilumina a ${house} como ponto de revisão no meio do ciclo. É hora de avaliar o que serve e o que precisa ser desmontado com consciência. ${concurrent}`,
+    "Oposição de Saturno": `A Oposição de Saturno ilumina a ${house} como ponto de revisão no meio do ciclo. É hora de avaliar o que serve e o que precisa ser reorganizado com consciência. ${concurrent}`,
     "Quadratura de Urano": `A Quadratura de Urano desperta a ${house} com um impulso de liberdade e ruptura. Estruturas antigas podem ceder para dar lugar à autenticidade. ${concurrent}`,
-    "Oposição de Urano": `A Oposição de Urano ressoa na ${house}, acionando a famosa crise de meia-idade: a necessidade de viver de acordo com quem você realmente é. ${concurrent}`,
+    "Oposição de Urano": `A Oposição de Urano ressoa na ${house}, acionando a necessidade de viver de acordo com quem você realmente é. A crise é de sentido, não de culpa. ${concurrent}`,
     "Retorno de Urano": `O Retorno de Urano completa um ciclo de cerca de 84 anos na ${house}. É uma conclusão de trajetória sobre autonomia e originalidade. ${concurrent}`,
     "Quadratura de Netuno": `A Quadratura de Netuno dissolve certezas na ${house}. Idealizações deixam de funcionar e uma nova visão de mundo emerge. ${concurrent}`,
     "Quadratura de Plutão": `A Quadratura de Plutão escava a ${house}. É um período de transformação profunda, poder e destruição criativa do que já não sustenta. ${concurrent}`,
-    "Retorno Nodal": `O Retorno Nodal ativa a ${house}, reconectando você com o caminho de vida e com contratos kármicos não resolvidos. ${concurrent}`,
-    "Oposição Nodal": `A Oposição Nodal ilumina a ${house} através do eixo invertido: você revisa padrões antigos para realinhar o destino. ${concurrent}`,
-    "Shani Sade Sati — Fase Ascendente": `Você está na fase ascendente do Shani Sade Sati, quando Saturno se aproxima da Lua pela ${house}. É um tempo de preparação e desapego emocional gradual. ${concurrent}`,
+    "Retorno Nodal": `O Retorno Nodal ativa a ${house}, convidando a uma redefinição de direção, escolhas e prioridades de vida. ${concurrent}`,
+    "Oposição Nodal": `A Oposição Nodal ilumina a ${house} como ponto de revisão: você equilibra o que herdou e o que escolhe construir daqui em diante. ${concurrent}`,
+    "Shani Sade Sati — Fase Ascendente": `Você está na fase ascendente do Shani Sade Sati, quando Saturno se aproxima da Lua pela ${house}. É um tempo de preparação, desapego gradual e reorganização emocional. ${concurrent}`,
     "Shani Sade Sati — Fase de Pico": `Você vive o pico do Shani Sade Sati, com Saturno diretamente sobre a Lua (${house}). A maturidade emocional é exigida de forma intensa e concreta. ${concurrent}`,
     "Shani Sade Sati — Fase de Descida": `Você está na fase de descida do Shani Sade Sati, com Saturno se afastando da Lua pela ${house}. O ciclo pede integração do que foi trabalhado. ${concurrent}`,
-    "Ardha-Ashtama Shani / Kantaka Shani da Lua": `O Ardha-Ashtama Shani (Kantaka da Lua) atinge a ${house}, gerando inquietação na base emocional, lar e questões com mãe/patrimônio. ${concurrent}`,
-    "Ashtama Shani da Lua": `O Ashtama Shani da Lua ressoa na ${house}, marcando um período de profunda transformação, desgaste e possíveis reviravoltas. ${concurrent}`,
-    "Kantaka Shani do Ascendente": `O Kantaka Shani do Ascendente atinge a ${house}, trazendo instabilidade na base de vida, carreira e estrutura externa. ${concurrent}`,
-    "Ashtama Shani do Ascendente": `O Ashtama Shani do Ascendente atinge a ${house}, impactando vitalidade, saúde e processos burocráticos ou heranças. ${concurrent}`,
+    "Ardha-Ashtama Shani / Kantaka Shani da Lua": `O Ardha-Ashtama Shani atinge a ${house}, pedindo ajustes na base emocional, lar e questões de segurança. ${concurrent}`,
+    "Ashtama Shani da Lua": `O Ashtama Shani da Lua ressoa na ${house}, marcando um período de profunda transformação emocional. A pressão pede reconstrução gradual, não fuga. ${concurrent}`,
+    "Kantaka Shani do Ascendente": `O Kantaka Shani do Ascendente atinge a ${house}, pedindo reajuste na base externa de vida, carreira e estruturas cotidianas. ${concurrent}`,
+    "Ashtama Shani do Ascendente": `O Ashtama Shani do Ascendente atinge a ${house}, convidando a uma reorganização de vitalidade, saúde e processos práticos. ${concurrent}`,
   };
 
   return templates[cycle.cycleName] || `O ciclo ${cycle.cycleName} atua sobre a ${house} na ${tradition}. É um período de reestruturação que pede consciência e paciência. ${concurrent}`;
@@ -915,47 +915,57 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
 
       {/* 3. Trânsitos agrupados por Esfera */}
       {activeTab === "transits" && (
-        isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16 space-y-4">
-            <Loader2 className="w-7 h-7 text-[#8c6239] animate-spin" />
-            <p className="font-mono text-[10px] text-[#8c7f70] tracking-widest uppercase animate-pulse">
-              Sincronizando trânsitos planetários...
-            </p>
-          </div>
-        ) : !text ? (
-          <div className="text-center py-12 text-[#8c7f70] font-sans text-sm">
-            Nenhuma leitura disponível.
-          </div>
-        ) : (
-          <div>
-            <RestructuringPhasesAccordion cycles={restructuringCycles || []} />
-            {allTransits.length === 0 ? (
-              <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
-                <p className="font-serif text-[#8c7f70] text-sm">
-                  Nenhum portal ativo no orbe de 4° no momento.
-                </p>
-              </div>
-            ) : (
-              <div>
-                {byHouse.map(([house, transits]) => {
-                  const start = globalIdx;
-                  globalIdx += transits.length;
-                  return (
-                    <SphereGroup
-                      key={house}
-                      house={house}
-                      transits={transits}
-                      activeKey={activeKey}
-                      startIndex={start}
-                      userId={userId}
-                      onActivate={handleActivate}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )
+        <div>
+          <RestructuringPhasesAccordion cycles={restructuringCycles || []} />
+
+          {isLoading && !text && (
+            <div className="flex items-center gap-3 py-4 px-5 rounded-xl border border-[#8c7f70]/10 bg-[#faf9f6]">
+              <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin flex-shrink-0" />
+              <p className="font-mono text-[10px] text-[#8c7f70] tracking-widest uppercase">
+                Sincronizando leitura dos próximos 30 dias...
+              </p>
+            </div>
+          )}
+
+          {!isLoading && !text && (
+            <div className="text-center py-12 text-[#8c7f70] font-sans text-sm">
+              Nenhuma leitura disponível.
+            </div>
+          )}
+
+          {text && (
+            <div className="mt-6">
+              {allTransits.length === 0 ? (
+                <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
+                  <p className="font-serif text-[#8c7f70] text-sm">
+                    Nenhum portal ativo no orbe de 4° no momento.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-[0.2em] mb-4 px-1">
+                    Portais ativos nos próximos 30 dias — clique na esfera para expandir
+                  </p>
+                  {byHouse.map(([house, transits]) => {
+                    const start = globalIdx;
+                    globalIdx += transits.length;
+                    return (
+                      <SphereGroup
+                        key={house}
+                        house={house}
+                        transits={transits}
+                        activeKey={activeKey}
+                        startIndex={start}
+                        userId={userId}
+                        onActivate={handleActivate}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -188,6 +188,20 @@ export default function App() {
       if (data.highlights && Array.isArray(data.highlights)) setHighlights(data.highlights);
       // Os 7 Caminhos deixaram de vir pré-carregados aqui — agora são gerados sob demanda
       // ao clicar em cada Caminho na Mandala (ver AstrologyMandala.handleElementClick).
+
+      // Reidrata leituras salvas em user_readings
+      if (userId) {
+        try {
+          const readingsRes = await fetch(`/api/user-readings?userId=${encodeURIComponent(userId)}`);
+          if (readingsRes.ok) {
+            const readingsData = await readingsRes.json();
+            if (readingsData.readings) setAiReadings(readingsData.readings);
+          }
+        } catch (readingsErr) {
+          console.warn("[AUTO-LOAD] Falha ao reidratar leituras:", readingsErr);
+        }
+      }
+
       setStep("mandala");
     } catch (err) {
       console.warn("[AUTO-LOAD] Falha ao carregar chart automaticamente:", err);

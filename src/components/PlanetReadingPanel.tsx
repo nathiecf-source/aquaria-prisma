@@ -48,19 +48,55 @@ function formatDegree(deg: number): string {
   return `${d}°${String(m).padStart(2, "0")}'`;
 }
 
-const VEDIC_STRUCTURAL_TEMPLATES: Record<string, string> = {
-  Sol: "identidade e propósito",
-  Lua: "emoção, nutrição e pertencimento",
-  Mercúrio: "mente, comunicação e adaptação",
-  Vênus: "relacionamentos, valores e prazer",
-  Marte: "ação, coragem e iniciativa",
-  Júpiter: "expansão, sabedoria e confiança",
-  Saturno: "estrutura, tempo e responsabilidade",
-  Urano: "liberdade, ruptura e originalidade",
-  Netuno: "intuição, dissolução e idealização",
-  Plutão: "poder, transformação e profundidade",
-  "Nodo Norte": "direção de crescimento e chamados do caminho",
-  "Nodo Sul": "padrões herdados e recursos do passado",
+const PLANET_ARTICLE: Record<string, { article: string; theme: string }> = {
+  Sol: { article: "seu", theme: "identidade e propósito" },
+  Lua: { article: "sua", theme: "emoção, nutrição e pertencimento" },
+  Mercúrio: { article: "seu", theme: "mente, comunicação e adaptação" },
+  Vênus: { article: "sua", theme: "relacionamentos, valores e prazer" },
+  Marte: { article: "seu", theme: "ação, coragem e iniciativa" },
+  Júpiter: { article: "seu", theme: "expansão, sabedoria e confiança" },
+  Saturno: { article: "seu", theme: "estrutura, tempo e responsabilidade" },
+  Urano: { article: "seu", theme: "liberdade, ruptura e originalidade" },
+  Netuno: { article: "seu", theme: "intuição, dissolução e idealização" },
+  Plutão: { article: "seu", theme: "poder, transformação e profundidade" },
+  "Nodo Norte": { article: "seu", theme: "direção de crescimento e chamados do caminho" },
+  "Nodo Sul": { article: "seu", theme: "padrões herdados e recursos do passado" },
+};
+
+const SIGN_ELEMENT: Record<string, string> = {
+  Áries: "fogo", Leão: "fogo", Sagitário: "fogo",
+  Touro: "terra", Virgem: "terra", Capricórnio: "terra",
+  Gêmeos: "ar", Libra: "ar", Aquário: "ar",
+  Câncer: "água", Escorpião: "água", Peixes: "água",
+};
+
+const ELEMENT_QUALITY: Record<string, string> = {
+  fogo: "impulso, entusiasmo e busca de sentido",
+  terra: "praticidade, materialização e paciência",
+  ar: "curiosidade, troca e mobilidade mental",
+  água: "sensibilidade, fluidez e profundidade emocional",
+};
+
+const HOUSE_MEANING: Record<number, string> = {
+  1: "corpo, presença e identidade",
+  2: "recursos, valores e autoestima",
+  3: "comunicação, aprendizado e irmãos",
+  4: "lar, raízes e fundação emocional",
+  5: "criatividade, prazer e autenticidade",
+  6: "saúde, rotina e serviço",
+  7: "relacionamentos, parcerias e o outro",
+  8: "transformações, vulnerabilidades e heranças",
+  9: "visão de mundo, ensinamentos e expansão",
+  10: "carreira, missão pública e realização",
+  11: "comunidade, projetos e futuro",
+  12: "inconsciente, espiritualidade e renúncia",
+};
+
+const HOUSE_NATURE: Record<number, "confort" | "tension" | "neutral"> = {
+  1: "confort", 4: "confort", 7: "confort", 10: "confort",
+  5: "confort", 9: "confort",
+  6: "tension", 8: "tension", 12: "tension",
+  2: "neutral", 3: "neutral", 11: "neutral",
 };
 
 function classifyVedicCondition(
@@ -70,18 +106,16 @@ function classifyVedicCondition(
 ): "confortavel" | "desafiadora" | "neutra" {
   const goodDignities = /Exaltado|Moolatrikona|Amigo/;
   const hardDignities = /Inimigo|Debilitado/;
-  const angularOrTrinal = [1, 4, 5, 7, 9, 10];
-  const hardHouses = [6, 8, 12];
 
   let score = 0;
   if (dignity) {
     if (goodDignities.test(dignity)) score += 2;
     if (hardDignities.test(dignity)) score -= 2;
-    if (dignity === "Neutro") score += 0;
   }
   if (house) {
-    if (angularOrTrinal.includes(house)) score += 1;
-    if (hardHouses.includes(house)) score -= 1;
+    const nature = HOUSE_NATURE[house];
+    if (nature === "confort") score += 1;
+    if (nature === "tension") score -= 1;
   }
   if (typeof shadbala === "number" && !isNaN(shadbala)) {
     if (shadbala >= 1.1) score += 1;
@@ -93,26 +127,47 @@ function classifyVedicCondition(
   return "neutra";
 }
 
+function dignityNote(dignity: string | undefined): string {
+  if (!dignity) return "";
+  if (/Exaltado|Moolatrikona|Amigo/.test(dignity)) {
+    return "recebe um terreno acolhedor, onde suas qualidades podem se manifestar com mais fluidez";
+  }
+  if (/Inimigo|Debilitado/.test(dignity)) {
+    return "encontra um terreno que pede paciência: suas qualidades aqui exigem mais maturidade para se firmarem";
+  }
+  return "mantém uma posição equilibrada, sem aceleração nem bloqueio excessivo";
+}
+
 function getVedicStructuralSummary(profile: any, canonicalName: string): string | null {
   const vedicPlanet = profile?.vedic_natal?.planets?.find(
     (p: any) => p.name === canonicalName
   );
   if (!vedicPlanet) return null;
 
-  const theme = VEDIC_STRUCTURAL_TEMPLATES[canonicalName] || "potencial e desafios";
+  const meta = PLANET_ARTICLE[canonicalName] || { article: "seu", theme: "potencial e desafios" };
+  const sign = vedicPlanet.sign || "desconhecido";
+  const house = typeof vedicPlanet.house === "number" ? vedicPlanet.house : null;
+  const element = SIGN_ELEMENT[sign] || "mistério";
+  const elementQuality = ELEMENT_QUALITY[element] || "qualidade particular";
+  const houseMeaning = house ? HOUSE_MEANING[house] : "uma área estrutural do mapa";
+  const dignity = vedicPlanet.dignity;
   const condition = classifyVedicCondition(
-    vedicPlanet.dignity,
-    typeof vedicPlanet.house === "number" ? vedicPlanet.house : undefined,
+    dignity,
+    house ?? undefined,
     profile?.vedic_balas?.shadbala?.[canonicalName]
   );
+  const dignNote = dignityNote(dignity);
+  const conditionPhrase =
+    condition === "confortavel"
+      ? "Aqui, o terreno oferece apoio"
+      : condition === "desafiadora"
+        ? "Aqui, o terreno pede reconstrução gradual"
+        : "Aqui, o terreno pede discernimento";
 
-  if (condition === "confortavel") {
-    return `Na estrutura silenciosa do mapa, seu ${canonicalName} encontra apoio natural para expressar seus ${theme}. O terreno pede menos esforço de reconstrução e mais confiança no ritmo próprio.`;
-  }
-  if (condition === "desafiadora") {
-    return `Na estrutura silenciosa do mapa, seu ${canonicalName} ocupa um terreno que pede paciência e reconstrução em torno de ${theme}. A pressão aqui não é punição, mas convite para construir de modo mais consciente.`;
-  }
-  return `Na estrutura silenciosa do mapa, seu ${canonicalName} mantém uma posição equilibrada para ${theme}. O terreno não acelera nem bloqueia: pede discernimento e ajustes sutis.`;
+  const nakshatra = vedicPlanet.nakshatra;
+  const nakshatraLine = nakshatra ? `, sob a influência de ${nakshatra}` : "";
+
+  return `${meta.article.charAt(0).toUpperCase() + meta.article.slice(1)} ${canonicalName} repousa em ${sign} (${element}), na Casa ${house ?? "?"} (${houseMeaning})${nakshatraLine}. Isso coloca ${meta.article} ${canonicalName} em uma área movida por ${elementQuality}. ${dignNote ? `${meta.article.charAt(0).toUpperCase() + meta.article.slice(1)} ${canonicalName} ${dignNote}. ` : ""}${conditionPhrase} na estrutura do mapa, em torno de ${meta.theme}.`;
 }
 
 function getIntegrationBalanceLine(condition: "confortavel" | "desafiadora" | "neutra"): string {
