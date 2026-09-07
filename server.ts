@@ -39,17 +39,17 @@ if (
 import express from "express";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
-import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "../src/server/astrology";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "../src/server/geminiService";
-import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "../src/server/profectionEngine";
-import { generateChatResponse } from "../src/server/chatService";
-import { getGlossaryDefinition } from "../src/server/glossaryData";
-import { getPlanetGlyphConfig, PLANET_GLYPHS } from "../src/lib/planetGlyphs";
-import { synthesizeMeditation } from "../src/server/ttsService";
-import { mixWithBackgroundMusic } from "../src/server/audioMixer";
+import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "./src/server/geminiService";
+import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
+import { generateChatResponse } from "./src/server/chatService";
+import { getGlossaryDefinition } from "./src/server/glossaryData";
+import { getPlanetGlyphConfig, PLANET_GLYPHS } from "./src/lib/planetGlyphs";
+import { synthesizeMeditation } from "./src/server/ttsService";
+import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
-import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "../src/server/transitEngine";
-import { calculateRestructuringCycles } from "../src/server/restructuringCyclesEngine";
+import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "./src/server/transitEngine";
+import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -3512,7 +3512,7 @@ async function createApp(): Promise<express.Application> {
   app.use("/assets/audio", express.static(path.join(process.cwd(), "public", "assets", "audio")));
 
   // Vite integration as middleware (apenas em dev; import dinamico evita
-  // carregar rollup e suas dependencias opcionais de plataforma no serverless)
+  // carregar rollup e suas dependencias opcionais de plataforma no container)
   if (process.env.NODE_ENV !== "production") {
     console.log("Iniciando Vite em modo desenvolvimento...");
     const { createServer: createViteServer } = await import("vite");
@@ -3521,7 +3521,7 @@ async function createApp(): Promise<express.Application> {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else if (!process.env.VERCEL) {
+  } else {
     console.log("Iniciando servidor em modo produção...");
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -3553,29 +3553,15 @@ async function createApp(): Promise<express.Application> {
 export { createApp };
 export default createApp;
 
-// Detecta se este módulo é o entrypoint real (npm start / npm run dev).
-// Em Vercel, o entrypoint é api/index.ts, entao process.argv[1] aponta para
-// o launcher da Vercel e nao para o bundle. Isso evita que o servidor tente
-// chamar app.listen() dentro do container serverless.
-function isMainModule(): boolean {
-  if (typeof process === "undefined" || !process.argv?.[1]) return false;
-  if (typeof import.meta === "undefined" || !import.meta.url) return false;
-  try {
-    const mainUrl = pathToFileURL(process.argv[1]).href;
-    return import.meta.url === mainUrl;
-  } catch {
-    return false;
-  }
-}
-
-if (process.env.VERCEL !== "1" && process.env.SERVERLESS !== "1" && isMainModule()) {
-  createApp().then((app) => {
-    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[AQUAR.IA Server] Cérebro online em http://localhost:${PORT}`);
-    });
-  }).catch((err: any) => {
-    console.error("[AQUAR.IA Server] Falha ao iniciar servidor local:", err);
-    process.exit(1);
+// Inicia o servidor automaticamente quando este arquivo e o entrypoint.
+// No Cloud Run, o Dockerfile executa `node dist/server.mjs` e a porta vem
+// da variavel de ambiente PORT (padrao 8080).
+createApp().then((app) => {
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[AQUAR.IA Server] Cérebro online em http://localhost:${PORT}`);
   });
-}
+}).catch((err: any) => {
+  console.error("[AQUAR.IA Server] Falha ao iniciar servidor:", err);
+  process.exit(1);
+});
