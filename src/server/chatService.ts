@@ -129,14 +129,14 @@ function parseUserTransitQuestion(message: string): ParsedTransit | null {
 }
 
 /** Tenta montar um TransitContext a partir de uma pergunta digitada pelo usuário. */
-function resolveUserTransitContext(
+async function resolveUserTransitContext(
   parsed: ParsedTransit,
   profile: CompleteAstrologicalProfile
-): TransitContext | null {
+): Promise<TransitContext | null> {
   if (!profile.tropical_natal) return null;
 
   const targetDate = parsed.date ?? new Date();
-  const positions = getAllPlanetPositions(targetDate, true);
+  const positions = await getAllPlanetPositions(targetDate, true);
   const planetLon = positions[parsed.planet];
   if (planetLon == null) return null;
 
@@ -159,7 +159,7 @@ function resolveUserTransitContext(
 
   // Caso contrário, procura o próximo ingresso dentro de 60 dias.
   try {
-    const events = getUpcomingCosmicEvents(targetDate, 60);
+    const events = await getUpcomingCosmicEvents(targetDate, 60);
     const match = events.find((e) => e.planet === parsed.planet && e.sign === parsed.sign);
     if (match) return match as TransitContext;
   } catch (err) {
@@ -183,7 +183,7 @@ export async function generateChatResponse(
   if (!effectiveTransitContext && profile.tropical_natal) {
     const parsedTransit = parseUserTransitQuestion(message);
     if (parsedTransit) {
-      const resolved = resolveUserTransitContext(parsedTransit, profile);
+      const resolved = await resolveUserTransitContext(parsedTransit, profile);
       if (resolved) {
         console.log("[ChatService] Trânsito detectado na pergunta:", resolved);
         effectiveTransitContext = resolved;
@@ -230,7 +230,7 @@ export async function generateChatResponse(
 
       // Enriquece com os aspectos exatos do planeta do evento na data
       const targetDate = new Date(effectiveTransitContext.date);
-      const chatTransits = calculateChatTransits(profile.tropical_natal, targetDate);
+      const chatTransits = await calculateChatTransits(profile.tropical_natal, targetDate);
       const allTransits = [...chatTransits.transitos_estruturais, ...chatTransits.transitos_dinamicos];
       const eventPlanet = effectiveTransitContext.planet;
       const relevant = eventPlanet

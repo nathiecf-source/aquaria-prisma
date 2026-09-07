@@ -1,5 +1,7 @@
-import { julian, planetposition, solar, moonposition } from "astronomia";
-import * as planetDataRaw from "astronomia/data";
+// Lazy loading: astronomia e seus dados VSOP87 sao pesados e nao sao
+// necessarios em todos os endpoints (ex: /api/settings). Carregamos sob demanda.
+let astromod: any = null;
+let planetData: any = null;
 
 // Compatibilidade: em build CJS o esbuild envolve o default do astronomia/data;
 // em ESM/dev o default já é o objeto com os dados.
@@ -14,7 +16,16 @@ function resolveAstronomiaData(raw: any) {
   return raw;
 }
 
-const planetData = resolveAstronomiaData(planetDataRaw);
+async function initAstronomia(): Promise<{ julian: any; planetposition: any; solar: any; moonposition: any; planetData: any }> {
+  if (astromod) return { ...astromod, planetData };
+  const [mod, dataRaw] = await Promise.all([
+    import("astronomia"),
+    import("astronomia/data"),
+  ]);
+  astromod = mod;
+  planetData = resolveAstronomiaData(dataRaw);
+  return { ...astromod, planetData };
+}
 
 function normalizeAngle(angle: number): number {
   return ((angle % 360) + 360) % 360;
@@ -179,7 +190,8 @@ function getGeoLon(planet: any, earth: any, jde: number): number {
   return (((Math.atan2(py - ey, px - ex) * 180 / Math.PI) + 360) % 360);
 }
 
-export function getTropicalTransitDegrees(date: Date, quiet = false): Record<string, number> {
+export async function getTropicalTransitDegrees(date: Date, quiet = false): Promise<Record<string, number>> {
+  const { julian, planetposition, solar } = await initAstronomia();
   const jde = julian.CalendarGregorianToJD(
     date.getFullYear(),
     date.getMonth() + 1,
@@ -357,12 +369,12 @@ export function calculateAspects(
   );
 }
 
-export function calculateChatTransits(
+export async function calculateChatTransits(
   natalChart: any,
   targetDate: Date
-): TransitPayload {
+): Promise<TransitPayload> {
   const natalPlanets = getNatalDegrees({ tropical_natal: natalChart });
-  const transitDegrees = getAllPlanetPositions(targetDate);
+  const transitDegrees = await getAllPlanetPositions(targetDate);
 
   return buildAspectPayload(
     transitDegrees,
@@ -376,7 +388,8 @@ export function calculateChatTransits(
 }
 
 /** Posições tropicais geocêntricas dos planetas rápidos para uma data. */
-export function getFastTransitDegrees(date: Date, quiet = false): Record<string, number> {
+export async function getFastTransitDegrees(date: Date, quiet = false): Promise<Record<string, number>> {
+  const { julian, planetposition, solar, moonposition } = await initAstronomia();
   const jde = julian.CalendarGregorianToJD(
     date.getFullYear(),
     date.getMonth() + 1,
@@ -411,15 +424,14 @@ export function getFastTransitDegrees(date: Date, quiet = false): Record<string,
 }
 
 /** Posições atuais de todos os planetas clássicos (para localizar o Senhor do Ano em trânsito). */
-export function getCurrentTransitDegrees(date: Date): Record<string, number> {
-  const all = { ...getTropicalTransitDegrees(date), ...getFastTransitDegrees(date) };
-  return all;
+export async function getCurrentTransitDegrees(date: Date): Promise<Record<string, number>> {
+  const [slow, fast] = await Promise.all([getTropicalTransitDegrees(date), getFastTransitDegrees(date)]);
+  return { ...slow, ...fast };
 }
 
 /** Todas as posições tropicais geocêntricas (rápidas + lentas) para uma data. */
-export function getAllPlanetPositions(date: Date, quiet = true): Record<string, number> {
-  const slow = getTropicalTransitDegrees(date, quiet);
-  const fast = getFastTransitDegrees(date, quiet);
+export async function getAllPlanetPositions(date: Date, quiet = true): Promise<Record<string, number>> {
+  const [slow, fast] = await Promise.all([getTropicalTransitDegrees(date, quiet), getFastTransitDegrees(date, quiet)]);
   return { ...slow, ...fast };
 }
 
@@ -475,10 +487,11 @@ export function getMeanLunarNode(jde: number): number {
 }
 
 /** Varre os próximos `days` dias a partir de `startDate` e retorna eventos cósmicos maiores. */
-export function getUpcomingCosmicEvents(
+export async function getUpcomingCosmicEvents(
   startDate: Date = new Date(),
   days: number = 30
-): UpcomingEvent[] {
+): Promise<UpcomingEvent[]> {
+  const { julian } = await initAstronomia();
   const events: UpcomingEvent[] = [];
   const stepDays = 0.5; // passo de 12h
   const totalSteps = Math.ceil(days / stepDays);
@@ -494,7 +507,7 @@ export function getUpcomingCosmicEvents(
 
   for (let i = 0; i <= totalSteps; i++) {
     const currentDate = new Date(baseTime + i * stepDays * msInDay);
-    const positions = getAllPlanetPositions(currentDate);
+    const positions = await getAllPlanetPositions(currentDate);
 
     // Fase lunar para detectar Lua Nova e Cheia
     const moon = positions["Lua"] ?? 0;

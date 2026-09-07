@@ -216,13 +216,15 @@ const ASPECT_TARGETS = [
 
 const RAPID_ORB = 2;
 
-export function calculateRapidActivations(
+export async function calculateRapidActivations(
   profile: CompleteAstrologicalProfile,
   profection: ProfectionData,
   referenceDate: Date = new Date()
-): RapidActivation[] {
-  const fastPositions = getFastTransitDegrees(referenceDate);
-  const allCurrentPositions = getCurrentTransitDegrees(referenceDate);
+): Promise<RapidActivation[]> {
+  const [fastPositions, allCurrentPositions] = await Promise.all([
+    getFastTransitDegrees(referenceDate),
+    getCurrentTransitDegrees(referenceDate),
+  ]);
   const natalHouses = natalHousesWithLongitude(profile.tropical_natal?.houses || []);
   const activations: RapidActivation[] = [];
   const seen = new Set<string>();

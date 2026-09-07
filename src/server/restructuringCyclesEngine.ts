@@ -44,8 +44,8 @@ function dateFromJde(jde: number): Date {
   return new Date((jde - 2440587.5) * MS_PER_DAY);
 }
 
-function planetLongitudeAtDate(planet: string, date: Date): number | null {
-  const degrees = getTropicalTransitDegrees(date, true);
+async function planetLongitudeAtDate(planet: string, date: Date): Promise<number | null> {
+  const degrees = await getTropicalTransitDegrees(date, true);
   if (degrees[planet] !== undefined) return degrees[planet];
   return null;
 }
@@ -54,19 +54,19 @@ function meanNodeLongitudeAtDate(date: Date): number {
   return getMeanLunarNode(jdeAt(date));
 }
 
-function findAspectWindow(
+async function findAspectWindow(
   planet: string,
   natalLongitude: number,
   targetAspect: number,
   centerDate: Date,
   maxDays: number = 365 * 5
-): { startDate: Date; endDate: Date; peakDate: Date } | null {
+): Promise<{ startDate: Date; endDate: Date; peakDate: Date } | null> {
   // Find the start by going backward until outside orb
   let startDate = new Date(centerDate.getTime());
   let prev = startDate;
   for (let i = 0; i < maxDays; i++) {
     const test = new Date(prev.getTime() - MS_PER_DAY);
-    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(test) : planetLongitudeAtDate(planet, test);
+    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(test) : await planetLongitudeAtDate(planet, test);
     if (lon === null) break;
     const dist = angularDistance(lon, natalLongitude);
     if (Math.abs(dist - targetAspect) > ORB) break;
@@ -79,7 +79,7 @@ function findAspectWindow(
   prev = endDate;
   for (let i = 0; i < maxDays; i++) {
     const test = new Date(prev.getTime() + MS_PER_DAY);
-    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(test) : planetLongitudeAtDate(planet, test);
+    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(test) : await planetLongitudeAtDate(planet, test);
     if (lon === null) break;
     const dist = angularDistance(lon, natalLongitude);
     if (Math.abs(dist - targetAspect) > ORB) break;
@@ -93,7 +93,7 @@ function findAspectWindow(
   const checkDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / MS_PER_DAY));
   for (let d = 0; d <= checkDays; d++) {
     const test = new Date(startDate.getTime() + d * MS_PER_DAY);
-    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(test) : planetLongitudeAtDate(planet, test);
+    const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(test) : await planetLongitudeAtDate(planet, test);
     if (lon === null) continue;
     const dist = angularDistance(lon, natalLongitude);
     const orb = Math.abs(dist - targetAspect);
@@ -179,10 +179,10 @@ function getNatalHouse(points: NatalPoint[], name: string): number {
   return points.find(p => p.name === name)?.house ?? 0;
 }
 
-function meanDailySpeed(planet: string, referenceDate: Date): number {
-  const lon1 = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(referenceDate) : planetLongitudeAtDate(planet, referenceDate);
+async function meanDailySpeed(planet: string, referenceDate: Date): Promise<number> {
+  const lon1 = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(referenceDate) : await planetLongitudeAtDate(planet, referenceDate);
   const future = new Date(referenceDate.getTime() + 365 * MS_PER_DAY);
-  const lon2 = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(future) : planetLongitudeAtDate(planet, future);
+  const lon2 = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(future) : await planetLongitudeAtDate(planet, future);
   if (lon1 === null || lon2 === null) return planet === "Nodo Norte" ? -0.053 : 0;
   let delta = normalizeAngle(lon2) - normalizeAngle(lon1);
   if (delta > 180) delta -= 360;
@@ -190,20 +190,20 @@ function meanDailySpeed(planet: string, referenceDate: Date): number {
   return delta / 365;
 }
 
-function findNextAspectWindow(
+async function findNextAspectWindow(
   planet: string,
   natalLongitude: number,
   targetAspect: number,
   referenceDate: Date,
   maxAttempts: number = 3
-): { startDate: Date; endDate: Date; peakDate: Date } | null {
-  const currentLon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(referenceDate) : planetLongitudeAtDate(planet, referenceDate);
+): Promise<{ startDate: Date; endDate: Date; peakDate: Date } | null> {
+  const currentLon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(referenceDate) : await planetLongitudeAtDate(planet, referenceDate);
   if (currentLon === null) {
     console.warn(`[RESTRUCTURING CYCLES] Não foi possível obter longitude atual de ${planet}`);
     return null;
   }
 
-  const speed = meanDailySpeed(planet, referenceDate);
+  const speed = await meanDailySpeed(planet, referenceDate);
   if (Math.abs(speed) < 1e-6) {
     console.warn(`[RESTRUCTURING CYCLES] Velocidade média de ${planet} muito pequena (${speed})`);
     return null;
@@ -235,7 +235,7 @@ function findNextAspectWindow(
     // Scan +/- 365 days around estimate
     for (let d = -365; d <= 365; d++) {
       const date = new Date(searchCenter.getTime() + d * MS_PER_DAY);
-      const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(date) : planetLongitudeAtDate(planet, date);
+      const lon = planet === "Nodo Norte" ? meanNodeLongitudeAtDate(date) : await planetLongitudeAtDate(planet, date);
       if (lon === null) continue;
       const dist = angularDistance(lon, natalLongitude);
       const orb = Math.abs(dist - targetAspect);
@@ -247,7 +247,7 @@ function findNextAspectWindow(
     }
 
     if (refinedCenter) {
-      const window = findAspectWindow(planet, natalLongitude, targetAspect, refinedCenter, 365 * 2);
+      const window = await findAspectWindow(planet, natalLongitude, targetAspect, refinedCenter, 365 * 2);
       if (window) {
         console.log(`[RESTRUCTURING CYCLES] ${planet} aspecto ${targetAspect}° — janela encontrada: ${formatDateISO(window.startDate)} → ${formatDateISO(window.endDate)}`);
         if (window.endDate.getTime() > referenceDate.getTime()) {
@@ -275,10 +275,10 @@ function concurrentCyclesForHouse(cycles: RestructuringCycle[], house: number | 
     .map(c => c.cycleName);
 }
 
-export function calculateRestructuringCycles(
+export async function calculateRestructuringCycles(
   profile: CompleteAstrologicalProfile,
   referenceDate: Date = new Date()
-): RestructuringCycle[] {
+): Promise<RestructuringCycle[]> {
   console.log(`[RESTRUCTURING CYCLES] Iniciando cálculo para ${profile.birthData?.birthDate || "data desconhecida"}, referência ${formatDateISO(referenceDate)}`);
   console.log(`[RESTRUCTURING CYCLES] vedic_saturn_transits presente: ${!!profile.vedic_saturn_transits}`);
 
@@ -293,7 +293,7 @@ export function calculateRestructuringCycles(
       continue;
     }
 
-    const currentLon = planetLongitudeAtDate(def.planet, referenceDate);
+    const currentLon = await planetLongitudeAtDate(def.planet, referenceDate);
     if (currentLon === null) {
       console.log(`[RESTRUCTURING CYCLES] ${def.planet}: longitude atual não encontrada`);
       continue;
@@ -305,7 +305,7 @@ export function calculateRestructuringCycles(
     console.log(`[RESTRUCTURING CYCLES] ${def.planet} ${def.cycle}: dist=${dist.toFixed(2)}°, orb=${orb.toFixed(2)}°, casa=${house}`);
 
     if (orb <= ORB) {
-      const window = findAspectWindow(def.planet, natalLon, def.aspect, referenceDate);
+      const window = await findAspectWindow(def.planet, natalLon, def.aspect, referenceDate);
       if (window) {
         const cycle: RestructuringCycle = {
           type: "ativo",
@@ -323,7 +323,7 @@ export function calculateRestructuringCycles(
         cycles.push(cycle);
       }
     } else {
-      const nextWindow = findNextAspectWindow(def.planet, natalLon, def.aspect, referenceDate);
+      const nextWindow = await findNextAspectWindow(def.planet, natalLon, def.aspect, referenceDate);
       if (nextWindow) {
         cycles.push({
           type: "proximo",
@@ -351,7 +351,7 @@ export function calculateRestructuringCycles(
     const nodeReturnOrb = Math.abs(nodeReturnDist - 0);
 
     if (nodeReturnOrb <= ORB) {
-      const window = findAspectWindow("Nodo Norte", northNodeLon, 0, referenceDate);
+      const window = await findAspectWindow("Nodo Norte", northNodeLon, 0, referenceDate);
       if (window) {
         const cycle: RestructuringCycle = {
           type: "ativo",
@@ -369,7 +369,7 @@ export function calculateRestructuringCycles(
         cycles.push(cycle);
       }
     } else {
-      const nextWindow = findNextAspectWindow("Nodo Norte", northNodeLon, 0, referenceDate);
+      const nextWindow = await findNextAspectWindow("Nodo Norte", northNodeLon, 0, referenceDate);
       if (nextWindow) {
         cycles.push({
           type: "proximo",
@@ -390,7 +390,7 @@ export function calculateRestructuringCycles(
       const oppositionOrb = Math.abs(oppositionDist - 180);
 
       if (oppositionOrb <= ORB) {
-        const window = findAspectWindow("Nodo Norte", northNodeLon, 180, referenceDate);
+        const window = await findAspectWindow("Nodo Norte", northNodeLon, 180, referenceDate);
         if (window) {
           const cycle: RestructuringCycle = {
             type: "ativo",
@@ -408,7 +408,7 @@ export function calculateRestructuringCycles(
           cycles.push(cycle);
         }
       } else {
-        const nextWindow = findNextAspectWindow("Nodo Norte", northNodeLon, 180, referenceDate);
+        const nextWindow = await findNextAspectWindow("Nodo Norte", northNodeLon, 180, referenceDate);
         if (nextWindow) {
           cycles.push({
             type: "proximo",

@@ -856,7 +856,7 @@ async function createApp(): Promise<express.Application> {
   // API Route: Próximos eventos cósmicos para o chat
   app.get("/api/chat/upcoming-events", async (req, res) => {
     try {
-      const events = getUpcomingCosmicEvents(new Date(), 30);
+      const events = await getUpcomingCosmicEvents(new Date(), 30);
       return res.json({ events });
     } catch (err: any) {
       console.error("Erro ao calcular eventos cósmicos:", err);
@@ -1497,7 +1497,7 @@ async function createApp(): Promise<express.Application> {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
         const restructuringCycles = Array.isArray(cached.restructuringCycles)
           ? cached.restructuringCycles
-          : calculateRestructuringCycles(profile, now);
+          : await calculateRestructuringCycles(profile, now);
         return res.json({ reading: cached.reading, restructuringCycles, cached: true });
       }
 
@@ -1505,7 +1505,7 @@ async function createApp(): Promise<express.Application> {
       let enrichedProfile = profile;
       try {
         const today = new Date();
-        const transitDegrees = getTropicalTransitDegrees(today);
+        const transitDegrees = await getTropicalTransitDegrees(today);
         const natalPlanets = getNatalDegrees(profile);
         const transitPayload = calculateAspects(transitDegrees, natalPlanets);
 
@@ -1599,7 +1599,7 @@ async function createApp(): Promise<express.Application> {
 
       let restructuringCycles: any[] = [];
       try {
-        restructuringCycles = calculateRestructuringCycles(enrichedProfile, new Date());
+        restructuringCycles = await calculateRestructuringCycles(enrichedProfile, new Date());
       } catch (cyclesErr: any) {
         console.warn("[RESTRUCTURING CYCLES] Falha ao calcular ciclos reestruturantes:", cyclesErr?.message);
       }
@@ -1690,7 +1690,7 @@ async function createApp(): Promise<express.Application> {
       }
 
       const profectionData = await calculateProfectionLord(profile, referenceDate, { allowSolarReturnFetch: true });
-      const activations = calculateRapidActivations(profile, profectionData, referenceDate);
+      const activations = await calculateRapidActivations(profile, profectionData, referenceDate);
 
       let reading = "";
       if (activations.length > 0) {

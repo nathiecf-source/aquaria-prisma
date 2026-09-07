@@ -1,10 +1,20 @@
 import { calculateSolarReturnChart } from "./solarReturnEngine";
 import { fetchAstrologyProviderResult, getBirthDetails, getNakshatraPada, getPlanetaryStates, getRasiChart, getVimsottariDasha, type AstrologyAPIResponse, type AstrologyProviderResult, type JHoraResponse } from "./astrologyProviders";
-import * as circularHoroscopeRaw from 'circular-natal-horoscope-js';
 import { createClient } from '@supabase/supabase-js';
 
-const circularHoroscope = (circularHoroscopeRaw as any).default ?? circularHoroscopeRaw;
-const { Origin, Horoscope } = circularHoroscope;
+let circularHoroscopeModule: any = null;
+
+async function getCircularHoroscope() {
+  if (!circularHoroscopeModule) {
+    const mod: any = await import('circular-natal-horoscope-js');
+    const circularHoroscope = (mod as any).default ?? mod;
+    circularHoroscopeModule = {
+      Origin: circularHoroscope.Origin,
+      Horoscope: circularHoroscope.Horoscope,
+    };
+  }
+  return circularHoroscopeModule;
+}
 
 export type GenderPreference = "feminino" | "masculino" | "neutro" | "neutro_estrutural" | "neutro_direto";
 
@@ -560,7 +570,8 @@ function mapAstrologyAPIVedic(api: AstrologyAPIResponse) {
   return { planets, ascLongitude, ascNakshatra: "" };
 }
 
-function localTropicalChart(birthData: BirthData, siderealLongitude: number, ayanamsha: number, vedicPlanets: VedicNatalPlanet[]): TropicalNatal {
+async function localTropicalChart(birthData: BirthData, siderealLongitude: number, ayanamsha: number, vedicPlanets: VedicNatalPlanet[]): Promise<TropicalNatal> {
+  const { Origin, Horoscope } = await getCircularHoroscope();
   const tropicalByName = new Map(vedicPlanets.map(p => [p.name, (p.longitude ?? (p.sign ? SIGNS_PT.indexOf(p.sign) * 30 + p.degree : 0)) + ayanamsha]));
   const [year, month, date] = birthData.birthDate.split("-").map(Number);
   const [hour, minute] = birthData.birthTime.split(":").map(Number);
@@ -685,7 +696,7 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   }
   const mapped = result.jhora ? mapJHoraVedic(result.jhora) : mapAstrologyAPIVedic(result.astrologyapi!);
   const ayanamsha = result.jhora ? providerAyanamsha(result.jhora) : providerAyanamsha({ birth_details: { date: birthData.birthDate } });
-  const tropical = localTropicalChart(birthData, mapped.ascLongitude, ayanamsha, mapped.planets);
+  const tropical = await localTropicalChart(birthData, mapped.ascLongitude, ayanamsha, mapped.planets);
   const lagna = getSignAndDegree(mapped.ascLongitude).sign;
   const horoscope = result.jhora ? record(result.jhora.horoscope) || {} : {};
   const specificsRaw = record(deepSection(horoscope, ["vedic_specifics", "special_lagnas", "lagnas"])) || {};

@@ -3,7 +3,12 @@ import serverless from "serverless-http";
 let handler: any;
 let handlerError: any;
 
+function elapsedMs(start: number): number {
+  return Math.round((Date.now() - start) / 10) / 100;
+}
+
 async function buildHandler() {
+  const buildStart = Date.now();
   console.log("[Vercel] Inicializando handler...", {
     node_env: process.env.NODE_ENV,
     vercel: process.env.VERCEL,
@@ -14,14 +19,22 @@ async function buildHandler() {
   });
 
   try {
+    const importStart = Date.now();
     const mod: any = await import("./server.mjs");
+    console.log(`[Vercel] Bundle importado em ${elapsedMs(importStart)}s`);
+
     const createApp = mod.createApp || mod.default?.createApp;
     if (!createApp) {
       throw new Error("Bundle api/server.mjs nao exporta createApp.");
     }
+
+    const appStart = Date.now();
     const app = await createApp();
-    console.log("[Vercel] Express app criado com sucesso.");
-    return serverless(app);
+    console.log(`[Vercel] Express app criado em ${elapsedMs(appStart)}s`);
+
+    const handler = serverless(app);
+    console.log(`[Vercel] Handler pronto em ${elapsedMs(buildStart)}s`);
+    return handler;
   } catch (err: any) {
     console.error("[Vercel] Falha ao criar handler:", err);
     handlerError = err;
