@@ -38,7 +38,6 @@ if (
 
 import express from "express";
 import { Resend } from "resend";
-import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "../src/server/astrology";
 import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "../src/server/geminiService";
@@ -3512,9 +3511,11 @@ async function createApp(): Promise<express.Application> {
   // Serve static background audio usado pelo Presence Pause e Meditação
   app.use("/assets/audio", express.static(path.join(process.cwd(), "public", "assets", "audio")));
 
-  // Vite integration as middleware
+  // Vite integration as middleware (apenas em dev; import dinamico evita
+  // carregar rollup e suas dependencias opcionais de plataforma no serverless)
   if (process.env.NODE_ENV !== "production") {
     console.log("Iniciando Vite em modo desenvolvimento...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
