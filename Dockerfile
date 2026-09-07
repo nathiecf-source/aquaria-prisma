@@ -1,7 +1,7 @@
 # Dockerfile para Aquar.IA no Google Cloud Run
 # Build multi-estagio: primeiro builda o frontend, depois o servidor.
 
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # Estagio final
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
