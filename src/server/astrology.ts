@@ -159,6 +159,48 @@ export interface VedicVargas {
   d10Dasamsa: Record<string, string>; // planet -> sign
 }
 
+export interface SaturnTransitPhase {
+  sign: string;
+  house: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface SaturnTransitPeriod {
+  period: number;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  referenceSign?: string;
+  phase1?: SaturnTransitPhase | null;
+  phase2?: SaturnTransitPhase | null;
+  phase3?: SaturnTransitPhase | null;
+}
+
+export interface SaturnTransitEntry {
+  degreeBased: SaturnTransitPeriod[];
+  signBased: SaturnTransitPeriod[];
+}
+
+export interface SaturnTransitsData {
+  sadeSati: {
+    moonSign: string;
+    moonDegree: number;
+    degreeBased: SaturnTransitPeriod[];
+    signBased: SaturnTransitPeriod[];
+  };
+  moonTransits: {
+    fourthHouse: SaturnTransitEntry;
+    eighthHouse: SaturnTransitEntry;
+  };
+  ascendantTransits: {
+    fourthHouse: SaturnTransitEntry;
+    eighthHouse: SaturnTransitEntry;
+  };
+  ascendantDegree: number;
+  ascendantSign: string;
+}
+
 export interface CompleteAstrologicalProfile {
   birthData: BirthData;
   tropical_natal: TropicalNatal;
@@ -168,6 +210,7 @@ export interface CompleteAstrologicalProfile {
   vedic_balas: VedicBalas;
   vedic_timing: VedicTiming;
   vedic_vargas: VedicVargas;
+  vedic_saturn_transits?: SaturnTransitsData | null;
   dataSource?: string;
 }
 
@@ -732,7 +775,73 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   timing.mahadashaNakshatra = nakshatraFor(timing.mahadasha);
   timing.antardashaNakshatra = nakshatraFor(timing.antardasha);
   timing.pratyantardashaNakshatra = nakshatraFor(timing.pratyantardasha);
-  return { birthData, tropical_natal: tropical, tropical_transits: [], vedic_natal: { planets: mapped.planets, drishti: [] }, vedic_specifics: specifics, vedic_balas: { shadbala: shad, ashtakavarga: ashta }, vedic_timing: timing, vedic_vargas: mapVargas(result.jhora), dataSource: `${fromCache ? "cache:" : ""}${result.meta.source}:${result.meta.status}` };
+  const vedicSaturnTransits = extractSaturnTransits(result.jhora);
+  return { birthData, tropical_natal: tropical, tropical_transits: [], vedic_natal: { planets: mapped.planets, drishti: [] }, vedic_specifics: specifics, vedic_balas: { shadbala: shad, ashtakavarga: ashta }, vedic_timing: timing, vedic_vargas: mapVargas(result.jhora), vedic_saturn_transits: vedicSaturnTransits, dataSource: `${fromCache ? "cache:" : ""}${result.meta.source}:${result.meta.status}` };
+}
+
+function normalizeEnglishSign(sign: string): string {
+  const map: Record<string, string> = {
+    aries: "Áries", taurus: "Touro", gemini: "Gêmeos", cancer: "Câncer",
+    leo: "Leão", virgo: "Virgem", libra: "Libra", scorpio: "Escorpião",
+    sagittarius: "Sagitário", capricorn: "Capricórnio", aquarius: "Aquário", pisces: "Peixes",
+  };
+  return map[sign.toLowerCase().trim()] || sign;
+}
+
+function normalizeSaturnTransitPhase(phase: any): SaturnTransitPhase | null {
+  if (!phase || typeof phase !== "object") return null;
+  return {
+    sign: normalizeEnglishSign(String(phase.sign || "")),
+    house: String(phase.house || ""),
+    startDate: String(phase.startDate || ""),
+    endDate: String(phase.endDate || ""),
+  };
+}
+
+function normalizeSaturnTransitPeriods(periods: any): SaturnTransitPeriod[] {
+  if (!Array.isArray(periods)) return [];
+  return periods.map((p: any) => ({
+    period: typeof p.period === "number" ? p.period : 0,
+    startDate: String(p.startDate || ""),
+    endDate: String(p.endDate || ""),
+    description: typeof p.description === "string" ? p.description : undefined,
+    referenceSign: typeof p.referenceSign === "string" ? normalizeEnglishSign(p.referenceSign) : undefined,
+    phase1: normalizeSaturnTransitPhase(p.phase1),
+    phase2: normalizeSaturnTransitPhase(p.phase2),
+    phase3: normalizeSaturnTransitPhase(p.phase3),
+  }));
+}
+
+function normalizeSaturnTransitEntry(entry: any): SaturnTransitEntry {
+  if (!entry || typeof entry !== "object") return { degreeBased: [], signBased: [] };
+  return {
+    degreeBased: normalizeSaturnTransitPeriods(entry.degreeBased),
+    signBased: normalizeSaturnTransitPeriods(entry.signBased),
+  };
+}
+
+export function extractSaturnTransits(jhora: any): SaturnTransitsData | null {
+  const root = record(jhora);
+  const raw = root?.saturn_transits;
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    sadeSati: {
+      moonSign: normalizeEnglishSign(String(raw.sadeSati?.moonSign || "")),
+      moonDegree: typeof raw.sadeSati?.moonDegree === "number" ? raw.sadeSati.moonDegree : 0,
+      degreeBased: normalizeSaturnTransitPeriods(raw.sadeSati?.degreeBased),
+      signBased: normalizeSaturnTransitPeriods(raw.sadeSati?.signBased),
+    },
+    moonTransits: {
+      fourthHouse: normalizeSaturnTransitEntry(raw.moonTransits?.fourthHouse),
+      eighthHouse: normalizeSaturnTransitEntry(raw.moonTransits?.eighthHouse),
+    },
+    ascendantTransits: {
+      fourthHouse: normalizeSaturnTransitEntry(raw.ascendantTransits?.fourthHouse),
+      eighthHouse: normalizeSaturnTransitEntry(raw.ascendantTransits?.eighthHouse),
+    },
+    ascendantDegree: typeof raw.ascendantDegree === "number" ? raw.ascendantDegree : 0,
+    ascendantSign: normalizeEnglishSign(String(raw.ascendantSign || "")),
+  };
 }
 
 export function calculateHighlights(profile: CompleteAstrologicalProfile): string[] {

@@ -468,7 +468,7 @@ export function getHouseForLongitude(
 }
 
 /** Longitude média do nodo lunar (ascendente). Erro < 1° para o século XXI. */
-function getMeanLunarNode(jde: number): number {
+export function getMeanLunarNode(jde: number): number {
   const T = (jde - 2451545.0) / 36525; // séculos julianos desde J2000.0
   let N = 125.044555 - 1934.1361849 * T + 0.0020756 * T * T - 0.00000215 * T * T * T;
   return ((N % 360) + 360) % 360;

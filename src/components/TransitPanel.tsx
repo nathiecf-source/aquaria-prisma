@@ -14,10 +14,25 @@ export interface ActiveTransit {
   ritmoTempo: string;
 }
 
+interface RestructuringCycle {
+  type: "ativo" | "proximo";
+  tradition: "tropical" | "vedic";
+  planet: string;
+  cycleName: string;
+  isActive: boolean;
+  orb?: number;
+  startDate?: string;
+  endDate?: string;
+  ageAtPeak?: number;
+  affectedHouse?: number;
+  concurrentTransits?: string[];
+}
+
 interface TransitPanelProps {
   isOpen: boolean;
   isLoading: boolean;
   text: string | null;
+  restructuringCycles?: RestructuringCycle[];
   dashaText?: string | null;
   isLoadingDashas?: boolean;
   profile: any;
@@ -558,12 +573,170 @@ const SphereGroup: React.FC<{
   );
 };
 
+// ─── Fases Reestruturantes ───────────────────────────────────────────────────
+
+const HOUSE_THEMES: Record<number, string> = {
+  1: "identidade e presença",
+  2: "valores e recursos",
+  3: "mente e comunicação",
+  4: "lar e fundamentos emocionais",
+  5: "criatividade e autoexpressão",
+  6: "rotina, corpo e serviço",
+  7: "relacionamentos e o outro",
+  8: "transformações e entregas profundas",
+  9: "visão de mundo e expansão",
+  10: "realização e legado",
+  11: "coletivo e futuro",
+  12: "inconsciente e espiritualidade",
+};
+
+const UPCOMING_CYCLE_TEXT: Record<string, string> = {
+  "Retorno de Saturno": "ciclo de revisão de estruturas, responsabilidades e legado pessoal.",
+  "Quadratura de Saturno": "teste de limites, ajuste de rota e consolidação de maturidade.",
+  "Oposição de Saturno": "meio do ciclo saturnino: revisão do que foi construído até aqui.",
+  "Quadratura de Urano": "impulso de ruptura, independência e mudança de direção.",
+  "Oposição de Urano": "crise de meia-idade uraniana: liberdade, renovação e autenticidade.",
+  "Retorno de Urano": "fechamento do grande ciclo uraniano de mudança.",
+  "Quadratura de Netuno": "dissolução de certezas e redifinição de visão de mundo.",
+  "Quadratura de Plutão": "transformação profunda, crise de poder e reconstrução.",
+  "Retorno Nodal": "reconexão com o camino de vida e com contratos kármicos.",
+  "Oposição Nodal": "eixo nodal invertido: revisão de padrões e realinhamento de destino.",
+  "Shani Sade Sati — Fase Ascendente": "início da reestruturação profunda de Saturno sobre a Lua.",
+  "Shani Sade Sati — Fase de Pico": "ponto máximo de maturação e responsabilização emocional.",
+  "Shani Sade Sati — Fase de Descida": "finalização do ciclo de reestruturação lunar.",
+  "Ardha-Ashtama Shani / Kantaka Shani da Lua": "tensão na base emocional, lar e relação com a mãe/patrimônio.",
+  "Ashtama Shani da Lua": "profunda transformação, desgaste e reviravoltas súbitas.",
+  "Kantaka Shani do Ascendente": "instabilidade na base de vida, carreira e estrutura externa.",
+  "Ashtama Shani do Ascendente": "impacto na vitalidade, saúde e processos burocráticos/heranças.",
+};
+
+function activeCycleParagraph(cycle: RestructuringCycle): string {
+  const house = cycle.affectedHouse ? `Casa ${cycle.affectedHouse} (${HOUSE_THEMES[cycle.affectedHouse] || "tema de vida"})` : "uma área estrutural do mapa";
+  const tradition = cycle.tradition === "vedic" ? "camada védica" : "camada tropical";
+  const concurrent = cycle.concurrentTransits && cycle.concurrentTransits.length > 0
+    ? `Ao mesmo tempo, ${cycle.concurrentTransits.join(" e ")} atuam sobre o mesmo tema, intensificando a pressão de mudança.`
+    : "";
+
+  const templates: Record<string, string> = {
+    "Retorno de Saturno": `Você vive um Retorno de Saturno que ressoou na ${house}. É um tempo de auditoria de estruturas, responsabilidades e legado. O que foi construído sem alma pede reorganização; o que foi feito com compromisso, solidificação. ${concurrent}`,
+    "Quadratura de Saturno": `A Quadratura de Saturno ativa a ${house}, trazendo testes de limites e ajustes de rota. A fricção pede paciência e realismo, não autopunição. ${concurrent}`,
+    "Oposição de Saturno": `A Oposição de Saturno ilumina a ${house} como ponto de revisão no meio do ciclo. É hora de avaliar o que serve e o que precisa ser desmontado com consciência. ${concurrent}`,
+    "Quadratura de Urano": `A Quadratura de Urano desperta a ${house} com um impulso de liberdade e ruptura. Estruturas antigas podem ceder para dar lugar à autenticidade. ${concurrent}`,
+    "Oposição de Urano": `A Oposição de Urano ressoa na ${house}, acionando a famosa crise de meia-idade: a necessidade de viver de acordo com quem você realmente é. ${concurrent}`,
+    "Retorno de Urano": `O Retorno de Urano completa um ciclo de cerca de 84 anos na ${house}. É uma conclusão de trajetória sobre autonomia e originalidade. ${concurrent}`,
+    "Quadratura de Netuno": `A Quadratura de Netuno dissolve certezas na ${house}. Idealizações deixam de funcionar e uma nova visão de mundo emerge. ${concurrent}`,
+    "Quadratura de Plutão": `A Quadratura de Plutão escava a ${house}. É um período de transformação profunda, poder e destruição criativa do que já não sustenta. ${concurrent}`,
+    "Retorno Nodal": `O Retorno Nodal ativa a ${house}, reconectando você com o caminho de vida e com contratos kármicos não resolvidos. ${concurrent}`,
+    "Oposição Nodal": `A Oposição Nodal ilumina a ${house} através do eixo invertido: você revisa padrões antigos para realinhar o destino. ${concurrent}`,
+    "Shani Sade Sati — Fase Ascendente": `Você está na fase ascendente do Shani Sade Sati, quando Saturno se aproxima da Lua pela ${house}. É um tempo de preparação e desapego emocional gradual. ${concurrent}`,
+    "Shani Sade Sati — Fase de Pico": `Você vive o pico do Shani Sade Sati, com Saturno diretamente sobre a Lua (${house}). A maturidade emocional é exigida de forma intensa e concreta. ${concurrent}`,
+    "Shani Sade Sati — Fase de Descida": `Você está na fase de descida do Shani Sade Sati, com Saturno se afastando da Lua pela ${house}. O ciclo pede integração do que foi trabalhado. ${concurrent}`,
+    "Ardha-Ashtama Shani / Kantaka Shani da Lua": `O Ardha-Ashtama Shani (Kantaka da Lua) atinge a ${house}, gerando inquietação na base emocional, lar e questões com mãe/patrimônio. ${concurrent}`,
+    "Ashtama Shani da Lua": `O Ashtama Shani da Lua ressoa na ${house}, marcando um período de profunda transformação, desgaste e possíveis reviravoltas. ${concurrent}`,
+    "Kantaka Shani do Ascendente": `O Kantaka Shani do Ascendente atinge a ${house}, trazendo instabilidade na base de vida, carreira e estrutura externa. ${concurrent}`,
+    "Ashtama Shani do Ascendente": `O Ashtama Shani do Ascendente atinge a ${house}, impactando vitalidade, saúde e processos burocráticos ou heranças. ${concurrent}`,
+  };
+
+  return templates[cycle.cycleName] || `O ciclo ${cycle.cycleName} atua sobre a ${house} na ${tradition}. É um período de reestruturação que pede consciência e paciência. ${concurrent}`;
+}
+
+function upcomingCycleLine(cycle: RestructuringCycle): string {
+  const base = UPCOMING_CYCLE_TEXT[cycle.cycleName] || `período de reestruturação e maturação.`;
+  const when = cycle.startDate ? `começa em ${cycle.startDate.split("-")[0]}` : "se aproxima";
+  return `${cycle.cycleName} ${when} — ${base}`;
+}
+
+const RestructuringPhasesAccordion: React.FC<{ cycles: RestructuringCycle[] }> = ({ cycles }) => {
+  const [expanded, setExpanded] = React.useState(true);
+  const active = cycles.filter(c => c.isActive);
+  const upcoming = cycles.filter(c => !c.isActive && c.type === "proximo");
+
+  return (
+    <div className="rounded-xl border border-[#8c6239]/20 bg-[#faf9f6] overflow-hidden mb-6">
+      <button
+        onClick={() => setExpanded(o => !o)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left bg-[#8c6239]/5 hover:bg-[#8c6239]/10 transition-colors"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-base leading-none flex-shrink-0">◈</span>
+          <span className="font-serif text-[#3c352d] text-[14px] tracking-wide">
+            Fases Reestruturantes
+          </span>
+        </div>
+        <span className="text-[#8c7f70] flex-shrink-0">
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </span>
+      </button>
+
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"}`}>
+        <div className="px-5 pb-5 pt-4 space-y-4">
+          {active.length === 0 ? (
+            <p className="font-sans text-[13px] text-[#5c544d] leading-relaxed">
+              Você não está em uma fase crítica de reestruturação profunda.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-[#8c6239]">
+                Ativos agora
+              </p>
+              {active.map((cycle, idx) => (
+                <div key={idx} className="rounded-lg border border-[#8c7f70]/10 bg-white p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-serif text-[#3c352d] text-[13px]">
+                      {cycle.cycleName}
+                    </span>
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                      cycle.tradition === "vedic"
+                        ? "bg-[#5c4d66]/10 text-[#5c4d66] border-[#5c4d66]/20"
+                        : "bg-[#8c6239]/10 text-[#8c6239] border-[#8c6239]/20"
+                    }`}>
+                      {cycle.tradition === "vedic" ? "Védico" : "Tropical"}
+                    </span>
+                  </div>
+                  <p className="font-sans text-[12.5px] text-[#5c544d] leading-relaxed">
+                    {activeCycleParagraph(cycle)}
+                  </p>
+                  {(cycle.startDate || cycle.endDate) && (
+                    <p className="font-mono text-[9px] text-[#8c7f70]">
+                      {cycle.startDate && cycle.endDate
+                        ? `${cycle.startDate} → ${cycle.endDate}`
+                        : cycle.startDate || cycle.endDate}
+                      {cycle.orb !== undefined && ` · orbe ${cycle.orb}°`}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {upcoming.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-[#8c7f70]/10">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-[#8c7f70]">
+                Próximos ciclos
+              </p>
+              <ul className="space-y-2">
+                {upcoming.map((cycle, idx) => (
+                  <li key={idx} className="font-sans text-[12px] text-[#5c544d] leading-snug flex items-start gap-2">
+                    <span className="text-[#8c6239] mt-1">•</span>
+                    {upcomingCycleLine(cycle)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Painel Principal ─────────────────────────────────────────────────────────
 
 const TransitPanel: React.FC<TransitPanelProps> = ({
   isOpen,
   isLoading,
   text,
+  restructuringCycles,
   dashaText,
   isLoadingDashas,
   profile,
@@ -754,31 +927,34 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
             Nenhuma leitura disponível.
           </div>
         ) : (
-          allTransits.length === 0 ? (
-            <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
-              <p className="font-serif text-[#8c7f70] text-sm">
-                Nenhum portal ativo no orbe de 4° no momento.
-              </p>
-            </div>
-          ) : (
-            <div>
-              {byHouse.map(([house, transits]) => {
-                const start = globalIdx;
-                globalIdx += transits.length;
-                return (
-                  <SphereGroup
-                    key={house}
-                    house={house}
-                    transits={transits}
-                    activeKey={activeKey}
-                    startIndex={start}
-                    userId={userId}
-                    onActivate={handleActivate}
-                  />
-                );
-              })}
-            </div>
-          )
+          <div>
+            <RestructuringPhasesAccordion cycles={restructuringCycles || []} />
+            {allTransits.length === 0 ? (
+              <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
+                <p className="font-serif text-[#8c7f70] text-sm">
+                  Nenhum portal ativo no orbe de 4° no momento.
+                </p>
+              </div>
+            ) : (
+              <div>
+                {byHouse.map(([house, transits]) => {
+                  const start = globalIdx;
+                  globalIdx += transits.length;
+                  return (
+                    <SphereGroup
+                      key={house}
+                      house={house}
+                      transits={transits}
+                      activeKey={activeKey}
+                      startIndex={start}
+                      userId={userId}
+                      onActivate={handleActivate}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )
       )}
     </div>

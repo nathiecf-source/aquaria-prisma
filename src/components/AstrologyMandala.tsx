@@ -499,6 +499,7 @@ export default function AstrologyMandala({
 
   const [isTransitsModalOpen, setIsTransitsModalOpen] = React.useState(false);
   const [transitsText, setTransitsText] = React.useState<string | null>(null);
+  const [restructuringCycles, setRestructuringCycles] = React.useState<any[]>([]);
   const [isFetchingTransits, setIsFetchingTransits] = React.useState(false);
   const [dashaText, setDashaText] = React.useState<string | null>(null);
   const [isFetchingDashas, setIsFetchingDashas] = React.useState(false);
@@ -562,6 +563,7 @@ export default function AstrologyMandala({
     .then(res => res.json())
     .then(data => {
       if (data.reading) setTransitsText(data.reading);
+      if (Array.isArray(data.restructuringCycles)) setRestructuringCycles(data.restructuringCycles);
     })
     .catch(err => console.error("Erro trânsitos:", err))
     .finally(() => setIsFetchingTransits(false));
@@ -2218,6 +2220,7 @@ export default function AstrologyMandala({
           isOpen={isTransitsModalOpen}
           isLoading={isFetchingTransits}
           text={transitsText}
+          restructuringCycles={restructuringCycles}
           dashaText={dashaText}
           isLoadingDashas={isFetchingDashas}
           onRefresh={fetchTransits}

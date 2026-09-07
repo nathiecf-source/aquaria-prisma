@@ -50,6 +50,7 @@ import { synthesizeMeditation } from "./src/server/ttsService";
 import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
 import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "./src/server/transitEngine";
+import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -1509,7 +1510,15 @@ async function createApp(): Promise<express.Application> {
       }
 
       const readingText = await generateTransitCyclesReading(enrichedProfile);
-      return res.json({ reading: readingText });
+
+      let restructuringCycles: any[] = [];
+      try {
+        restructuringCycles = calculateRestructuringCycles(enrichedProfile, new Date());
+      } catch (cyclesErr: any) {
+        console.warn("[RESTRUCTURING CYCLES] Falha ao calcular ciclos reestruturantes:", cyclesErr?.message);
+      }
+
+      return res.json({ reading: readingText, restructuringCycles });
     } catch (err: any) {
       console.error("Erro ao gerar Leitura de Trânsitos e Ciclos:", err);
       return res.status(500).json({
