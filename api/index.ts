@@ -1,4 +1,4 @@
-import { createApp } from "../server";
+import { createApp } from "./server";
 
 let handler: any;
 let handlerError: any;

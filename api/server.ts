@@ -40,17 +40,17 @@ import express from "express";
 import { Resend } from "resend";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
-import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "./src/server/geminiService";
-import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
-import { generateChatResponse } from "./src/server/chatService";
-import { getGlossaryDefinition } from "./src/server/glossaryData";
-import { getPlanetGlyphConfig, PLANET_GLYPHS } from "./src/lib/planetGlyphs";
-import { synthesizeMeditation } from "./src/server/ttsService";
-import { mixWithBackgroundMusic } from "./src/server/audioMixer";
+import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "../src/server/astrology";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "../src/server/geminiService";
+import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "../src/server/profectionEngine";
+import { generateChatResponse } from "../src/server/chatService";
+import { getGlossaryDefinition } from "../src/server/glossaryData";
+import { getPlanetGlyphConfig, PLANET_GLYPHS } from "../src/lib/planetGlyphs";
+import { synthesizeMeditation } from "../src/server/ttsService";
+import { mixWithBackgroundMusic } from "../src/server/audioMixer";
 import crypto from "crypto";
-import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "./src/server/transitEngine";
-import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
+import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "../src/server/transitEngine";
+import { calculateRestructuringCycles } from "../src/server/restructuringCyclesEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
