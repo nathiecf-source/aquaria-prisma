@@ -34,13 +34,22 @@ function formatDate(iso: string): string {
   }
 }
 
+interface JournalNote {
+  id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
   const [insights, setInsights] = React.useState<Insight[]>([]);
   const [journals, setJournals] = React.useState<JournalEntry[]>([]);
+  const [notes, setNotes] = React.useState<JournalNote[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<"todos" | "pausa" | "ciclos" | "diario">("todos");
   const [editing, setEditing] = React.useState<{ pathId: string; text: string; saving: boolean } | null>(null);
+  const [editingNote, setEditingNote] = React.useState<{ id: string; text: string; saving: boolean } | null>(null);
 
   const fetchAll = React.useCallback(async () => {
     setLoading(true);
@@ -67,9 +76,18 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
         return (json.entries || []) as JournalEntry[];
       })();
 
-      const [insightsData, journalsData] = await Promise.all([insightsPromise, journalsPromise]);
+      const notesPromise = (async () => {
+        if (!userId) return [] as JournalNote[];
+        const res = await fetch(`/api/journal/notes?userId=${userId}`);
+        if (!res.ok) return [] as JournalNote[];
+        const json = await res.json();
+        return (json.notes || []) as JournalNote[];
+      })();
+
+      const [insightsData, journalsData, notesData] = await Promise.all([insightsPromise, journalsPromise, notesPromise]);
       setInsights(insightsData);
       setJournals(journalsData);
+      setNotes(notesData);
     } catch (err: any) {
       setError("Não foi possível carregar o diário.");
       console.error("[DiarioAlquimico]", err);
@@ -100,6 +118,26 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
     }
   };
 
+  const saveNoteEdit = async (id: string) => {
+    if (!editingNote || !userId) return;
+    setEditingNote((prev) => (prev ? { ...prev, saving: true } : null));
+    try {
+      const res = await fetch(`/api/journal/notes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, content: editingNote.text }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar");
+      await fetchAll();
+      setEditingNote(null);
+    } catch (err) {
+      console.error("[DiarioAlquimico] Erro ao editar nota:", err);
+      setError("Não foi possível salvar a edição.");
+    } finally {
+      setEditingNote((prev) => (prev ? { ...prev, saving: false } : null));
+    }
+  };
+
   const combinedEntries = React.useMemo(() => {
     const insightEntries = insights.map(insight => ({
       key: `insight-${insight.id}`,
@@ -125,12 +163,23 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
       text: journal.journal_text,
       categoryLabel: `${journal.path_title || journal.path_id} — Diário Alquímico`,
       filterKey: "diario" as const,
+      kind: "path" as const,
     }));
 
-    return [...insightEntries, ...journalEntries].sort(
+    const noteEntries = notes.map(note => ({
+      key: `note-${note.id}`,
+      noteId: note.id,
+      timestamp: note.updated_at !== note.created_at ? note.updated_at : note.created_at,
+      text: note.content,
+      categoryLabel: "Diário Alquímico — Nota",
+      filterKey: "diario" as const,
+      kind: "note" as const,
+    }));
+
+    return [...insightEntries, ...journalEntries, ...noteEntries].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
-  }, [insights, journals]);
+  }, [insights, journals, notes]);
 
   const filtered = combinedEntries.filter(entry => activeFilter === "todos" || entry.filterKey === activeFilter);
 
@@ -191,8 +240,12 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
       ) : (
         <div className="space-y-3">
           {filtered.map((entry) => {
-            const isDiario = entry.filterKey === "diario" && "pathId" in entry;
-            const isEditing = isDiario && editing?.pathId === (entry as any).pathId;
+            const isPathJournal = (entry as any).kind === "path";
+            const isNote = (entry as any).kind === "note";
+            const isEditable = isPathJournal || isNote;
+            const isEditingPath = isPathJournal && editing?.pathId === (entry as any).pathId;
+            const isEditingNote = isNote && editingNote?.id === (entry as any).noteId;
+            const isEditing = isEditingPath || isEditingNote;
 
             return (
               <div key={entry.key} className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-5 py-4 space-y-2">
@@ -204,9 +257,15 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
                     <span className="font-sans text-[9px] text-[#5c4d66] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#5c4d66]/10">
                       {entry.categoryLabel}
                     </span>
-                    {isDiario && !isEditing && (
+                    {isEditable && !isEditing && (
                       <button
-                        onClick={() => setEditing({ pathId: (entry as any).pathId, text: entry.text, saving: false })}
+                        onClick={() => {
+                          if (isPathJournal) {
+                            setEditing({ pathId: (entry as any).pathId, text: entry.text, saving: false });
+                          } else {
+                            setEditingNote({ id: (entry as any).noteId, text: entry.text, saving: false });
+                          }
+                        }}
                         className="p-1 text-[#8c7f70] hover:text-[#5c4d66] transition-colors"
                         aria-label="Editar nota"
                       >
@@ -219,24 +278,37 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
                 {isEditing ? (
                   <div className="space-y-3">
                     <textarea
-                      value={editing.text}
-                      onChange={(e) => setEditing({ ...editing, text: e.target.value })}
+                      value={isEditingPath ? editing!.text : editingNote!.text}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (isEditingPath) {
+                          setEditing((prev) => (prev ? { ...prev, text: value } : prev));
+                        } else {
+                          setEditingNote((prev) => (prev ? { ...prev, text: value } : prev));
+                        }
+                      }}
                       className="w-full min-h-[100px] p-3 rounded-lg border border-[#e6e2d8] bg-white/60 text-sm text-[#4a3f35] leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-[#5c4d66]/30"
                     />
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => setEditing(null)}
-                        disabled={editing.saving}
+                        onClick={() => (isEditingPath ? setEditing(null) : setEditingNote(null))}
+                        disabled={isEditingPath ? editing!.saving : editingNote!.saving}
                         className="px-3 py-1.5 rounded-lg border border-[#e6e2d8] text-[#8c7f70] text-[10px] font-bold uppercase tracking-widest hover:bg-[#ede9de] transition-colors"
                       >
                         Cancelar
                       </button>
                       <button
-                        onClick={() => saveJournalEdit((entry as any).pathId)}
-                        disabled={editing.saving || !editing.text.trim() || editing.text === entry.text}
+                        onClick={() => (isEditingPath ? saveJournalEdit((entry as any).pathId) : saveNoteEdit((entry as any).noteId))}
+                        disabled={
+                          isEditingPath
+                            ? editing!.saving || !editing!.text.trim() || editing!.text === entry.text
+                            : editingNote!.saving || !editingNote!.text.trim() || editingNote!.text === entry.text
+                        }
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8c6239] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#6b4a2b] transition-colors disabled:opacity-50"
                       >
-                        {editing.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        {(isEditingPath ? editing!.saving : editingNote!.saving)
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Save className="w-3.5 h-3.5" />}
                         Salvar
                       </button>
                     </div>

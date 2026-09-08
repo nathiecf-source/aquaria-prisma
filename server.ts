@@ -2058,6 +2058,174 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
+  // ============================================================
+  // Diário Alquímico — notas avulsas (journal_notes)
+  // ============================================================
+
+  // Migra a nota legada salva em user_paths (path_id = 'floating-journal')
+  // para a tabela journal_notes, preservando o histórico.
+  async function migrateLegacyFloatingJournal(supabase: any, userId: string) {
+    try {
+      const { data: legacy } = await supabase
+        .from("user_paths")
+        .select("journal_text, updated_at")
+        .eq("user_id", userId)
+        .eq("path_id", "floating-journal")
+        .maybeSingle();
+
+      if (!legacy?.journal_text) return;
+
+      const { data: existing } = await supabase
+        .from("journal_notes")
+        .select("id")
+        .eq("user_id", userId)
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        await supabase.from("journal_notes").insert({
+          user_id: userId,
+          content: legacy.journal_text,
+          created_at: legacy.updated_at || new Date().toISOString(),
+          updated_at: legacy.updated_at || new Date().toISOString(),
+        });
+      }
+
+      await supabase
+        .from("user_paths")
+        .update({ journal_text: "", updated_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .eq("path_id", "floating-journal");
+    } catch (err: any) {
+      console.warn("[JOURNAL NOTES] Falha na migração legada:", err?.message || err);
+    }
+  }
+
+  // GET /api/journal/notes?userId= — lista notas (mais recentes primeiro)
+  app.get("/api/journal/notes", async (req, res) => {
+    try {
+      const userId = String(req.query.userId || "");
+      if (!userId) {
+        return res.status(400).json({ error: "userId é obrigatório." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      await migrateLegacyFloatingJournal(supabase, userId);
+
+      const { data, error } = await supabase
+        .from("journal_notes")
+        .select("id, content, created_at, updated_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        return res.status(500).json({ error: "Erro ao buscar notas.", details: error.message });
+      }
+
+      return res.json({ notes: data || [] });
+    } catch (err: any) {
+      console.error("[JOURNAL NOTES LIST] Erro:", err);
+      return res.status(500).json({ error: "Erro ao buscar notas.", details: err?.message || String(err) });
+    }
+  });
+
+  // POST /api/journal/notes — cria uma nova nota
+  app.post("/api/journal/notes", async (req, res) => {
+    try {
+      const { userId, content } = req.body;
+      if (!userId || !content || !String(content).trim()) {
+        return res.status(400).json({ error: "userId e content são obrigatórios." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { data, error } = await supabase
+        .from("journal_notes")
+        .insert({ user_id: userId, content: String(content).trim() })
+        .select("id, content, created_at, updated_at")
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: "Erro ao salvar nota.", details: error.message });
+      }
+
+      return res.json({ success: true, note: data });
+    } catch (err: any) {
+      console.error("[JOURNAL NOTES POST] Erro:", err);
+      return res.status(500).json({ error: "Erro ao salvar nota.", details: err?.message || String(err) });
+    }
+  });
+
+  // PATCH /api/journal/notes/:id — edita uma nota existente
+  app.patch("/api/journal/notes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { userId, content } = req.body;
+      if (!id || !userId || !content || !String(content).trim()) {
+        return res.status(400).json({ error: "id, userId e content são obrigatórios." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { data, error } = await supabase
+        .from("journal_notes")
+        .update({ content: String(content).trim(), updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select("id, content, created_at, updated_at")
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: "Erro ao atualizar nota.", details: error.message });
+      }
+
+      return res.json({ success: true, note: data });
+    } catch (err: any) {
+      console.error("[JOURNAL NOTES PATCH] Erro:", err);
+      return res.status(500).json({ error: "Erro ao atualizar nota.", details: err?.message || String(err) });
+    }
+  });
+
+  // DELETE /api/journal/notes/:id?userId= — remove uma nota
+  app.delete("/api/journal/notes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = String(req.query.userId || req.body?.userId || "");
+      if (!id || !userId) {
+        return res.status(400).json({ error: "id e userId são obrigatórios." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { error } = await supabase
+        .from("journal_notes")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (error) {
+        return res.status(500).json({ error: "Erro ao excluir nota.", details: error.message });
+      }
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("[JOURNAL NOTES DELETE] Erro:", err);
+      return res.status(500).json({ error: "Erro ao excluir nota.", details: err?.message || String(err) });
+    }
+  });
+
   // GET /api/meditation/download — faz download do áudio gerado
   app.get("/api/meditation/download", async (req, res) => {
     try {
