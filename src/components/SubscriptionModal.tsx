@@ -93,11 +93,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         Validade
                       </p>
                       <p className="text-[#3c352d]">
-                        Seu acesso completo está garantido até{" "}
-                        <span className="font-semibold">{expiry}</span>.
+                        Sua assinatura expira em: <span className="font-semibold">{expiry}</span>.
                       </p>
                     </div>
                   )}
+
+                  <div className="flex items-start gap-2 text-xs text-[#6e6356] bg-[#f4f1eb] p-3 rounded-xl border border-[#e6e2d8]">
+                    <Check className="w-4 h-4 text-[#8c6239] shrink-0 mt-0.5" />
+                    <p>
+                      A assinatura mensal é uma forma de manutenção para quem já adquiriu o Passe de Expansão. Ela só é necessária após o término do período do Passe.
+                    </p>
+                  </div>
 
                   <div className="flex items-start gap-2 text-xs text-[#6e6356] bg-[#f4f1eb] p-3 rounded-xl border border-[#e6e2d8]">
                     <Check className="w-4 h-4 text-[#8c6239] shrink-0 mt-0.5" />

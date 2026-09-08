@@ -2533,6 +2533,8 @@ ${dignityToneNote}
 
 [DIRETRIZES DE REDAÇÃO]
 
+TODOS OS TEXTOS DESTA LEITURA DEVEM SER ESCRITOS FALANDO DIRETAMENTE COM O LEITOR, EM SEGUNDA PESSOA ("você", "sua", "seu"). É PROIBIDO REFERIR-SE AO LEITOR NA TERCEIRA PESSOA ("a usuária", "o usuário", "ela", "ele", "a pessoa"). A leitura deve soar como uma conversa íntima e direta.
+
 1. FUNÇÃO DO PLANETA ("functionText", máx. 4 a 5 linhas, um único parágrafo fluido): funda a "Função sintetizada" do fichamento com o signo e a casa tropical reais do usuário${config.isAngle ? "" : " e com sua psique"}. Não repita o fichamento literalmente; adapte-o organicamente à posição concreta. Não separe função geral e psicológica — costure-as num só corpo textual. Não use jargões banais nem linguagem de preenchimento.
 2. APRENDIZADOS ("shadowText", máx. 3 a 4 linhas, um único parágrafo fluido): adapte a "Oitava de Aprendizado" do fichamento ao signo e casa reais. Mostre o trabalho sombra, a armadilha e a saída evolutiva. Não mencione "dignidade", "exaltação", "queda" ou "detrimento" ao usuário.
 3. SÍNTESE DE CADA ASPECTO ("aspectReadings", máx. 2 linhas por aspecto): para cada aspecto listado em [DADOS TÉCNICOS — ASPECTOS ATIVOS], gere um objeto com "planet1", "planet2", "type", "orb" (copie exatamente os valores técnicos fornecidos) e "interpretation" — uma frase cirúrgica explicando a dinâmica de forças entre os dois astros, nomeando os signos envolvidos.
@@ -3034,7 +3036,7 @@ ${CHAKRA_BLOCKLIST_RULE}
 Lendo a sua Mandala Alquímica, ${userName}, o gráfico à sua frente é um organismo vivo que traduz a fricção entre a sua psique e a sua alma. Cada opacidade, cor e pétala iluminada reflete a sua assinatura energética. Explore os elementos clicando em cada item para aprofundar a sua leitura.
 
 #### As Camadas do Destino
-O gráfico utiliza a transparência para revelar a origem da sua força. A cor de cada fatia vem do signo da cúspide tropical. As fatias **mais transparentes** indicam a presença de planetas no Mapa Védico — a camada mais sutil da estrutura do destino — (${vedicHousesText}). As fatias **semi-transparentes** revelam a presença de planetas no Mapa Tropical — a dinâmica da psique em evidência — (${tropicalHousesText}). As faties com **opacidade total** marcam a Interseção: casas habitadas nos dois sistemas (${intersectHousesListText}) e indicam temas de maior força do mapa.
+O gráfico utiliza a transparência para revelar a origem da sua força. A cor de cada fatia vem do signo da cúspide tropical. As fatias **mais transparentes** indicam a presença de planetas no Mapa Védico — a camada mais sutil da estrutura do destino — (${vedicHousesText}). As fatias **semi-transparentes** revelam a presença de planetas no Mapa Tropical — a dinâmica da psique em evidência — (${tropicalHousesText}). As fatias com **opacidade total** marcam a Interseção: casas habitadas nos dois sistemas (${intersectHousesListText}) e indicam temas de maior força do mapa.
 
 #### A Paleta Elemental
 As cores das casas vêm dos signos das cúspides tropicais e refletem o seu temperamento base:
@@ -3069,7 +3071,7 @@ ${retrogradePlanets.length > 0 ? `No seu mapa tropical, ${joinWords(retrogradePl
 ${weakestElements.length > 0 ? `O(s) elemento(s) com menor pontuação é(são): ${joinWords(weakestElements)} (${minElementCount} planetas).` : 'Os elementos estão relativamente equilibrados.'} Descreva a importância de integrar essa energia para evitar vieses e compensar o temperamento.
 
 #### Os Pontos de Atrito
-${tensePlanets.length > 0 ? `Os pontos com 3 ou mais aspectos tensos (incluindo planetas, Quíron, Nodos, Ascendente e MC) são: ${joinWords(tensePlanets)}.` : 'Não há pontos com 3 ou mais aspectos tensos no mapa.'} Explique o que esses atritos pedem em termos de lapidação consciente e transformação.`;
+${tensePlanets.length > 0 ? `Os pontos com 3 ou mais aspectos tensos são: ${joinWords(tensePlanets)}.` : 'Não há pontos com 3 ou mais aspectos tensos no mapa.'} Explique o que esses atritos pedem em termos de lapidação consciente e transformação.`;
 
   const fixedIntro = `Bem vind@, ${userName}.\n\nA Aquar.IA Prisma é uma forma singular de revelar a potência original e singular da sua alma, e os aprendizados que você veio lapidar.\n\nO nome vem daí: assim como um prisma decompõe a luz em suas cores ocultas, há muitas formas de revelar a alma — e cada astrologia oferece apenas uma camada dessa realidade. Por isso a Aquar.IA une dois ângulos, o tropical e o védico, e parte de um enfoque alquímico para transformar as sombras e potenciais adormecidos, oferecendo uma visão mais integrada da sua dinâmica psíquica e da sua estrutura oculta.\n\nO que vem a seguir não é previsão. É um espelho refratado da sua alma.\n\n> 'Quando uma situação interna não é tornada consciente, ela aparece do lado de fora como destino'\n> Carl G. Jung, Aion.`;
 
@@ -3322,7 +3324,7 @@ Pule uma linha e, em uma nova linha isolada, escreva o subtítulo:
 
 **A geografia de [Planeta Mahadasha] no mapa natal**
 
-Baseada nos dados de GEOGRAFIA NATAL DOS REGENTES, escreva um parágrafo curto dividido em duas camadas, cada uma em sua própria linha:
+Escreva um parágrafo curto dividido em duas camadas, cada uma em sua própria linha. NUNCA repita frases de instrução como "Baseada nos dados de..." ou "GEOGRAFIA NATAL DOS REGENTES". Inicie diretamente com a interpretação:
 
 - **Psicológica (Mapa Tropical):** [onde este planeta habita no mapa tropical, qual esfera da vida ele toca e o que ele ativa psicologicamente neste ciclo].
 - **Estrutural (Mapa Sideral):** [onde ele está no mapa sideral, sua Nakshatra, dignidade, força e o que isso ativa estruturalmente na vida do consulente].
@@ -3336,7 +3338,7 @@ Pule uma linha e, em uma nova linha isolada, escreva o subtítulo:
 
 **A geografia de [Planeta Antardasha] no mapa natal**
 
-Baseada nos dados de GEOGRAFIA NATAL DOS REGENTES, escreva um parágrafo curto dividido em duas camadas, cada uma em sua própria linha:
+Escreva um parágrafo curto dividido em duas camadas, cada uma em sua própria linha. NUNCA repita frases de instrução como "Baseada nos dados de..." ou "GEOGRAFIA NATAL DOS REGENTES". Inicie diretamente com a interpretação:
 
 - **Psicológica (Mapa Tropical):** [onde este planeta habita no mapa tropical, qual esfera da vida ele toca e o que ele ativa psicologicamente neste ciclo].
 - **Estrutural (Mapa Sideral):** [onde ele está no mapa sideral, sua Nakshatra, dignidade, força e o que isso ativa estruturalmente na vida do consulente].
@@ -3350,7 +3352,7 @@ Pule uma linha e, em uma nova linha isolada, escreva o subtítulo:
 
 **A geografia de [Planeta Pratyantardasha] no mapa natal**
 
-Baseada nos dados de GEOGRAFIA NATAL DOS REGENTES, escreva um parágrafo curto dividido em duas camadas, cada uma em sua própria linha:
+Escreva um parágrafo curto dividido em duas camadas, cada uma em sua própria linha. NUNCA repita frases de instrução como "Baseada nos dados de..." ou "GEOGRAFIA NATAL DOS REGENTES". Inicie diretamente com a interpretação:
 
 - **Psicológica (Mapa Tropical):** [onde este planeta habita no mapa tropical, qual esfera da vida ele toca e o que ele ativa psicologicamente neste ciclo].
 - **Estrutural (Mapa Sideral):** [onde ele está no mapa sideral, sua Nakshatra, dignidade, força e o que isso ativa estruturalmente na vida do consulente].
@@ -3726,6 +3728,11 @@ Por favor, gere a leitura da Tríade do Tempo Cósmico baseada estritamente ness
       .replace(/(?:^|\n)(?:\*\*)?(A geografia de [A-Za-zÀ-ÿ\s]+ no mapa natal)(?:\*\*)?(?=$|\n)/g, "\n**$1**\n\n")
       .replace(/Mapa Védico/g, "Mapa Sideral")
       .replace(/mapa védico/g, "mapa sideral");
+
+    // Remove instruções internas que possam ter vazado
+    reading = reading
+      .replace(/Baseada nos dados de GEOGRAFIA NATAL DOS REGENTES,?\s*/gi, "")
+      .replace(/escreva um parágrafo curto dividido em duas camadas,?\s*(cada uma em sua própria linha)?[:\-]?\s*/gi, "");
 
     // Garante que o parágrafo "Sua fase atual" esteja com a tríade correta
     reading = correctDashaPhaseParagraph(

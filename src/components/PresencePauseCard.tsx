@@ -20,7 +20,7 @@ const AUDIO_URL = "/assets/audio/background-meditation.mp3";
 const TOTAL_SECONDS = 60;
 const PHASE_DURATIONS = [4, 4, 4, 4];
 const PHASE_LABELS = ["Inspire", "Retenha o ar", "Solte", "Retenha o ar"];
-const PHASE_SCALE = [1.25, 1.25, 1, 1];
+const PHASE_SCALE = [1.25, 1, 1.25, 1];
 
 const HOUSE_FALLBACK_QUESTION: Record<number, string> = {
   1: "O que você está defendendo sobre quem você é, quando ninguém está olhando?",
@@ -247,7 +247,7 @@ export function PresencePauseCard({ houseId, synthesisContext, userId, profile }
 
       <div className="flex flex-col items-center justify-center py-6 space-y-4">
         <div
-          className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full"
+          className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full transition-transform duration-300 ease-in-out"
           style={{
             transform: `scale(${scale})`,
           }}

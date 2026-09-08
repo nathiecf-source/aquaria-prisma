@@ -13,6 +13,10 @@ import { Footer } from "./components/Footer";
 import OnboardingTour, { TourStep } from "./components/OnboardingTour";
 import { FloatingChatButton } from "./components/FloatingChatButton";
 import { ChatModal } from "./components/ChatModal";
+import { JournalModal } from "./components/JournalModal";
+import { FeedbackSection } from "./components/FeedbackSection";
+import { FeedbackModal } from "./components/FeedbackModal";
+import { InstallPWA } from "./components/InstallPWA";
 import { PaywallBarrier } from "./components/PaywallBarrier";
 import PlanosPage from "./components/PlanosPage";
 import SuccessPage from "./components/SuccessPage";
@@ -53,6 +57,9 @@ export default function App() {
   const [showTour, setShowTour] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showChatPaywall, setShowChatPaywall] = useState(false);
+  const [isJournalOpen, setIsJournalOpen] = useState(false);
+  const [showFeedbackSection, setShowFeedbackSection] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [chatActive, setChatActive] = useState(true);
   const [chamado, setChamado] = useState<{ active: boolean; expiresAt: string | null; features: string[]; bannerText: string }>({
     active: false,
@@ -288,6 +295,26 @@ export default function App() {
       })
       .catch((err) => console.warn("[App] Erro ao carregar settings:", err));
   }, []);
+
+  // Contador de acessos para pedir avaliação no 5º acesso
+  useEffect(() => {
+    if (step !== "mandala" || !userProfile) return;
+
+    try {
+      const STORAGE_KEY = "aquaria_access_count";
+      const DISMISSED_KEY = "aquaria_feedback_dismissed";
+      const count = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) + 1;
+      localStorage.setItem(STORAGE_KEY, String(count));
+
+      const dismissed = localStorage.getItem(DISMISSED_KEY) === "true";
+      if (count === 5 && !dismissed) {
+        setShowFeedbackModal(true);
+        localStorage.setItem(DISMISSED_KEY, "true");
+      }
+    } catch {
+      // ignore
+    }
+  }, [step, userProfile]);
 
   useEffect(() => {
     // onAuthStateChange é suficiente — dispara INITIAL_SESSION na montagem e SIGNED_IN/OUT depois
@@ -634,9 +661,9 @@ export default function App() {
       {session && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
           {/* User Tier Badge & Sign Out */}
-          <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 bg-white/90 backdrop-blur rounded-full shadow-sm border border-[#e6e2d8] text-[10px] tracking-wider font-mono">
+          <div className="flex items-center gap-2 px-2.5 sm:px-3.5 py-1.5 bg-white/90 backdrop-blur rounded-full shadow-sm border border-[#e6e2d8] text-[10px] tracking-wider font-mono">
             <span className={`w-2 h-2 rounded-full ${isPlus ? 'bg-[#d4af37] shadow-[0_0_8px_#d4af37]' : 'bg-gray-400'}`} />
-            <span className="text-[#3c352d] font-semibold">{userProfile?.full_name || 'Usuário'}</span>
+            <span className="text-[#3c352d] font-semibold max-w-[100px] sm:max-w-none truncate">{userProfile?.full_name || 'Usuário'}</span>
             <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold ${isPlus ? 'bg-[#d4af37]/20 text-[#8c6239] border border-[#d4af37]/40 animate-pulse' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
               {activeSubscriptionTier}
             </span>
@@ -735,7 +762,18 @@ export default function App() {
       </section>
 
       {/* Bottom Footer */}
-      <Footer userProfile={userProfile} />
+      <Footer
+        userProfile={userProfile}
+        onFeedbackClick={() => setShowFeedbackSection(true)}
+      />
+
+      {showFeedbackSection && (
+        <div className="w-full max-w-3xl mx-auto px-4 pb-8">
+          <FeedbackSection
+            userId={userProfile?.id}
+          />
+        </div>
+      )}
 
       <CommunityPopup isReady={step === "mandala" && !isLoadingSession} />
 
@@ -751,11 +789,12 @@ export default function App() {
       {step === "mandala" && userProfile && chatActive && (
         <FloatingChatButton
           isLocked={!canChat}
-          onClick={() =>
+          onChat={() =>
             canChat
               ? setIsChatOpen(true)
               : setShowChatPaywall(true)
           }
+          onJournal={() => setIsJournalOpen(true)}
         />
       )}
 
@@ -785,6 +824,21 @@ export default function App() {
         userId={userProfile?.id}
         userName={userProfile?.full_name || userProfile?.name || userName}
       />
+
+      <JournalModal
+        isOpen={isJournalOpen}
+        onClose={() => setIsJournalOpen(false)}
+        userId={userProfile?.id || ""}
+      />
+
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        userId={userProfile?.id || ""}
+        onClose={() => setShowFeedbackModal(false)}
+        onGoToFeedback={() => setShowFeedbackSection(true)}
+      />
+
+      <InstallPWA />
     </main>
   );
 }

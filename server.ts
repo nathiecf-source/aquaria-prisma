@@ -3416,6 +3416,73 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
+  // GET /api/feedbacks/public - depoimentos públicos aprovados (prova social)
+  app.get("/api/feedbacks/public", async (req, res) => {
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { data, error } = await supabase
+        .from("user_feedbacks")
+        .select("id, content, rating, created_at")
+        .gte("rating", 4)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error("[Public] Erro ao listar feedbacks:", error);
+        return res.status(500).json({ error: "Erro ao listar depoimentos." });
+      }
+
+      return res.json({ feedbacks: data || [] });
+    } catch (err: any) {
+      console.error("[Public] Erro em feedbacks:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // POST /api/feedback - enviar avaliação
+  app.post("/api/feedback", async (req, res) => {
+    try {
+      const { userId, rating, content } = req.body;
+
+      if (!userId || typeof userId !== "string") {
+        return res.status(400).json({ error: "userId é obrigatório." });
+      }
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "rating deve ser entre 1 e 5." });
+      }
+      if (!content || typeof content !== "string" || content.trim().length < 3) {
+        return res.status(400).json({ error: "content deve ter pelo menos 3 caracteres." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { error } = await supabase
+        .from("user_feedbacks")
+        .insert({
+          user_id: userId,
+          rating,
+          content: content.trim(),
+        });
+
+      if (error) {
+        console.error("[Feedback] Erro ao salvar:", error);
+        return res.status(500).json({ error: "Erro ao salvar avaliação." });
+      }
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("[Feedback] Erro:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
   // GET /api/admin/user-events - histórico de eventos de uma usuária
   app.get("/api/admin/user-events", async (req, res) => {
     const admin = await requireAdmin(req, res);

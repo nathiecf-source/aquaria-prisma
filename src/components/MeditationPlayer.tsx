@@ -22,7 +22,7 @@ function formatTime(totalSeconds: number): string {
 const BREATH_TOTAL_SECONDS = 60;
 const BREATH_PHASE_DURATIONS = [4, 4, 4, 4];
 const BREATH_PHASE_LABELS = ["Inspire", "Retenha o ar", "Solte", "Retenha o ar"];
-const BREATH_PHASE_SCALE = [1.25, 1.25, 1, 1];
+const BREATH_PHASE_SCALE = [1.25, 1, 1.25, 1];
 const BACKGROUND_AUDIO_URL = "/assets/audio/background-meditation.mp3";
 
 export function MeditationPlayer({ audioUrl, isLoading, onGenerate, userId, pathId, title, gender, genderPreference }: MeditationPlayerProps) {
@@ -306,7 +306,7 @@ export function MeditationPlayer({ audioUrl, isLoading, onGenerate, userId, path
 
         <div className="flex flex-col items-center justify-center py-4 space-y-4">
           <div
-            className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full"
+            className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full transition-transform duration-300 ease-in-out"
             style={{ transform: `scale(${scale})` }}
           >
             <svg

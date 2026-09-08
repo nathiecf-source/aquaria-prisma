@@ -2282,7 +2282,7 @@ export default function AstrologyMandala({
       <RightPanelDrawer
         isOpen={isPlanetPanelOpen && !!selectedPlanetId}
         onClose={() => { setIsPlanetPanelOpen(false); setSelectedPlanetId(null); }}
-        title="Régua de Glifos"
+        title="Engrenagens Celestes: os planetas"
       >
         <PlanetReadingPanel
           planetId={selectedPlanetId}

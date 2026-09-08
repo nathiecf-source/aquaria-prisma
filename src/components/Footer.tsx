@@ -7,9 +7,10 @@ import { BookingModal } from "./BookingModal";
 
 interface FooterProps {
   userProfile?: any;
+  onFeedbackClick?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
+export const Footer: React.FC<FooterProps> = ({ userProfile, onFeedbackClick }) => {
   const [showAbout, setShowAbout] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
@@ -69,6 +70,15 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
             className="hover:text-[#3c352d] transition-colors cursor-pointer"
           >
             Sua Assinatura
+          </button>
+
+          <span className="hidden sm:inline text-[#e6e2d8]">•</span>
+
+          <button
+            onClick={onFeedbackClick}
+            className="hover:text-[#3c352d] transition-colors cursor-pointer"
+          >
+            Avaliação
           </button>
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>

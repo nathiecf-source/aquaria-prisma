@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X, Send, FileDown, Loader2 } from "lucide-react";
+import { X, Send, FileDown, Loader2, ChevronDown } from "lucide-react";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { useChat, ChartMode, ChatMessage, TransitContext } from "../hooks/useChat";
@@ -90,8 +90,9 @@ export const ChatModal: React.FC<ChatModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<ChatTab>("tropical");
   const [selectedEvent, setSelectedEvent] = useState<TransitContext | null>(null);
+  const [showEventsSheet, setShowEventsSheet] = useState(false);
 
-  const messagesWithWelcome = [WELCOME_MESSAGE, ...messages];
+  const messagesWithWelcome = activeTab === "ciclos" ? messages : [WELCOME_MESSAGE, ...messages];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -107,6 +108,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
       reset();
       setActiveTab("tropical");
       setSelectedEvent(null);
+      setShowEventsSheet(false);
     }
   }, [isOpen, reset]);
 
@@ -139,6 +141,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
 
   const handleEventClick = (event: TransitContext) => {
     setSelectedEvent(event);
+    setShowEventsSheet(false);
     sendMessage(event.event, { transitContext: event, invisible: true });
   };
 
@@ -224,13 +227,13 @@ export const ChatModal: React.FC<ChatModalProps> = ({
         {/* Body */}
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
           {isCiclos && (
-            <div className="w-full md:w-56 lg:w-64 border-b md:border-b-0 md:border-r border-[#d9d4c7] bg-[#f4f1eb] flex flex-col">
+            <div className="hidden md:flex w-56 lg:w-64 border-b md:border-b-0 md:border-r border-[#d9d4c7] bg-[#f4f1eb] flex-col">
               <div className="px-4 py-3 border-b border-[#d9d4c7]">
                 <h3 className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold">
                   Próximos 30 dias
                 </h3>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-40 md:max-h-none">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {isLoadingEvents ? (
                   <div className="flex items-center justify-center py-6 text-[#8c7f70]">
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -269,6 +272,28 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             ref={containerRef}
             className="flex-1 overflow-y-auto px-5 py-5 space-y-5 scrollbar-thin scrollbar-thumb-[#c5a880] scrollbar-track-transparent"
           >
+            {isCiclos && (
+              <div className="md:hidden mb-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEventsSheet(true)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-[#d9d4c7] bg-white/60 text-xs text-[#4a3f35] hover:bg-white transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    {selectedEvent ? (
+                      <>
+                        <span className="text-[#8c7f70]">Céu do momento:</span>
+                        <span className="font-light truncate max-w-[180px]">{selectedEvent.event}</span>
+                      </>
+                    ) : (
+                      <span className="text-[#8c7f70]">Escolher evento do céu do momento</span>
+                    )}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-[#8c7f70] shrink-0" />
+                </button>
+              </div>
+            )}
+
             {messagesWithWelcome.map((msg, idx) => {
               const isBot = msg.role === "bot";
 
@@ -386,10 +411,65 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             </div>
             <p className="mt-2 text-[10px] text-[#8c7f70] text-center">
               A conversa não é salva no banco. Você pode exportar para PDF quando
-              quiser.
+              quiser. Clique no ícone <FileDown className="inline w-3 h-3 mx-0.5" /> no topo do chat.
             </p>
           </form>
         </div>
+
+        {/* Mobile events bottom sheet */}
+        {showEventsSheet && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center md:hidden">
+            <div
+              className="absolute inset-0 bg-[#4a3f35]/40 backdrop-blur-sm"
+              onClick={() => setShowEventsSheet(false)}
+            />
+            <div className="relative w-full max-h-[70vh] bg-[#f4f1eb] rounded-t-2xl border-t border-[#d9d4c7] shadow-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-[#d9d4c7]">
+                <h3 className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold">
+                  Céu do momento — Próximos 30 dias
+                </h3>
+                <button
+                  onClick={() => setShowEventsSheet(false)}
+                  className="p-1 rounded-full text-[#8c7f70] hover:text-[#4a3f35]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {isLoadingEvents ? (
+                  <div className="flex items-center justify-center py-6 text-[#8c7f70]">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <span className="text-xs">Calculando ciclos...</span>
+                  </div>
+                ) : events.length === 0 ? (
+                  <p className="text-xs text-[#8c7f70] text-center py-4">
+                    Nenhum evento encontrado.
+                  </p>
+                ) : (
+                  events.map((event, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleEventClick(event)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors group ${
+                        selectedEvent?.event === event.event &&
+                        selectedEvent?.date === event.date
+                          ? "bg-[#8c6239]/10 border-[#8c6239]/40"
+                          : "bg-white/40 border-[#d9d4c7] hover:bg-white/80 hover:border-[#c5a880]"
+                      }`}
+                    >
+                      <span className="block text-[9px] text-[#8c7f70] uppercase tracking-wider mb-0.5">
+                        {formatEventDate(event.date)}
+                      </span>
+                      <span className="text-xs text-[#4a3f35] font-light leading-snug group-hover:text-[#8c6239] transition-colors">
+                        {event.event}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
