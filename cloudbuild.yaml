@@ -19,18 +19,16 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'aquaria'
+      - 'aquaria-app'
       - '--image'
       - 'gcr.io/aquaria-app/aquaria:main'
       - '--region'
-      - 'southamerica-east1'
+      - 'us-central1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
-      - '--env-vars-file'
-      - 'env-vars.yaml'
     id: 'deploy'
 
 options:
