@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, BookOpen } from "lucide-react";
+import { Loader2, BookOpen, Pencil, X, Save } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import EvolutionDashboard from "./EvolutionDashboard";
 
@@ -40,6 +40,7 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<"todos" | "pausa" | "ciclos" | "diario">("todos");
+  const [editing, setEditing] = React.useState<{ pathId: string; text: string; saving: boolean } | null>(null);
 
   const fetchAll = React.useCallback(async () => {
     setLoading(true);
@@ -79,6 +80,26 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
 
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const saveJournalEdit = async (pathId: string) => {
+    if (!editing || !userId) return;
+    setEditing((prev) => (prev ? { ...prev, saving: true } : null));
+    try {
+      const res = await fetch("/api/meditation/journal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, pathId, journalText: editing.text }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar");
+      await fetchAll();
+      setEditing(null);
+    } catch (err) {
+      console.error("[DiarioAlquimico] Erro ao editar nota:", err);
+      setError("Não foi possível salvar a edição.");
+    } finally {
+      setEditing((prev) => (prev ? { ...prev, saving: false } : null));
+    }
+  };
+
   const combinedEntries = React.useMemo(() => {
     const insightEntries = insights.map(insight => ({
       key: `insight-${insight.id}`,
@@ -99,6 +120,7 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
 
     const journalEntries = journals.map(journal => ({
       key: `journal-${journal.path_id}`,
+      pathId: journal.path_id,
       timestamp: journal.updated_at,
       text: journal.journal_text,
       categoryLabel: `${journal.path_title || journal.path_id} — Diário Alquímico`,
@@ -168,21 +190,65 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((entry) => (
-            <div key={entry.key} className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-5 py-4 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-widest">
-                  {formatDate(entry.timestamp)}
-                </p>
-                <span className="font-sans text-[9px] text-[#5c4d66] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#5c4d66]/10">
-                  {entry.categoryLabel}
-                </span>
+          {filtered.map((entry) => {
+            const isDiario = entry.filterKey === "diario" && "pathId" in entry;
+            const isEditing = isDiario && editing?.pathId === (entry as any).pathId;
+
+            return (
+              <div key={entry.key} className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-5 py-4 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-widest">
+                    {formatDate(entry.timestamp)}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-sans text-[9px] text-[#5c4d66] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#5c4d66]/10">
+                      {entry.categoryLabel}
+                    </span>
+                    {isDiario && !isEditing && (
+                      <button
+                        onClick={() => setEditing({ pathId: (entry as any).pathId, text: entry.text, saving: false })}
+                        className="p-1 text-[#8c7f70] hover:text-[#5c4d66] transition-colors"
+                        aria-label="Editar nota"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={editing.text}
+                      onChange={(e) => setEditing({ ...editing, text: e.target.value })}
+                      className="w-full min-h-[100px] p-3 rounded-lg border border-[#e6e2d8] bg-white/60 text-sm text-[#4a3f35] leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-[#5c4d66]/30"
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setEditing(null)}
+                        disabled={editing.saving}
+                        className="px-3 py-1.5 rounded-lg border border-[#e6e2d8] text-[#8c7f70] text-[10px] font-bold uppercase tracking-widest hover:bg-[#ede9de] transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => saveJournalEdit((entry as any).pathId)}
+                        disabled={editing.saving || !editing.text.trim() || editing.text === entry.text}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8c6239] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#6b4a2b] transition-colors disabled:opacity-50"
+                      >
+                        {editing.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-sans text-[13.5px] text-[#3c352d] leading-relaxed whitespace-pre-wrap">
+                    {entry.text}
+                  </p>
+                )}
               </div>
-              <p className="font-sans text-[13.5px] text-[#3c352d] leading-relaxed whitespace-pre-wrap">
-                {entry.text}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -14,7 +14,6 @@ import OnboardingTour, { TourStep } from "./components/OnboardingTour";
 import { FloatingChatButton } from "./components/FloatingChatButton";
 import { ChatModal } from "./components/ChatModal";
 import { JournalModal } from "./components/JournalModal";
-import { FeedbackSection } from "./components/FeedbackSection";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { InstallPWA } from "./components/InstallPWA";
 import { PaywallBarrier } from "./components/PaywallBarrier";
@@ -25,6 +24,7 @@ import GlobalBanner from "./components/GlobalBanner";
 import { CommunityPopup } from "./components/CommunityPopup";
 
 import { hasPlusAccess, hasChamadoFeature } from "./lib/access";
+import { useUserFlags } from "./hooks/useUserFlags";
 
 type FlowStep = "form" | "confirm" | "loading" | "mandala";
 
@@ -58,7 +58,6 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showChatPaywall, setShowChatPaywall] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
-  const [showFeedbackSection, setShowFeedbackSection] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [chatActive, setChatActive] = useState(true);
   const [chamado, setChamado] = useState<{ active: boolean; expiresAt: string | null; features: string[]; bannerText: string }>({
@@ -92,22 +91,10 @@ export default function App() {
     chamadoRef.current = chamado;
   }, [chamado]);
 
+  const { markFlagAsSeen, isFlagSeen } = useUserFlags(session?.user?.id);
+
   const markTourAsSeen = async () => {
-    localStorage.setItem("has_seen_onboarding", "true");
-    const userId = session?.user?.id;
-    if (userId) {
-      try {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ has_seen_onboarding: true })
-          .eq("id", userId);
-        if (error) {
-          console.warn("[Onboarding] Erro ao salvar flag no Supabase:", error);
-        }
-      } catch (err) {
-        console.warn("[Onboarding] Falha ao atualizar perfil:", err);
-      }
-    }
+    await markFlagAsSeen("has_seen_onboarding");
   };
 
   const handleCompleteTour = () => {
@@ -299,22 +286,21 @@ export default function App() {
   // Contador de acessos para pedir avaliação no 5º acesso
   useEffect(() => {
     if (step !== "mandala" || !userProfile) return;
+    if (isFlagSeen("has_seen_feedback", userProfile)) return;
 
     try {
       const STORAGE_KEY = "aquaria_access_count";
-      const DISMISSED_KEY = "aquaria_feedback_dismissed";
       const count = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) + 1;
       localStorage.setItem(STORAGE_KEY, String(count));
 
-      const dismissed = localStorage.getItem(DISMISSED_KEY) === "true";
-      if (count === 5 && !dismissed) {
+      if (count === 5) {
         setShowFeedbackModal(true);
-        localStorage.setItem(DISMISSED_KEY, "true");
+        markFlagAsSeen("has_seen_feedback");
       }
     } catch {
       // ignore
     }
-  }, [step, userProfile]);
+  }, [step, userProfile, isFlagSeen, markFlagAsSeen]);
 
   useEffect(() => {
     // onAuthStateChange é suficiente — dispara INITIAL_SESSION na montagem e SIGNED_IN/OUT depois
@@ -370,13 +356,10 @@ export default function App() {
   // Dispara o onboarding no primeiro acesso à mandala, se ainda não foi visto.
   useEffect(() => {
     if (step !== "mandala" || !userProfile || isLoadingSession) return;
-    const alreadySeen =
-      userProfile.has_seen_onboarding === true ||
-      localStorage.getItem("has_seen_onboarding") === "true";
-    if (!alreadySeen) {
+    if (!isFlagSeen("has_seen_onboarding", userProfile)) {
       setShowTour(true);
     }
-  }, [step, userProfile, isLoadingSession]);
+  }, [step, userProfile, isLoadingSession, isFlagSeen]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -762,20 +745,13 @@ export default function App() {
       </section>
 
       {/* Bottom Footer */}
-      <Footer
+      <Footer userProfile={userProfile} />
+
+      <CommunityPopup
+        isReady={step === "mandala" && !isLoadingSession}
         userProfile={userProfile}
-        onFeedbackClick={() => setShowFeedbackSection(true)}
+        onMarkSeen={() => markFlagAsSeen("has_seen_community")}
       />
-
-      {showFeedbackSection && (
-        <div className="w-full max-w-3xl mx-auto px-4 pb-8">
-          <FeedbackSection
-            userId={userProfile?.id}
-          />
-        </div>
-      )}
-
-      <CommunityPopup isReady={step === "mandala" && !isLoadingSession} />
 
       {showTour && step === "mandala" && (
         <OnboardingTour
@@ -834,11 +810,18 @@ export default function App() {
       <FeedbackModal
         isOpen={showFeedbackModal}
         userId={userProfile?.id || ""}
-        onClose={() => setShowFeedbackModal(false)}
-        onGoToFeedback={() => setShowFeedbackSection(true)}
+        userProfile={userProfile}
+        onClose={() => {
+          setShowFeedbackModal(false);
+          markFlagAsSeen("has_seen_feedback");
+        }}
+        onGoToFeedback={() => setShowFeedbackModal(true)}
       />
 
-      <InstallPWA />
+      <InstallPWA
+        userProfile={userProfile}
+        onMarkSeen={() => markFlagAsSeen("has_seen_pwa")}
+      />
     </main>
   );
 }

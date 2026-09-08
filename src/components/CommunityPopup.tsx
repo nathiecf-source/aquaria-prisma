@@ -5,18 +5,26 @@ import { QRCodeSVG } from "qrcode.react";
 const WHATSAPP_LINK = "https://chat.whatsapp.com/BuQ0JxIqiBQK4nf9upmYth";
 const VISIT_COUNT_KEY = "aquaria_visit_count";
 const SESSION_FLAG_KEY = "aquaria_this_session";
-const DISMISS_KEY = "community_popup_dismissed";
 
 interface CommunityPopupProps {
   isReady?: boolean;
+  userProfile?: any;
+  onMarkSeen?: () => void;
 }
 
-export const CommunityPopup: React.FC<CommunityPopupProps> = ({ isReady = true }) => {
+export const CommunityPopup: React.FC<CommunityPopupProps> = ({
+  isReady = true,
+  userProfile,
+  onMarkSeen,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  const alreadySeen =
+    userProfile?.has_seen_community === true ||
+    localStorage.getItem("community_popup_dismissed") === "true";
+
   useEffect(() => {
-    if (!isReady) return;
-    if (localStorage.getItem(DISMISS_KEY)) return;
+    if (!isReady || alreadySeen) return;
 
     // Evita contar reloads dentro da mesma sessão/aba
     const alreadyThisSession = sessionStorage.getItem(SESSION_FLAG_KEY);
@@ -31,10 +39,11 @@ export const CommunityPopup: React.FC<CommunityPopupProps> = ({ isReady = true }
         return () => clearTimeout(timeout);
       }
     }
-  }, [isReady]);
+  }, [isReady, alreadySeen]);
 
   const handleClose = () => {
-    localStorage.setItem(DISMISS_KEY, "true");
+    localStorage.setItem("community_popup_dismissed", "true");
+    onMarkSeen?.();
     setIsOpen(false);
   };
 

@@ -4,17 +4,18 @@ import { AboutModal } from "./AboutModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { FAQModal } from "./FAQModal";
 import { BookingModal } from "./BookingModal";
+import { FeedbackSection } from "./FeedbackSection";
 
 interface FooterProps {
   userProfile?: any;
-  onFeedbackClick?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ userProfile, onFeedbackClick }) => {
+export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
   const [showAbout, setShowAbout] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   return (
     <>
@@ -75,7 +76,7 @@ export const Footer: React.FC<FooterProps> = ({ userProfile, onFeedbackClick }) 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
 
           <button
-            onClick={onFeedbackClick}
+            onClick={() => setShowFeedback(true)}
             className="hover:text-[#3c352d] transition-colors cursor-pointer"
           >
             Avaliação
@@ -147,6 +148,14 @@ export const Footer: React.FC<FooterProps> = ({ userProfile, onFeedbackClick }) 
 
       {showBooking && (
         <BookingModal onClose={() => setShowBooking(false)} />
+      )}
+
+      {showFeedback && (
+        <FeedbackSection
+          userId={userProfile?.id}
+          isOpen={showFeedback}
+          onClose={() => setShowFeedback(false)}
+        />
       )}
     </>
   );

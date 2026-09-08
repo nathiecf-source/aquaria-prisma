@@ -8,11 +8,16 @@ interface BeforeInstallPromptEvent extends Event {
 
 const DISMISS_KEY = "aquaria_pwa_dismissed";
 
-export const InstallPWA: React.FC = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showBanner, setShowBanner] = useState(false);
+interface InstallPWAProps {
+  userProfile?: any;
+  onMarkSeen?: () => void;
+}
+
+export const InstallPWA: React.FC<InstallPWAProps> = ({ userProfile, onMarkSeen }) => {
+  const [localDeferredPrompt, setLocalDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
+  const [showAndroidFallback, setShowAndroidFallback] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -25,51 +30,60 @@ export const InstallPWA: React.FC = () => {
       wasDismissed = localStorage.getItem(DISMISS_KEY) === "true";
     } catch {}
 
+    if (!wasDismissed && userProfile?.has_seen_pwa === true) {
+      wasDismissed = true;
+    }
+
     setIsStandalone(standalone);
     setIsIOSDevice(iOS);
     setDismissed(wasDismissed);
 
-    if (standalone || wasDismissed) return;
-
-    // iOS não dispara beforeinstallprompt; mostramos banner manualmente.
-    if (iOS) {
-      setShowBanner(true);
-      return;
+    // Usa o prompt capturado em main.tsx, se disponível
+    const globalPrompt = (window as any).__AQUARIA_INSTALL_PROMPT__ as BeforeInstallPromptEvent | null;
+    if (globalPrompt) {
+      setLocalDeferredPrompt(globalPrompt);
     }
 
+    // Também escuta eventos futuros (caso o prompt seja disparado depois)
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowBanner(true);
+      setLocalDeferredPrompt(e as BeforeInstallPromptEvent);
     };
-
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   const markDismissed = () => {
-    setShowBanner(false);
     setShowModal(false);
     setShowIOSInstructions(false);
+    setShowAndroidFallback(false);
     setDismissed(true);
     try {
       localStorage.setItem(DISMISS_KEY, "true");
     } catch {}
+    onMarkSeen?.();
   };
 
   const handleAndroidInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
-      setShowModal(false);
-      setShowBanner(false);
+    const prompt = localDeferredPrompt || (window as any).__AQUARIA_INSTALL_PROMPT__ as BeforeInstallPromptEvent | null;
+
+    if (prompt) {
+      prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") {
+        setLocalDeferredPrompt(null);
+        (window as any).__AQUARIA_INSTALL_PROMPT__ = null;
+        setShowModal(false);
+      }
+    } else {
+      // Fallback: abre instruções manuais
+      setShowAndroidFallback(true);
     }
   };
 
   const openModal = () => {
-    setShowBanner(false);
+    setShowAndroidFallback(false);
+    setShowIOSInstructions(false);
     setShowModal(true);
   };
 
@@ -82,42 +96,6 @@ export const InstallPWA: React.FC = () => {
 
   return (
     <>
-      {/* Banner automático (aparece uma única vez) */}
-      {showBanner && !dismissed && (
-        <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-50 p-4 rounded-2xl bg-[#3c352d] text-[#f4f1eb] shadow-2xl border border-[#c5a880]/30 flex items-start gap-3">
-          <div className="mt-0.5">
-            <Download className="w-5 h-5 text-[#c5a880]" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium leading-snug">Baixar App Aquar.IA</p>
-            <p className="text-[10px] text-[#c5a880] mt-0.5">
-              Instale na tela inicial para acessar com um toque.
-            </p>
-            <div className="flex items-center gap-2 mt-3">
-              <button
-                onClick={openModal}
-                className="px-4 py-2 rounded-lg bg-[#8c6239] hover:bg-[#6b4a2b] text-white text-xs font-bold uppercase tracking-widest transition-colors"
-              >
-                Baixar
-              </button>
-              <button
-                onClick={markDismissed}
-                className="px-4 py-2 rounded-lg border border-[#c5a880]/30 text-[#c5a880] hover:bg-[#f4f1eb]/10 text-xs font-bold uppercase tracking-widest transition-colors"
-              >
-                Depois
-              </button>
-            </div>
-          </div>
-          <button
-            onClick={markDismissed}
-            className="text-[#c5a880] hover:text-white transition-colors"
-            aria-label="Fechar"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {/* Botão fixo no rodapé */}
       {!dismissed && (
         <button
@@ -177,6 +155,38 @@ export const InstallPWA: React.FC = () => {
               className="w-full mt-6 py-2.5 rounded-lg border border-[#e6e2d8] text-[#8c7f70] text-xs font-bold uppercase tracking-widest hover:bg-[#ede9de] transition-colors"
             >
               Não quero instalar agora
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Android / Chrome */}
+      {showAndroidFallback && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-[#3c352d]/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-sm bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl shadow-[0_20px_60px_rgba(60,53,45,0.18)] p-6 sm:p-8">
+            <button
+              onClick={() => setShowAndroidFallback(false)}
+              className="absolute top-4 right-4 p-2 text-[#8c7f70] hover:text-[#3c352d] transition-colors"
+              aria-label="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-lg font-serif tracking-[0.12em] uppercase text-[#3c352d] mb-4">
+              Instalar no Android
+            </h2>
+
+            <ol className="space-y-3 text-sm text-[#4a3f35] leading-relaxed mb-6 list-decimal pl-4">
+              <li>Toque no menu <strong>⋮</strong> (três pontinhos) no canto superior direito do Chrome.</li>
+              <li>Selecione <strong>Adicionar à tela inicial</strong> ou <strong>Instalar app</strong>.</li>
+              <li>Confirme tocando em <strong>Adicionar</strong> ou <strong>Instalar</strong>.</li>
+            </ol>
+
+            <button
+              onClick={() => setShowAndroidFallback(false)}
+              className="w-full py-2.5 rounded-lg bg-[#3c352d] text-[#f4f1eb] text-xs font-bold uppercase tracking-widest hover:bg-[#5c4d66] transition-colors"
+            >
+              Entendido
             </button>
           </div>
         </div>

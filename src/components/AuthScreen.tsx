@@ -31,6 +31,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Por favor, preencha um endereço de e-mail válido.");
+      return;
+    }
+
     if (password.length < 6) {
       setError("A senha deve conter no mínimo 6 caracteres.");
       return;
@@ -43,6 +49,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       }
       if (!whatsappNumber) {
         setError("O número do WhatsApp é obrigatório para ativar o seu perfil astrológico.");
+        return;
+      }
+      // Remove tudo que não for dígito e exige pelo menos 10 dígitos (incluindo DDD)
+      const digits = whatsappNumber.replace(/\D/g, "");
+      if (digits.length < 10 || digits.length > 15) {
+        setError("Por favor, preencha um número de WhatsApp válido com DDD.");
         return;
       }
     }

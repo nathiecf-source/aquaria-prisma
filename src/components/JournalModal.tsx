@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { X, Save } from "lucide-react";
+import { X } from "lucide-react";
 import { AlchemyJournal } from "./AlchemyJournal";
 
 interface JournalModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
+  onSaved?: () => void;
 }
 
-export const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, userId }) => {
+export const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, userId, onSaved }) => {
   const [initialText, setInitialText] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +74,7 @@ export const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, use
             userId={userId}
             pathId="floating-journal"
             initialText={initialText}
+            onSaved={onSaved}
           />
         )}
       </div>

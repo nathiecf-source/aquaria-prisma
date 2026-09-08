@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Star } from "lucide-react";
 
 interface FeedbackModalProps {
   isOpen: boolean;
   userId: string;
+  userProfile?: any;
   onClose: () => void;
   onGoToFeedback: () => void;
 }
@@ -18,6 +19,14 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setRating(0);
+      setContent("");
+      setSaved(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -34,7 +43,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       });
       if (res.ok) {
         setSaved(true);
-        setTimeout(() => onClose(), 1500);
       }
     } catch (err) {
       console.error("[FeedbackModal] Erro ao enviar:", err);
@@ -43,11 +51,18 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    try {
+      localStorage.setItem("aquaria_feedback_dismissed", "true");
+    } catch {}
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-[#3c352d]/60 backdrop-blur-sm">
       <div className="relative w-full max-w-md bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl shadow-[0_20px_60px_rgba(60,53,45,0.18)] p-6 sm:p-8">
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 p-2 text-[#8c7f70] hover:text-[#3c352d] transition-colors"
           aria-label="Fechar"
         >
@@ -99,7 +114,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                onClose();
+                handleClose();
                 onGoToFeedback();
               }}
               className="flex-1 px-5 py-2.5 border border-[#8c7f70]/40 text-[#3c352d] text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-[#ede9de]/50 transition-colors"
