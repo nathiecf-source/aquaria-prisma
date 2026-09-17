@@ -1,8 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { X, CalendarClock, Check, Star, RefreshCcw, ExternalLink, ArrowRight } from "lucide-react";
 import { hasActiveAccess, formatAccessExpiry } from "../lib/access";
 import { getPlanDisplayName, isPlanRecurring, MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
+import { supabase } from "../lib/supabaseClient";
+
+interface Transaction {
+  id: string;
+  plan_id: string;
+  order_nsu: string;
+  amount: number;
+  status: string;
+  provider: string;
+  created_at: string;
+}
+
+interface PurchaseHistory {
+  transactions: Transaction[];
+  hasBoughtLongTermPass: boolean;
+  hasBoughtMonthly: boolean;
+  currentPlanId: string | null;
+  accessExpiresAt: string | null;
+  isActive: boolean;
+}
 
 interface SubscriptionModalProps {
   userProfile: any;
@@ -20,13 +40,40 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   onClose,
 }) => {
   const isPlus = hasActiveAccess(userProfile);
-  const expiry = isPlus ? formatAccessExpiry(userProfile) : null;
+  const profileExpiry = isPlus ? formatAccessExpiry(userProfile) : null;
   const currentPlanId = userProfile?.current_plan_id;
   const rawPlanName = getPlanDisplayName(currentPlanId);
   const planName = isPlus && rawPlanName === "Plano Gratuito"
     ? "Acesso PLUS"
     : rawPlanName;
   const recurring = isPlanRecurring(currentPlanId);
+
+  const [history, setHistory] = useState<PurchaseHistory | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    setLoadingHistory(true);
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        const token = data.session?.access_token;
+        return fetch("/api/user/purchase-history", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      })
+      .then((res) => res.json().catch(() => ({})))
+      .then((data) => {
+        if (data && typeof data === "object") {
+          setHistory(data as PurchaseHistory);
+        }
+      })
+      .catch((err) => console.warn("[SubscriptionModal] Erro ao carregar histórico:", err))
+      .finally(() => setLoadingHistory(false));
+  }, []);
+
+  const hasBoughtLongTermPass = history?.hasBoughtLongTermPass === true;
+  const hasAnyAccessHistory = hasBoughtLongTermPass || history?.hasBoughtMonthly;
+  const expiry = profileExpiry || (history?.accessExpiresAt ? new Date(history.accessExpiresAt).toLocaleDateString("pt-BR") : null);
 
   const openMonthlyLink = () => {
     try {
@@ -139,43 +186,57 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               {/* Estado: acesso expirado */}
               <div>
                 <h3 className="font-serif text-lg tracking-wider uppercase text-[#3c352d] mb-2">
-                  Seu ciclo de imersão foi encerrado
+                  {hasAnyAccessHistory ? "Seu ciclo de imersão foi encerrado" : "Acesso gratuito ativo"}
                 </h3>
                 <p className="text-xs text-[#6e6356] leading-relaxed">
-                  Seu período de acesso completo chegou ao fim. A interface e seus dados continuam
-                  salvos, mas as leituras profundas e os trânsitos exigem a manutenção ativa.
+                  {hasAnyAccessHistory
+                    ? "Seu período de acesso completo chegou ao fim. A interface e seus dados continuam salvos, mas as leituras profundas e os trânsitos exigem a manutenção ativa."
+                    : "Você está no acesso gratuito. Explore o seu mapa e, quando quiser desbloquear leituras profundas, ciclos e chat, conheça os passes de expansão."}
                 </p>
               </div>
 
-              <div className="p-5 bg-[#ede9de]/40 border border-[#8c7f70]/10 rounded-2xl">
-                <p className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-3">
-                  Continuar com os Ciclos Ativos
-                </p>
-
-                <div className="mb-4">
-                  <p className="font-serif text-2xl font-bold text-[#8c6239]">R$ 12,90 / mês</p>
-                  <p className="text-xs text-[#6e6356]">
-                    Sem fidelidade, cancele quando quiser.
+              {hasBoughtLongTermPass && userProfile?.access_expires_at && (
+                <div className="p-4 bg-[#f4f1eb] border border-[#e6e2d8] rounded-2xl">
+                  <p className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-1">
+                    Validade do seu plano
+                  </p>
+                  <p className="text-sm text-[#3c352d]">
+                    Seu plano expira em: <span className="font-semibold">{expiry}</span>
                   </p>
                 </div>
+              )}
 
-                <ul className="space-y-2 mb-5">
-                  {MAINTENANCE_BENEFITS.map((benefit, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-xs text-[#3c352d]">
-                      <Check className="w-3.5 h-3.5 text-[#8c6239] shrink-0 mt-0.5" />
-                      <span>{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
+              {hasAnyAccessHistory ? (
+                <div className="p-5 bg-[#ede9de]/40 border border-[#8c7f70]/10 rounded-2xl">
+                  <p className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-3">
+                    Continuar com os Ciclos Ativos
+                  </p>
 
-                <button
-                  onClick={openMonthlyLink}
-                  className="w-full py-3.5 px-6 rounded-xl bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-[#8c6239]/10 flex items-center justify-center gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Reativar Ciclos por R$ 12,90/mês
-                </button>
-              </div>
+                  <div className="mb-4">
+                    <p className="font-serif text-2xl font-bold text-[#8c6239]">R$ 12,90 / mês</p>
+                    <p className="text-xs text-[#6e6356]">
+                      Sem fidelidade, cancele quando quiser.
+                    </p>
+                  </div>
+
+                  <ul className="space-y-2 mb-5">
+                    {MAINTENANCE_BENEFITS.map((benefit, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-[#3c352d]">
+                        <Check className="w-3.5 h-3.5 text-[#8c6239] shrink-0 mt-0.5" />
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={openMonthlyLink}
+                    className="w-full py-3.5 px-6 rounded-xl bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-[#8c6239]/10 flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Reativar Ciclos por R$ 12,90/mês
+                  </button>
+                </div>
+              ) : null}
 
               <div className="p-4 bg-[#f4f1eb] border border-[#e6e2d8] rounded-2xl text-center">
                 <p className="text-xs text-[#6e6356] mb-3">

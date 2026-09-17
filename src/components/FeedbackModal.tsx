@@ -5,6 +5,7 @@ interface FeedbackModalProps {
   isOpen: boolean;
   userId: string;
   userProfile?: any;
+  dayNumber?: number;
   onClose: () => void;
   onGoToFeedback: () => void;
 }
@@ -12,6 +13,7 @@ interface FeedbackModalProps {
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   isOpen,
   userId,
+  dayNumber = 1,
   onClose,
   onGoToFeedback,
 }) => {

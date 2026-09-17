@@ -25,6 +25,7 @@ import { CommunityPopup } from "./components/CommunityPopup";
 
 import { hasPlusAccess, hasChamadoFeature } from "./lib/access";
 import { useUserFlags } from "./hooks/useUserFlags";
+import { promptOneSignalPush, oneSignalLogin, oneSignalLogout } from "./lib/onesignal";
 
 type FlowStep = "form" | "confirm" | "loading" | "mandala";
 
@@ -91,7 +92,9 @@ export default function App() {
     chamadoRef.current = chamado;
   }, [chamado]);
 
-  const { markFlagAsSeen, isFlagSeen } = useUserFlags(session?.user?.id);
+  const { markFlagAsSeen, isFlagSeen, markFirstAccess, getCurrentDay } = useUserFlags(session?.user?.id);
+
+  const currentDay = getCurrentDay(userProfile);
 
   const markTourAsSeen = async () => {
     await markFlagAsSeen("has_seen_onboarding");
@@ -100,11 +103,13 @@ export default function App() {
   const handleCompleteTour = () => {
     setShowTour(false);
     markTourAsSeen();
+    promptOneSignalPush();
   };
 
   const handleSkipTour = () => {
     setShowTour(false);
     markTourAsSeen();
+    promptOneSignalPush();
   };
 
   const loadChartOnLogin = async (userId: string, currentSession: any) => {
@@ -283,24 +288,15 @@ export default function App() {
       .catch((err) => console.warn("[App] Erro ao carregar settings:", err));
   }, []);
 
-  // Contador de acessos para pedir avaliação no 5º acesso
+  // Dispara avaliação no 4º dia após o primeiro acesso
   useEffect(() => {
     if (step !== "mandala" || !userProfile) return;
     if (isFlagSeen("has_seen_feedback", userProfile)) return;
-
-    try {
-      const STORAGE_KEY = "aquaria_access_count";
-      const count = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) + 1;
-      localStorage.setItem(STORAGE_KEY, String(count));
-
-      if (count === 5) {
-        setShowFeedbackModal(true);
-        markFlagAsSeen("has_seen_feedback");
-      }
-    } catch {
-      // ignore
+    if (currentDay >= 4) {
+      setShowFeedbackModal(true);
+      markFlagAsSeen("has_seen_feedback");
     }
-  }, [step, userProfile, isFlagSeen, markFlagAsSeen]);
+  }, [step, userProfile, isFlagSeen, markFlagAsSeen, currentDay]);
 
   useEffect(() => {
     // onAuthStateChange é suficiente — dispara INITIAL_SESSION na montagem e SIGNED_IN/OUT depois
@@ -319,6 +315,7 @@ export default function App() {
         }
 
         fetchUserProfile(currentUserId, currentSession);
+        oneSignalLogin(currentUserId);
         if (!chartLoadedRef.current && !isSpecialRoute(pathname)) {
           chartLoadedRef.current = true;
           loadChartOnLogin(currentUserId, currentSession);
@@ -356,12 +353,16 @@ export default function App() {
   // Dispara o onboarding no primeiro acesso à mandala, se ainda não foi visto.
   useEffect(() => {
     if (step !== "mandala" || !userProfile || isLoadingSession) return;
-    if (!isFlagSeen("has_seen_onboarding", userProfile)) {
-      setShowTour(true);
-    }
-  }, [step, userProfile, isLoadingSession, isFlagSeen]);
+
+    markFirstAccess(userProfile).then(() => {
+      if (!isFlagSeen("has_seen_onboarding", userProfile) && currentDay <= 1) {
+        setShowTour(true);
+      }
+    });
+  }, [step, userProfile, isLoadingSession, isFlagSeen, markFirstAccess, currentDay]);
 
   const handleSignOut = async () => {
+    oneSignalLogout();
     await supabase.auth.signOut();
     chartLoadedRef.current = false;
     isLoadingChartRef.current = false;
@@ -750,6 +751,7 @@ export default function App() {
       <CommunityPopup
         isReady={step === "mandala" && !isLoadingSession}
         userProfile={userProfile}
+        dayNumber={currentDay}
         onMarkSeen={() => markFlagAsSeen("has_seen_community")}
       />
 
@@ -811,6 +813,7 @@ export default function App() {
         isOpen={showFeedbackModal}
         userId={userProfile?.id || ""}
         userProfile={userProfile}
+        dayNumber={currentDay}
         onClose={() => {
           setShowFeedbackModal(false);
           markFlagAsSeen("has_seen_feedback");

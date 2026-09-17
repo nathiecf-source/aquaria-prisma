@@ -3,18 +3,19 @@ import { X, MessageCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 const WHATSAPP_LINK = "https://chat.whatsapp.com/BuQ0JxIqiBQK4nf9upmYth";
-const VISIT_COUNT_KEY = "aquaria_visit_count";
 const SESSION_FLAG_KEY = "aquaria_this_session";
 
 interface CommunityPopupProps {
   isReady?: boolean;
   userProfile?: any;
+  dayNumber?: number;
   onMarkSeen?: () => void;
 }
 
 export const CommunityPopup: React.FC<CommunityPopupProps> = ({
   isReady = true,
   userProfile,
+  dayNumber = 1,
   onMarkSeen,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,21 +26,15 @@ export const CommunityPopup: React.FC<CommunityPopupProps> = ({
 
   useEffect(() => {
     if (!isReady || alreadySeen) return;
+    if (dayNumber < 2) return;
 
-    // Evita contar reloads dentro da mesma sessão/aba
     const alreadyThisSession = sessionStorage.getItem(SESSION_FLAG_KEY);
-    if (!alreadyThisSession) {
-      sessionStorage.setItem(SESSION_FLAG_KEY, "true");
-      const current = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || "0", 10);
-      const next = current + 1;
-      localStorage.setItem(VISIT_COUNT_KEY, String(next));
+    if (alreadyThisSession) return;
 
-      if (next === 2) {
-        const timeout = setTimeout(() => setIsOpen(true), 1500);
-        return () => clearTimeout(timeout);
-      }
-    }
-  }, [isReady, alreadySeen]);
+    sessionStorage.setItem(SESSION_FLAG_KEY, "true");
+    const timeout = setTimeout(() => setIsOpen(true), 1500);
+    return () => clearTimeout(timeout);
+  }, [isReady, alreadySeen, dayNumber]);
 
   const handleClose = () => {
     localStorage.setItem("community_popup_dismissed", "true");

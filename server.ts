@@ -40,7 +40,8 @@ import express from "express";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, HouseReadingSection } from "./src/server/geminiService";
+import { ensureDrishtis } from "./src/server/astrologyProviders";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, HouseReadingSection } from "./src/server/geminiService";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -48,7 +49,7 @@ import { getPlanetGlyphConfig, PLANET_GLYPHS } from "./src/lib/planetGlyphs";
 import { synthesizeMeditation } from "./src/server/ttsService";
 import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
-import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getVedicTransitTerrain } from "./src/server/transitEngine";
+import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getAllPlanetPositions, getVedicTransitTerrain } from "./src/server/transitEngine";
 import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
@@ -413,6 +414,17 @@ async function createApp(): Promise<express.Application> {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
+  // Redirect www para non-www para evitar conflitos de CORS/autenticacao no Supabase
+  app.use((req: any, res: any, next: any) => {
+    const host = req.headers.host || "";
+    if (host.toLowerCase().startsWith("www.")) {
+      const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+      const newUrl = `${protocol}://${host.replace(/^www\./i, "")}${req.url}`;
+      return res.redirect(301, newUrl);
+    }
+    next();
+  });
+
   // Middleware for parsing JSON
   app.use(express.json());
   app.use((req: any, res: any, next: any) => {
@@ -433,6 +445,7 @@ async function createApp(): Promise<express.Application> {
     "/coupons/validate",
     "/analytics/track",
     "/chat/upcoming-events",
+    "/generate-vedic-structural",
   ]);
 
   app.use("/api", (req: any, res: any, next: any) => {
@@ -535,6 +548,64 @@ async function createApp(): Promise<express.Application> {
     } catch (err: any) {
       console.error("Erro em /api/user-readings:", err);
       return res.status(500).json({ error: "Erro ao buscar leituras salvas.", details: err?.message || String(err) });
+    }
+  });
+
+  // GET /api/user/purchase-history - retorna histórico de compras do usuário autenticado
+  app.get("/api/user/purchase-history", async (req, res) => {
+    try {
+      const userId = String((req as any).userId || "");
+      if (!userId) {
+        return res.status(400).json({ error: "userId é obrigatório." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const [txRes, profileRes] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("id, plan_id, order_nsu, amount, status, provider, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profiles")
+          .select("has_access, access_expires_at, current_plan_id, subscription_tier")
+          .eq("id", userId)
+          .single(),
+      ]);
+
+      if (txRes.error) {
+        console.error("[PurchaseHistory] Erro ao buscar transações:", txRes.error);
+        return res.status(500).json({ error: "Erro ao buscar histórico de compras." });
+      }
+
+      const transactions = (txRes.data || []) as any[];
+      const paidTransactions = transactions.filter((t) => t.status === "paid" || t.status === "completed");
+
+      const LONG_TERM_PLANS = new Set(["semester", "annual-launch", "annual-official"]);
+      const longTermPaid = paidTransactions.find((t) => LONG_TERM_PLANS.has(t.plan_id));
+      const hasBoughtLongTermPass = !!longTermPaid;
+      const hasBoughtMonthly = paidTransactions.some((t) => t.plan_id === "monthly");
+
+      const profile = profileRes.data || {};
+      const now = new Date();
+      const accessExpiresAt = profile.access_expires_at ? new Date(profile.access_expires_at) : null;
+      const isActive = !!accessExpiresAt && accessExpiresAt > now;
+
+      return res.json({
+        transactions: paidTransactions,
+        hasBoughtLongTermPass,
+        hasBoughtMonthly,
+        currentPlanId: profile.current_plan_id || null,
+        accessExpiresAt: profile.access_expires_at || null,
+        isActive,
+      });
+    } catch (err: any) {
+      console.error("[PurchaseHistory] Erro:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
     }
   });
 
@@ -1360,6 +1431,63 @@ async function createApp(): Promise<express.Application> {
       console.error("Erro ao gerar leitura do ponto astrológico:", err);
       return res.status(500).json({
         error: "Erro ao gerar leitura do ponto astrológico.",
+        details: err?.message || String(err)
+      });
+    }
+  });
+
+  // API Route: Generate Vedic Structural Analysis (para Dinâmica Estrutural das Engrenagens Celestes)
+  app.post("/api/generate-vedic-structural", async (req, res) => {
+    try {
+      const { profile, planetId, userId } = req.body;
+      if (!profile || !planetId) {
+        return res.status(400).json({ error: "Perfil astrológico e planetId são obrigatórios." });
+      }
+
+      const config = getPlanetGlyphConfig(planetId);
+      if (!config) {
+        return res.status(400).json({ error: "Ponto astrológico desconhecido." });
+      }
+
+      const canonicalName = config.canonicalName;
+      const vedicPlanet = profile?.vedic_natal?.planets?.find((p: any) => p.name === canonicalName);
+      if (!vedicPlanet) {
+        return res.status(400).json({ error: "Planeta védico não encontrado no perfil." });
+      }
+
+      const readingId = `vedic-structural-v3-${planetId}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached) {
+        return res.json({ structuralText: cached.structuralText, cached: true });
+      }
+
+      const gender = profile?.birthData?.gender || "neutro";
+
+      // Drishtis recebidos = planetas que aspectam a casa onde este planeta está
+      const globalDrishti = ensureDrishtis(profile);
+      const planetHouse = vedicPlanet.house || 0;
+      const planetDrishti = globalDrishti
+        .filter((d: string) => new RegExp(`Casa\\s+${planetHouse}\\b`, "i").test(d))
+        .map((d: string) => d.split(" olha ")[0] || d);
+
+      const input = {
+        planet: canonicalName,
+        sign: vedicPlanet.sign || "desconhecido",
+        house: vedicPlanet.house || 0,
+        dignity: vedicPlanet.dignity || "Neutro",
+        nakshatra: vedicPlanet.nakshatra,
+        drishti: planetDrishti,
+        shadbala: profile?.vedic_balas?.shadbala?.[canonicalName],
+      };
+
+      const readingText = await generateVedicStructural(input, gender);
+      const parsedReading = JSON.parse(readingText);
+      await saveReading(userId, readingId, "vedic-structural", parsedReading);
+      return res.json({ structuralText: parsedReading.structuralText, cached: false });
+    } catch (err: any) {
+      console.error("Erro ao gerar análise estrutural védica:", err);
+      return res.status(500).json({
+        error: "Erro ao gerar análise estrutural védica.",
         details: err?.message || String(err)
       });
     }
@@ -3561,7 +3689,7 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
-  // GET /api/admin/feedbacks - lista depoimentos
+  // GET /api/admin/feedbacks - lista depoimentos (incluindo excluídos)
   app.get("/api/admin/feedbacks", async (req, res) => {
     const admin = await requireAdmin(req, res);
     if (!admin) return;
@@ -3569,7 +3697,7 @@ async function createApp(): Promise<express.Application> {
     try {
       const { data, error } = await admin.supabase
         .from("user_feedbacks")
-        .select("id, content, rating, created_at")
+        .select("id, content, rating, created_at, is_featured, is_deleted")
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -3584,7 +3712,64 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
-  // GET /api/feedbacks/public - depoimentos públicos aprovados (prova social)
+  // PATCH /api/admin/feedbacks/:id - destaca ou edita depoimento
+  app.patch("/api/admin/feedbacks/:id", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { id } = req.params;
+      const { is_featured, is_deleted } = req.body;
+
+      const updates: any = {};
+      if (typeof is_featured === "boolean") updates.is_featured = is_featured;
+      if (typeof is_deleted === "boolean") updates.is_deleted = is_deleted;
+
+      const { data, error } = await admin.supabase
+        .from("user_feedbacks")
+        .update(updates)
+        .eq("id", id)
+        .select("id, is_featured, is_deleted")
+        .single();
+
+      if (error) {
+        console.error("[Admin] Erro ao atualizar feedback:", error);
+        return res.status(500).json({ error: "Erro ao atualizar depoimento." });
+      }
+
+      return res.json({ success: true, feedback: data });
+    } catch (err: any) {
+      console.error("[Admin] Erro em patch feedback:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // DELETE /api/admin/feedbacks/:id - exclusão lógica
+  app.delete("/api/admin/feedbacks/:id", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { id } = req.params;
+
+      const { error } = await admin.supabase
+        .from("user_feedbacks")
+        .update({ is_deleted: true })
+        .eq("id", id);
+
+      if (error) {
+        console.error("[Admin] Erro ao deletar feedback:", error);
+        return res.status(500).json({ error: "Erro ao apagar depoimento." });
+      }
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("[Admin] Erro em delete feedback:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // GET /api/feedbacks/public - depoimentos públicos em destaque (prova social)
   app.get("/api/feedbacks/public", async (req, res) => {
     try {
       const supabase = getSupabaseAdmin();
@@ -3595,7 +3780,8 @@ async function createApp(): Promise<express.Application> {
       const { data, error } = await supabase
         .from("user_feedbacks")
         .select("id, content, rating, created_at")
-        .gte("rating", 4)
+        .eq("is_featured", true)
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -3739,6 +3925,177 @@ async function createApp(): Promise<express.Application> {
       return res.json({ success: true, simulated: false, to: user_email, subject: template.subject, messageId: data?.id });
     } catch (err: any) {
       console.error("[Admin] Erro em send-email:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  // ============================================================
+  // OneSignal Push Notifications
+  // ============================================================
+
+  const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID || "7f5a7fbe-433b-40cb-9df8-e6e74cdc3a4a";
+  const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "";
+
+  function verifyCronToken(req: any): boolean {
+    const cronSecret = process.env.CRON_SECRET || "";
+    if (!cronSecret) return false;
+    const queryToken = (req.query?.token as string) || "";
+    const headerToken = (req.headers?.["x-cron-secret"] as string) || "";
+    return queryToken === cronSecret || headerToken === cronSecret;
+  }
+
+  async function getDailyTransitSummary(): Promise<{ title: string; message: string } | null> {
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const events = await getUpcomingCosmicEvents(startOfDay, 2);
+
+      // Só dispara se houver um evento real (ingresso, Lua Nova, Lua Cheia ou eclipse)
+      const activeEvents = events.filter((e: any) => new Date(e.date) >= startOfDay);
+      if (activeEvents.length > 0) {
+        const event = activeEvents[0];
+        const dateStr = new Date(event.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+        const title = `${dateStr} - ${event.event}`;
+        const message = "O que esse trânsito pede de você hoje? Abra o chat ciclos e descubra.";
+        return { title, message };
+      }
+
+      return null;
+    } catch (err) {
+      console.error("[OneSignal] Erro ao calcular trânsito do dia:", err);
+      return null;
+    }
+  }
+
+  async function sendOneSignalNotification(payload: {
+    title: string;
+    message: string;
+    url?: string;
+    include_segments?: string[];
+  }): Promise<{ success: boolean; id?: string; error?: any }> {
+    if (!ONESIGNAL_REST_API_KEY) {
+      console.warn("[OneSignal] ONESIGNAL_REST_API_KEY não configurada. Notificação não enviada.");
+      return { success: false, error: "ONESIGNAL_REST_API_KEY ausente." };
+    }
+
+    try {
+      const body = {
+        app_id: ONESIGNAL_APP_ID,
+        included_segments: payload.include_segments || ["All"],
+        headings: { en: payload.title, pt: payload.title },
+        contents: { en: payload.message, pt: payload.message },
+        url: payload.url || "https://aquar-ia.app",
+        ttl: 86400,
+      };
+
+      const res = await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${ONESIGNAL_REST_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("[OneSignal] Erro ao enviar notificação:", data);
+        return { success: false, error: data };
+      }
+
+      console.log("[OneSignal] Notificação enviada:", data.id);
+      return { success: true, id: data.id };
+    } catch (err: any) {
+      console.error("[OneSignal] Erro de conexão:", err);
+      return { success: false, error: err?.message || String(err) };
+    }
+  }
+
+  // POST /api/cron/daily-transit - disparado pelo Cloud Scheduler às 08h BRT
+  app.post("/api/cron/daily-transit", async (req, res) => {
+    try {
+      if (!verifyCronToken(req)) {
+        return res.status(401).json({ error: "Token inválido." });
+      }
+
+      const summary = await getDailyTransitSummary();
+      if (!summary) {
+        return res.json({
+          success: true,
+          sent: false,
+          reason: "Nenhum evento astral relevante identificado para hoje.",
+        });
+      }
+
+      const result = await sendOneSignalNotification({
+        title: summary.title,
+        message: summary.message,
+        url: getAppUrl(),
+      });
+
+      if (!result.success) {
+        return res.status(500).json({ error: "Erro ao enviar notificação.", details: result.error });
+      }
+
+      return res.json({ success: true, sent: true, notificationId: result.id });
+    } catch (err: any) {
+      console.error("[Cron] Erro em daily-transit:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  // POST /api/admin/test-push - envia notificação de teste (admin)
+  app.post("/api/admin/test-push", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { title, message, url } = req.body || {};
+      const result = await sendOneSignalNotification({
+        title: typeof title === "string" && title.trim() ? title : "Aquar.IA — Teste de notificação",
+        message: typeof message === "string" && message.trim() ? message : "Se você recebeu esta mensagem, o push está funcionando.",
+        url: typeof url === "string" && url.trim() ? url : getAppUrl(),
+      });
+
+      if (!result.success) {
+        return res.status(500).json({ error: "Erro ao enviar notificação de teste.", details: result.error });
+      }
+
+      return res.json({ success: true, notificationId: result.id });
+    } catch (err: any) {
+      console.error("[Admin] Erro em test-push:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  // POST /api/admin/trigger-daily-transit - dispara trânsito do dia manualmente (admin)
+  app.post("/api/admin/trigger-daily-transit", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const summary = await getDailyTransitSummary();
+      if (!summary) {
+        return res.json({
+          success: true,
+          sent: false,
+          reason: "Nenhum evento astral relevante identificado para hoje.",
+        });
+      }
+
+      const result = await sendOneSignalNotification({
+        title: summary.title,
+        message: summary.message,
+        url: getAppUrl(),
+      });
+
+      if (!result.success) {
+        return res.status(500).json({ error: "Erro ao enviar notificação.", details: result.error });
+      }
+
+      return res.json({ success: true, sent: true, summary, notificationId: result.id });
+    } catch (err: any) {
+      console.error("[Admin] Erro em trigger-daily-transit:", err);
       return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
     }
   });

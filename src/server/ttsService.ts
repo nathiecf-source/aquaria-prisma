@@ -8,16 +8,19 @@ function getTTSClient(): TextToSpeechClient {
   const credentialsJson = process.env.GOOGLE_TTS_CREDENTIALS_JSON;
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
 
-  if (!credentialsJson) {
-    throw new Error("[TTS] GOOGLE_TTS_CREDENTIALS_JSON não configurado.");
+  // Se houver credenciais explicitas, usa-as (modo legado).
+  // Caso contrario, usa a service account nativa do Cloud Run.
+  if (credentialsJson) {
+    const credentials = JSON.parse(credentialsJson);
+    ttsClient = new TextToSpeechClient({
+      projectId: projectId || credentials.project_id,
+      credentials,
+    });
+  } else {
+    ttsClient = new TextToSpeechClient({
+      projectId,
+    });
   }
-
-  const credentials = JSON.parse(credentialsJson);
-
-  ttsClient = new TextToSpeechClient({
-    projectId: projectId || credentials.project_id,
-    credentials,
-  });
 
   return ttsClient!;
 }

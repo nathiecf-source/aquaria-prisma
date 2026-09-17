@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import GlobalBanner from "./GlobalBanner";
 import { StoryCard } from "./StoryCard";
-import { Calendar, Mail, Send } from "lucide-react";
+import { Calendar, Mail, Send, Bell, Rocket } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 
 interface AdminPageProps {
@@ -54,6 +54,7 @@ const TABS = [
   { id: "cupons", label: "Cupons e Parcerias" },
   { id: "chamado", label: "O Chamado" },
   { id: "feedbacks", label: "Feedbacks" },
+  { id: "push", label: "Push" },
   { id: "avisos", label: "Avisos Globais" },
   { id: "suporte", label: "Suporte Técnico" },
 ];
@@ -132,6 +133,10 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [previewStory, setPreviewStory] = useState<{ content: string; id: string } | null>(null);
 
+  const [pushTestTitle, setPushTestTitle] = useState("Aquar.IA — Teste de notificação");
+  const [pushTestMessage, setPushTestMessage] = useState("Se você recebeu esta mensagem, o push está funcionando.");
+  const [pushLoading, setPushLoading] = useState(false);
+
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
@@ -178,6 +183,60 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   async function getToken(): Promise<string | null> {
     const { data } = await (await import("../lib/supabaseClient")).supabase.auth.getSession();
     return data?.session?.access_token || null;
+  }
+
+  async function handleSendTestPush() {
+    setPushLoading(true);
+    setMessage(null);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/test-push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({ title: pushTestTitle, message: pushTestMessage }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMessage({ type: "success", text: `Notificação de teste enviada. ID: ${data.notificationId || "—"}` });
+      } else {
+        setMessage({ type: "error", text: data.error || "Erro ao enviar notificação de teste." });
+      }
+    } catch (err) {
+      console.error("[Admin] Erro ao enviar teste push:", err);
+      setMessage({ type: "error", text: "Erro ao enviar notificação de teste." });
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  async function handleTriggerDailyPush() {
+    setPushLoading(true);
+    setMessage(null);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/trigger-daily-transit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMessage({ type: "success", text: `Trânsito do dia enviado: ${data.summary?.title || "—"}` });
+      } else {
+        setMessage({ type: "error", text: data.error || "Erro ao disparar trânsito do dia." });
+      }
+    } catch (err) {
+      console.error("[Admin] Erro ao disparar trânsito do dia:", err);
+      setMessage({ type: "error", text: "Erro ao disparar trânsito do dia." });
+    } finally {
+      setPushLoading(false);
+    }
   }
 
   async function loadMetrics() {
@@ -233,6 +292,66 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
       if (res.ok) setFeedbacks(data.feedbacks || []);
     } catch (err) {
       console.error("[Admin] Erro ao carregar feedbacks:", err);
+    }
+  }
+
+  async function toggleFeatureFeedback(id: string, featured: boolean) {
+    const current = feedbacks.find((f) => f.id === id);
+    if (!current) return;
+
+    const nextFeatured = !featured;
+    // Feedback publico precisa ter nota >= 4
+    if (nextFeatured && current.rating < 4) {
+      setMessage({ type: "error", text: "Apenas depoimentos com nota 4 ou 5 podem ser destacados." });
+      return;
+    }
+
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/feedbacks/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({ is_featured: nextFeatured }),
+      });
+
+      if (res.ok) {
+        setFeedbacks((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, is_featured: nextFeatured } : f))
+        );
+        setMessage({ type: "success", text: `Depoimento ${nextFeatured ? "destacado" : "removido dos destaques"}.` });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setMessage({ type: "error", text: data.error || "Erro ao atualizar destaque." });
+      }
+    } catch (err) {
+      console.error("[Admin] Erro ao destacar feedback:", err);
+      setMessage({ type: "error", text: "Erro ao atualizar destaque." });
+    }
+  }
+
+  async function handleDeleteFeedback(id: string) {
+    if (!window.confirm("Tem certeza que deseja apagar este depoimento? Ele será removido do carrossel público.")) return;
+
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/feedbacks/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
+      });
+
+      if (res.ok) {
+        setFeedbacks((prev) => prev.filter((f) => f.id !== id));
+        setMessage({ type: "success", text: "Depoimento apagado." });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setMessage({ type: "error", text: data.error || "Erro ao apagar depoimento." });
+      }
+    } catch (err) {
+      console.error("[Admin] Erro ao deletar feedback:", err);
+      setMessage({ type: "error", text: "Erro ao apagar depoimento." });
     }
   }
 
@@ -874,13 +993,19 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
         {activeTab === "feedbacks" && (
           <section className="space-y-6">
             <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm overflow-x-auto">
-              <h2 className="text-xs uppercase tracking-widest text-[#6e6356] mb-4">Mural de Prova Social</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Mural de Prova Social</h2>
+                <p className="text-[10px] text-[#8c7f70]">
+                  Só os depoimentos com <strong>Destaque</strong> aparecem no carrossel da avaliação.
+                </p>
+              </div>
               {feedbacks.length === 0 ? (
                 <p className="text-sm text-[#6e6356]">Nenhum depoimento cadastrado.</p>
               ) : (
                 <table className="w-full text-sm text-left">
                   <thead className="text-[10px] uppercase tracking-widest text-[#6e6356] border-b border-[#e6e2d8]">
                     <tr>
+                      <th className="pb-2 pr-4">Destaque</th>
                       <th className="pb-2 pr-4">Autor</th>
                       <th className="pb-2 pr-4">Nota</th>
                       <th className="pb-2 pr-4">Depoimento</th>
@@ -889,8 +1014,20 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {feedbacks.map((feedback) => (
+                    {feedbacks
+                      .filter((feedback) => !feedback.is_deleted)
+                      .map((feedback) => (
                       <tr key={feedback.id} className="border-b border-[#e6e2d8]/50 last:border-0">
+                        <td className="py-3 pr-4">
+                          <input
+                            type="checkbox"
+                            checked={feedback.is_featured === true}
+                            onChange={() => toggleFeatureFeedback(feedback.id, feedback.is_featured === true)}
+                            disabled={feedback.rating < 4 && !feedback.is_featured}
+                            className="w-4 h-4 accent-[#8c6239]"
+                            title={feedback.rating < 4 ? "Apenas notas 4 ou 5 podem ser destacadas" : "Aparece no carrossel"}
+                          />
+                        </td>
                         <td className="py-3 pr-4 font-medium">Anônimo</td>
                         <td className="py-3 pr-4 text-[#6e6356]">{feedback.rating} ⭐</td>
                         <td className="py-3 pr-4 text-[#6e6356] max-w-md truncate">{feedback.content}</td>
@@ -898,12 +1035,20 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                           {new Date(feedback.created_at).toLocaleDateString("pt-BR")}
                         </td>
                         <td className="py-3 text-right">
-                          <button
-                            onClick={() => handlePreviewStory(feedback.content, feedback.id)}
-                            className="px-3 py-1.5 bg-[#3c352d] text-[#fbf9f5] text-[10px] font-bold uppercase tracking-wider rounded hover:bg-[#2a251f]"
-                          >
-                            Visualizar Card
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handlePreviewStory(feedback.content, feedback.id)}
+                              className="px-3 py-1.5 bg-[#3c352d] text-[#fbf9f5] text-[10px] font-bold uppercase tracking-wider rounded hover:bg-[#2a251f]"
+                            >
+                              Card
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFeedback(feedback.id)}
+                              className="px-3 py-1.5 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider rounded hover:bg-red-50 transition-colors"
+                            >
+                              Apagar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -930,6 +1075,56 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {activeTab === "push" && (
+          <section className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm space-y-6">
+            <h2 className="text-xs uppercase tracking-widest text-[#6e6356] mb-4">Notificações Push</h2>
+
+            <div className="p-4 bg-[#f4f1eb] border border-[#e6e2d8] rounded-2xl">
+              <h3 className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-3 flex items-center gap-2">
+                <Bell className="w-4 h-4" /> Teste Manual
+              </h3>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={pushTestTitle}
+                  onChange={(e) => setPushTestTitle(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#e6e2d8] rounded-lg text-sm text-[#3c352d]"
+                  placeholder="Título da notificação"
+                />
+                <textarea
+                  value={pushTestMessage}
+                  onChange={(e) => setPushTestMessage(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#e6e2d8] rounded-lg text-sm text-[#3c352d] min-h-[80px]"
+                  placeholder="Mensagem da notificação"
+                />
+                <button
+                  onClick={handleSendTestPush}
+                  disabled={pushLoading}
+                  className="px-4 py-2 bg-[#3c352d] text-[#fbf9f5] text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-[#5c4d66] transition-colors disabled:opacity-50"
+                >
+                  {pushLoading ? "Enviando..." : "Enviar notificação de teste"}
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#f4f1eb] border border-[#e6e2d8] rounded-2xl">
+              <h3 className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-3 flex items-center gap-2">
+                <Rocket className="w-4 h-4" /> Trânsito do Dia
+              </h3>
+              <p className="text-xs text-[#6e6356] mb-3">
+                Dispara a notificação diária com o trânsito astral principal. O Cloud Scheduler também pode chamar o endpoint cron às 08h BRT.
+              </p>
+              <button
+                onClick={handleTriggerDailyPush}
+                disabled={pushLoading}
+                className="px-4 py-2 bg-[#8c6239] text-[#fbf9f5] text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-[#6b452b] transition-colors disabled:opacity-50"
+              >
+                {pushLoading ? "Disparando..." : "Disparar trânsito do dia"}
+              </button>
+            </div>
           </section>
         )}
 
