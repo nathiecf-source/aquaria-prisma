@@ -5,11 +5,11 @@ steps:
       - '-t'
       - 'gcr.io/aquaria-app/aquaria:main'
       - '.'
-    id: 'build'
+    id: 'build-production'
 
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/aquaria-app/aquaria:main']
-    id: 'push'
+    id: 'push-production'
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
@@ -25,7 +25,7 @@ steps:
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
-    id: 'deploy'
+    id: 'deploy-production'
 
 options:
   logging: CLOUD_LOGGING_ONLY

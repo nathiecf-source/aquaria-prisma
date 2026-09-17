@@ -15,10 +15,13 @@ RUN npm install
 COPY . .
 
 # Argumentos de build para variaveis Vite (sao injetadas no build do frontend)
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
+# Valores default sao publicos (anon key e app id); podem ser sobrescritos por build-arg
+ARG VITE_SUPABASE_URL=https://xhphnxqdrbckqoesxaaz.supabase.co
+ARG VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhocGhueHFkcmJja3FvZXN4YWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNjI1NzIsImV4cCI6MjA5ODkzODU3Mn0.GgQUguGqrPGdTfk2oxO8RmmHq88uHQXGp6qxSj10Dhs
+ARG VITE_ONESIGNAL_APP_ID=7f5a7fbe-433b-40cb-9df8-e6e74cdc3a4a
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_ONESIGNAL_APP_ID=$VITE_ONESIGNAL_APP_ID
 
 # Builda o frontend (Vite -> dist/) e o bundle do servidor (Express -> dist/server.mjs)
 RUN npm run build

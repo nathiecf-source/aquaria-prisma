@@ -3,21 +3,21 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/aquaria-app/aquaria:main'
+      - 'gcr.io/aquaria-app/aquaria:staging'
       - '.'
-    id: 'build'
+    id: 'build-staging'
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/aquaria-app/aquaria:main']
-    id: 'push'
+    args: ['push', 'gcr.io/aquaria-app/aquaria:staging']
+    id: 'push-staging'
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'aquaria-app'
+      - 'aquaria-app-staging'
       - '--image'
-      - 'gcr.io/aquaria-app/aquaria:main'
+      - 'gcr.io/aquaria-app/aquaria:staging'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -25,7 +25,7 @@ steps:
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
-    id: 'deploy'
+    id: 'deploy-staging'
 
 options:
   logging: CLOUD_LOGGING_ONLY
