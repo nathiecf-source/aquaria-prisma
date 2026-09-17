@@ -92,50 +92,61 @@ const HOUSE_MEANING: Record<number, string> = {
   12: "inconsciente, espiritualidade e renúncia",
 };
 
-const HOUSE_NATURE: Record<number, "confort" | "tension" | "neutral"> = {
-  1: "confort", 4: "confort", 7: "confort", 10: "confort",
-  5: "confort", 9: "confort",
-  6: "tension", 8: "tension", 12: "tension",
-  2: "neutral", 3: "neutral", 11: "neutral",
-};
 
-function classifyVedicCondition(
-  dignity: string | undefined,
-  house: number | undefined,
-  shadbala: number | undefined
-): "confortavel" | "desafiadora" | "neutra" {
-  const goodDignities = /Exaltado|Moolatrikona|Amigo/;
-  const hardDignities = /Inimigo|Debilitado/;
 
-  let score = 0;
-  if (dignity) {
-    if (goodDignities.test(dignity)) score += 2;
-    if (hardDignities.test(dignity)) score -= 2;
+function getDignityDescription(planet: string, sign: string, dignity: string | undefined): string {
+  if (!dignity) return "";
+  
+  // Terminologia branda para dignidades
+  if (dignity === "Exaltado") {
+    return `em seu ponto de potência máxima: ${planet} alcança clareza e força plena em ${sign}`;
   }
-  if (house) {
-    const nature = HOUSE_NATURE[house];
-    if (nature === "confort") score += 1;
-    if (nature === "tension") score -= 1;
+  if (dignity === "Moolatrikona") {
+    return `em casa: ${planet} opera com recursos próprios e estabilidade em ${sign}`;
   }
-  if (typeof shadbala === "number" && !isNaN(shadbala)) {
-    if (shadbala >= 1.1) score += 1;
-    if (shadbala <= 0.9) score -= 1;
+  if (dignity === "Amigo") {
+    return `em relação harmoniosa: ${planet} encontra apoio natural do signo de ${sign}`;
   }
-
-  if (score > 0) return "confortavel";
-  if (score < 0) return "desafiadora";
-  return "neutra";
+  if (dignity === "Neutro") {
+    return `em equilíbrio: ${planet} nem é favorecido nem desafiado por ${sign}`;
+  }
+  if (dignity === "Inimigo") {
+    return `em relação de desafio: ${planet} precisa trabalhar para expressar suas qualidades em ${sign}`;
+  }
+  if (dignity === "Debilitado") {
+    return `em ponto de ajuste: ${planet} requer maturação e consciência para operar em ${sign}`;
+  }
+  return "";
 }
 
-function dignityNote(dignity: string | undefined): string {
-  if (!dignity) return "";
-  if (/Exaltado|Moolatrikona|Amigo/.test(dignity)) {
-    return "recebe um terreno acolhedor, onde suas qualidades podem se manifestar com mais fluidez";
+function getHouseClassification(house: number): { type: string; description: string } {
+  if ([6, 8, 12].includes(house)) {
+    return { type: "desafio", description: "área de sublimação e transformação" };
   }
-  if (/Inimigo|Debilitado/.test(dignity)) {
-    return "encontra um terreno que pede paciência: suas qualidades aqui exigem mais maturidade para se firmarem";
+  if ([1, 4, 7, 10].includes(house)) {
+    return { type: "proeminência", description: "área de estabilidade e projeção" };
   }
-  return "mantém uma posição equilibrada, sem aceleração nem bloqueio excessivo";
+  if ([1, 5, 9].includes(house)) {
+    return { type: "fortuna", description: "área de dharma e propósito" };
+  }
+  return { type: "equilíbrio", description: "área neutra do mapa" };
+}
+
+function getAspectSummary(drishti: string[] | undefined): string {
+  if (!drishti || drishti.length === 0) return "";
+  
+  const benefics = drishti.filter(d => /Júpiter|Vênus|Mercúrio/.test(d));
+  const malefics = drishti.filter(d => /Saturno|Marte|Rahu|Ketu/.test(d));
+  
+  let parts: string[] = [];
+  if (benefics.length > 0) {
+    parts.push(`recebe apoio de ${benefics.join(", ")}`);
+  }
+  if (malefics.length > 0) {
+    parts.push(`tem contato com intensidade de ${malefics.join(", ")}`);
+  }
+  
+  return parts.length > 0 ? parts.join(" e ") : "";
 }
 
 function getVedicStructuralSummary(profile: any, canonicalName: string): string | null {
@@ -147,38 +158,50 @@ function getVedicStructuralSummary(profile: any, canonicalName: string): string 
   const meta = PLANET_ARTICLE[canonicalName] || { article: "seu", theme: "potencial e desafios" };
   const sign = vedicPlanet.sign || "desconhecido";
   const house = typeof vedicPlanet.house === "number" ? vedicPlanet.house : null;
-  const element = SIGN_ELEMENT[sign] || "mistério";
-  const elementQuality = ELEMENT_QUALITY[element] || "qualidade particular";
-  const houseMeaning = house ? HOUSE_MEANING[house] : "uma área estrutural do mapa";
   const dignity = vedicPlanet.dignity;
-  const condition = classifyVedicCondition(
-    dignity,
-    house ?? undefined,
-    profile?.vedic_balas?.shadbala?.[canonicalName]
-  );
-  const dignNote = dignityNote(dignity);
-  const conditionPhrase =
-    condition === "confortavel"
-      ? "Aqui, o terreno oferece apoio"
-      : condition === "desafiadora"
-        ? "Aqui, o terreno pede reconstrução gradual"
-        : "Aqui, o terreno pede discernimento";
-
   const nakshatra = vedicPlanet.nakshatra;
-  const nakshatraLine = nakshatra ? `, sob a influência de ${nakshatra}` : "";
+  const drishti = profile?.vedic_natal?.drishti;
 
-  return `${meta.article.charAt(0).toUpperCase() + meta.article.slice(1)} ${canonicalName} repousa em ${sign} (${element}), na Casa ${house ?? "?"} (${houseMeaning})${nakshatraLine}. Isso coloca ${meta.article} ${canonicalName} em uma área movida por ${elementQuality}. ${dignNote ? `${meta.article.charAt(0).toUpperCase() + meta.article.slice(1)} ${canonicalName} ${dignNote}. ` : ""}${conditionPhrase} na estrutura do mapa, em torno de ${meta.theme}.`;
+  // Classificação da casa
+  const houseClass = house ? getHouseClassification(house) : { type: "neutra", description: "área do mapa" };
+  const houseMeaning = house ? HOUSE_MEANING[house] : "uma área estrutural";
+
+  // Descrição da dignidade
+  const dignityDesc = getDignityDescription(canonicalName, sign, dignity);
+
+  // Resumo dos aspectos
+  const aspectSummary = getAspectSummary(drishti);
+
+  // Construção do texto em camadas
+  const parts: string[] = [];
+
+  // Camada 1: Posição básica
+  parts.push(`${meta.article.charAt(0).toUpperCase() + meta.article.slice(1)} ${canonicalName} está em ${sign}, na Casa ${house ?? "?"} (${houseMeaning})`);
+
+  // Camada 2: Dignidade específica
+  if (dignityDesc) {
+    parts.push(dignityDesc);
+  }
+
+  // Camada 3: Classificação da casa
+  if (house && houseClass.type !== "equilíbrio") {
+    parts.push(`Esta é uma ${houseClass.description}`);
+  }
+
+  // Camada 4: Nakshatra
+  if (nakshatra) {
+    parts.push(`sob a influência de ${nakshatra}`);
+  }
+
+  // Camada 5: Aspectos
+  if (aspectSummary) {
+    parts.push(aspectSummary);
+  }
+
+  return parts.join(". ") + ".";
 }
 
-function getIntegrationBalanceLine(condition: "confortavel" | "desafiadora" | "neutra"): string {
-  if (condition === "confortavel") {
-    return "A leveza da compreensão encontra aqui um terreno estável: deixe que o que você sente psicologicamente se ancore no que a vida já oferece como sustentação.";
-  }
-  if (condition === "desafiadora") {
-    return "A leveza da compreensão precisa encontrar a solidez da prática: o que a psique revela pede, aqui, ser sustentado com paciência e reconstrução cotidiana.";
-  }
-  return "A compreensão e a estrutura caminham lado a lado: deixe que o insight psicológico se torne um hábito silencioso, nem forçado nem negligenciado.";
-}
+
 
 const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
   planetId,
@@ -192,6 +215,8 @@ const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [aspectsExpanded, setAspectsExpanded] = React.useState(true);
+  const [structuralSummary, setStructuralSummary] = React.useState<string | null>(null);
+  const [loadingStructural, setLoadingStructural] = React.useState(false);
 
   const config = getPlanetGlyphConfig(planetId);
   const position = resolveHeaderPosition(profile, config);
@@ -199,16 +224,31 @@ const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
   const vedicPlanetForCondition = config?.canonicalName
     ? profile?.vedic_natal?.planets?.find((p: any) => p.name === config.canonicalName)
     : null;
-  const structuralSummary = config && !config.isAngle && vedicPlanetForCondition
-    ? getVedicStructuralSummary(profile, config.canonicalName)
-    : null;
-  const structuralCondition = structuralSummary
-    ? classifyVedicCondition(
-        vedicPlanetForCondition?.dignity,
-        typeof vedicPlanetForCondition?.house === "number" ? vedicPlanetForCondition.house : undefined,
-        profile?.vedic_balas?.shadbala?.[config?.canonicalName]
-      )
-    : "neutra";
+
+  const fetchVedicStructural = React.useCallback(async () => {
+    if (!config || config.isAngle || !vedicPlanetForCondition) return;
+    setLoadingStructural(true);
+    try {
+      const res = await fetch("/api/generate-vedic-structural", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, planetId, userId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Falha ao buscar análise estrutural.");
+      }
+      const data = await res.json();
+      if (data.structuralText) {
+        setStructuralSummary(data.structuralText);
+      }
+    } catch (err: any) {
+      console.error("[PlanetReadingPanel] Erro ao carregar análise estrutural:", err);
+      // Silently fall back to local generation if backend fails
+    } finally {
+      setLoadingStructural(false);
+    }
+  }, [config, planetId, profile, userId, vedicPlanetForCondition]);
 
   const fetchReading = React.useCallback(async () => {
     if (!config) return;
@@ -243,6 +283,12 @@ const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planetId]);
+
+  React.useEffect(() => {
+    if (config && !config.isAngle && vedicPlanetForCondition) {
+      fetchVedicStructural();
+    }
+  }, [config, vedicPlanetForCondition, fetchVedicStructural]);
 
   if (!config) return null;
 
@@ -319,11 +365,6 @@ const PlanetReadingPanel: React.FC<PlanetReadingPanelProps> = ({
                 <p className="font-sans text-[12.5px] text-[#3c352d] leading-relaxed">
                   {reading.shadowText}
                 </p>
-                {structuralSummary && (
-                  <p className="font-sans text-[12px] text-[#5c544d] leading-relaxed mt-2 pt-2 border-t border-[#8c7f70]/10 italic">
-                    {getIntegrationBalanceLine(structuralCondition)}
-                  </p>
-                )}
               </div>
             )}
 

@@ -617,3 +617,78 @@ export function getBirthDetails(
 ): Record<string, unknown> | undefined {
   return isRecord(jhora) ? jhora.birth_details : undefined;
 }
+
+export function getDrishti(
+  jhora: JHoraResponse | undefined | null
+): string[] | undefined {
+  const h = horoscopeRoot(jhora);
+  const section = h?.drishti ?? h?.aspects ?? h?.planetary_aspects ?? h?.aspect_data;
+  if (!isRecord(section)) {
+    return undefined;
+  }
+  
+  // Convert drishti object to array of strings
+  const drishtiArray: string[] = [];
+  for (const [planet, aspects] of Object.entries(section)) {
+    if (Array.isArray(aspects)) {
+      aspects.forEach((aspect: any) => {
+        if (typeof aspect === 'string') {
+          drishtiArray.push(`${planet} ${aspect}`);
+        } else if (typeof aspect === 'object' && aspect !== null) {
+          const aspectType = aspect.type || aspect.aspect || '';
+          const targetPlanet = aspect.planet || aspect.to || '';
+          if (aspectType && targetPlanet) {
+            drishtiArray.push(`${planet} ${aspectType} ${targetPlanet}`);
+          }
+        }
+      });
+    } else if (typeof aspects === 'string') {
+      drishtiArray.push(`${planet} ${aspects}`);
+    }
+  }
+  
+  return drishtiArray.length > 0 ? drishtiArray : undefined;
+}
+
+function getAspectHouses(planetName: string): number[] {
+  switch (planetName) {
+    case "Marte":
+      return [4, 7, 8];
+    case "Júpiter":
+      return [5, 7, 9];
+    case "Saturno":
+      return [3, 7, 10];
+    // Nodos não lançam drishtis, apenas recebem
+    case "Nodo Norte":
+    case "Nodo Sul":
+      return [];
+    default:
+      return [7]; // Sol, Lua, Mercúrio, Vênus
+  }
+}
+
+export function calculateDrishti(planets: { name: string; house: number }[]): string[] {
+  const drishtis: string[] = [];
+  
+  for (const planet of planets) {
+    const aspectHouses = getAspectHouses(planet.name);
+    const planetHouse = planet.house;
+    
+    for (const aspectHouse of aspectHouses) {
+      // Count the planet's own house as 1st, so target = planetHouse + aspectHouse - 1 (mod 12)
+      const targetHouse = ((planetHouse + aspectHouse - 2) % 12) + 1;
+      drishtis.push(`${planet.name} olha Casa ${targetHouse}`);
+    }
+  }
+  
+  return drishtis;
+}
+
+export function ensureDrishtis(profile: any): string[] {
+  const existing = profile?.vedic_natal?.drishti;
+  if (Array.isArray(existing) && existing.length > 0) {
+    return existing;
+  }
+  const planets = profile?.vedic_natal?.planets || [];
+  return calculateDrishti(planets.map((p: any) => ({ name: p.name, house: p.house })));
+}

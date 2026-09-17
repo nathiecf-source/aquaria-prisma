@@ -4,6 +4,9 @@
 // ESTE ARQUIVO É ESTRITAMENTE TROPICAL: sem nakshatras, sem termos védicos e sem
 // referências siderais. As dignidades listadas servem apenas para calibração interna
 // do tom do modelo; elas NÃO devem ser expostas ao usuário na interface.
+//
+// Tom: próximo ao das leituras de Casa — fluido, poético, direto e psicologicamente
+// refinado. Evitar jargão astrológico e estruturas rebuscadas.
 
 export interface PlanetFichamentoEntry {
   id: string;
@@ -26,9 +29,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "sol",
     canonicalName: "Sol",
     functionText:
-      "O Sol é o núcleo de coerência identitária: ele síntese o que a alma veio irradiar nesta encarnação. Em seu melhor funcionamento, oferece autonomia, calor vital e a capacidade de dizer 'eu sou' sem barganhar reconhecimento. Psicologicamente, ele regula a autoestima, o propósito consciente e a coragem de ocupar o centro da própria história. Quando tocado, revela o lugar onde o ego aprende a brilhar sem queimar.",
+      "O Sol fala do lugar onde você aprende a dizer 'eu sou' sem pedir licença. É o seu centro irradiante, a coragem de ocupar a própria história e o calor que mantém o propósito acordado. Quando ele está aceso, você não precisa barganhar reconhecimento: a sua presença organiza o ambiente sem forçar.",
     shadowText:
-      "A oitava de aprendizado do Sol ensina que liderança sem humildade vira performance vazia e que o brilho verdadeiro não precisa eclipsar o outro. O trabalho sombra é trocar a sede de aplauso pela responsabilidade silenciosa de ser testemunha de si mesmo.",
+      "O aprendizado do Sol aparece quando o brilho vira performance e a liderança esquece a humildade. A sombra é acreditar que só existe quando aplaudido. O caminho é deixar o ego descansar e descobrir que ser testemunha de si mesmo também é uma forma de luz.",
     dignities: {
       domicile: ["Leão"],
       exaltation: ["Áries"],
@@ -41,9 +44,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "lua",
     canonicalName: "Lua",
     functionText:
-      "A Lua governa o campo emocional, a memória corporal e os ritmos de acolhimento. Ela é a mãe interna que nutre, protege e, quando ferida, retrai. Psicologicamente, indica como a pessoa sente em segurança, como recebe carinho e como regula o humor. Sua posição tropical aponta o território emocional onde a alma precisa ser cuidada para, só então, cuidar.",
+      "A Lua fala do seu mundo emocional, da memória que o corpo guarda e dos ritmos nos quais você se sente seguro. Ela revela como você acolhe, como precisa ser acolhido e como regula o humor ao longo do dia. É a parte de você que aprendeu a cuidar antes de pedir cuidado, e que precisa de um abrigo íntimo para poder abrir.",
     shadowText:
-      "A oitava de aprendizado da Lua ensina que apegos e dependências emocionais mascaram a fome de pertencimento. O trabalho sombra é criar o abrigo interior — para que o outro seja companheiro, e não fonte de oxigênio.",
+      "O aprendizado da Lua acontece quando a fome de pertencimento se confunde com apego. A sombra é fazer do outro a fonte de oxigênio emocional. O caminho é construir o abrigo interior primeiro, para que a companhia seja um encontro, e não uma sobrevivência.",
     dignities: {
       domicile: ["Câncer"],
       exaltation: ["Touro"],
@@ -56,9 +59,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "mercurio",
     canonicalName: "Mercúrio",
     functionText:
-      "Mercúrio é o mensageiro: articula percepções, traduz experiências e tece redes de significado. Ele governa a curiosidade, a fala, o raciocínio e a capacidade de aprender. Psicologicamente, revela como a mente filtra o mundo, como a pessoa nomeia suas verdades e como constrói diálogos internos. É o planetário da cognição em movimento.",
+      "Mercúrio é o movimento da sua mente: a curiosidade que liga uma ideia à outra, a fala que traduz o que você sente e o raciocínio que organiza o mundo. Ele mostra como você nomeia suas verdades e como constrói o diálogo consigo mesmo. É a inteligência em ação, sempre buscando entender, conectar e comunicar.",
     shadowText:
-      "A oitava de aprendizado de Mercúrio ensina que a mente acelerada, quando desancorada, vira labirinto de justificações. O trabalho sombra é aprender a calar o raciocínio para que a intuição fale — e falar só depois de ouvir.",
+      "O aprendizado de Mercúrio aparece quando a mente acelera demais e vira labirinto de justificações. A sombra é falar para não sentir. O caminho é aprender a ouvir antes de nomear, e deixar que a intuição também tenha vez.",
     dignities: {
       domicile: ["Gêmeos", "Virgem"],
       exaltation: ["Aquário"],
@@ -71,9 +74,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "venus",
     canonicalName: "Vênus",
     functionText:
-      "Vênus é a sacerdotisa do prazer, da beleza e do encontro. Ela une o que está separado: corpos, valores, sensibilidades estéticas. Psicologicamente, revela como a pessoa ama, o que considera belo e como troca afeto. Sua posição tropical indica o território onde o coração aprende a seduzir sem barganhar e a valorizar sem possuir.",
+      "Vênus fala do prazer, do encontro e do que você considera belo. É a parte de você que une o que estava separado: corpos, valores e sensibilidades. Ela revela como você ama, como troca afeto e como aprende a seduzir sem barganhar. É o coração aberto ao mundo, buscando harmonia e conexão.",
     shadowText:
-      "A oitava de aprendizado de Vênus ensina que o prazer usado como anestesia gera dependência afetiva e autoestima colada no desejo do outro. O trabalho sombra é cultivar o gozo próprio, para que a relação seja templo, e não mercado.",
+      "O aprendizado de Vênus aparece quando o prazer vira anestesia e a autoestima fica presa no desejo do outro. A sombra é tratar a relação como mercado. O caminho é cultivar o gozo próprio, para que o encontro seja templo, e não troca.",
     dignities: {
       domicile: ["Touro", "Libra"],
       exaltation: ["Peixes"],
@@ -86,9 +89,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "marte",
     canonicalName: "Marte",
     functionText:
-      "Marte é o fogo da ação, o impulso de conquista e a capacidade de defender fronteiras. Ele governa a libido de existir, a coragem de iniciar e a ferocidade protetora. Psicologicamente, mostra como a pessoa lida com raiva, desejo e competição. Sua posição tropical indica o campo onde a vontade aprende a ser afirmada sem destruir.",
+      "Marte fala da sua energia de ação, do impulso que te faz começar e da coragem de defender o que é seu. Ele mostra como você lida com raiva, desejo e competição. É o fogo que move a vontade e que precisa de um direcionamento claro para não queimar o que está ao redor.",
     shadowText:
-      "A oitava de aprendizado de Marte ensina que a força sem direção vira agressão ou autossabotagem. O trabalho sombra é converter a combatividade em assertividade — usar a espada para construir, não apenas para cortar.",
+      "O aprendizado de Marte aparece quando a força vira agressão ou quando a raiva fica sem direção. A sombra é querer vencer a qualquer custo. O caminho é aprender a usar a energia de Marte para construir, não para destruir — afirmar o que você precisa sem ferir quem não merece.",
     dignities: {
       domicile: ["Áries", "Escorpião"],
       exaltation: ["Capricórnio"],
@@ -101,9 +104,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "jupiter",
     canonicalName: "Júpiter",
     functionText:
-      "Júpiter é o arquétipo da expansão, da fé e do sentido maior. Ele abre horizontes, oferece otimismo e conecta a pessoa a leis, filosofias e crenças. Psicologicamente, regula a capacidade de confiar na vida, de crescer e de ensinar. Sua posição tropical indica o território onde a alma busca compreender e abundar.",
+      "Júpiter fala da expansão, da fé e da busca por sentido. É a parte de você que quer crescer, confiar na vida e ver além do que está ali na frente. Ele mostra onde você se sente chamado a entender melhor o mundo e a si mesmo, e onde a esperança encontra um terreno fértil.",
     shadowText:
-      "A oitava de aprendizado de Júpiter ensina que a expansão sem discernimento vira arrogância, excesso ou fuga na espiritualidade. O trabalho sombra é aprender a grandiosidade responsável: mais não é sempre melhor, e a sabedoria precisa de limites.",
+      "O aprendizado de Júpiter aparece quando a vontade de crescer vira excesso, arrogância ou fuga. A sombra é acreditar que mais é sempre melhor. O caminho é expandir com discernimento, para que a fé seja âncora, e não escapismo.",
     dignities: {
       domicile: ["Sagitário", "Peixes"],
       exaltation: ["Câncer"],
@@ -116,9 +119,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "saturno",
     canonicalName: "Saturno",
     functionText:
-      "Saturno é o grande escultor: delimita tempo, maturidade e responsabilidade. Ele governa estruturas, deveres e as lições que só se aprendem pela persistência. Psicologicamente, indica onde a pessoa sente medo, onde precisa construir disciplina e onde encontra a própria autoridade. Sua posição tropical aponta o campo da maturação forçada pela vida.",
+      "Saturno fala de tempo, responsabilidade e das lições que só se aprendem com persistência. Ele mostra onde você precisa construir estrutura, onde sente medo e onde a vida pede maturidade. É o professor lento e exigente que, quando você aprende a ouvir, revela a sua própria autoridade.",
     shadowText:
-      "A oitava de aprendizado de Saturno ensina que o rigor excessivo vira prisão e que a culpa mascarada de dever gera amargura. O trabalho sombra é transformar o mestre severo em mestre paciente — estruturar com amor, não com medo.",
+      "O aprendizado de Saturno aparece quando o rigor vira prisão e o dever vira culpa. A sombra é acreditar que só vale a pena quando é doloroso. O caminho é transformar o medo em paciência e estruturar a vida com cuidado, não com castigo.",
     dignities: {
       domicile: ["Capricórnio", "Aquário"],
       exaltation: ["Libra"],
@@ -131,9 +134,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "urano",
     canonicalName: "Urano",
     functionText:
-      "Urano é o disruptor e o inventor: traz insights súbitos, originalidade e a necessidade de romper padrões obsoletos. Ele governa a liberdade, a tecnologia e a consciência coletiva. Psicologicamente, revela onde a pessoa precisa desautorizar o convencional para ser fiel a si mesma. Sua posição tropical indica o campo da revolução interior.",
+      "Urano fala da sua necessidade de liberdade, de originalidade e de romper com o que já não faz sentido. Ele traz insights de repente e mostra onde você precisa ser fiel a si mesmo, mesmo que isso desafie o convencional. É a voz que diz que é possível viver de outro jeito.",
     shadowText:
-      "A oitava de aprendizado de Urano ensina que a rebeldia sem causa vira mero contrarianismo e que a liberdade alheia também precisa ser honrada. O trabalho sombra é integrar o diferente sem quebrar tudo: inovar com responsabilidade.",
+      "O aprendizado de Urano aparece quando a diferença vira rebeldia por rebeldia. A sombra é quebrar tudo só para provar que pode. O caminho é inovar sem destruir o que ainda sustenta você, e honrar a liberdade dos outros enquanto conquista a sua.",
     dignities: {
       domicile: ["Aquário"],
       exaltation: ["Escorpião"],
@@ -146,9 +149,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "netuno",
     canonicalName: "Netuno",
     functionText:
-      "Netuno é o oceano da alma: dissolve fronteiras, amplifica a sensibilidade e abre canais de inspiração e compaixão. Ele governa o sonho, a espiritualidade e a capacidade de transcendência. Psicologicamente, indica onde a pessoa sente o invisível e onde pode confundir ilusão com intuição. Sua posição tropical aponta o território da entrega e da permeabilidade.",
+      "Netuno fala da sensibilidade, da imaginação e da conexão com o que não se vê. Ele amplifica a compaixão e abre espaço para o sagrado. É a parte de você que sente o mundo por inteiro, que sonha e que precisa aprender a distinguir intuição de ilusão.",
     shadowText:
-      "A oitava de aprendizado de Netuno ensina que a dissolução sem centro vira fuga, vício ou martírio. O trabalho sombra é discernir entre compaixão e resgate, entre sonho e evasão — e ancorar o sagrado no cotidiano.",
+      "O aprendizado de Netuno aparece quando a sensibilidade vira fuga ou quando o sonho substitui a realidade. A sombra é confundir compaixão com resgate. O caminho é ancorar o sagrado no dia a dia, sem perder o contato com o chão.",
     dignities: {
       domicile: ["Peixes"],
       exaltation: ["Leão"],
@@ -161,9 +164,9 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "plutao",
     canonicalName: "Plutão",
     functionText:
-      "Plutão é o alquimista das profundezas: governa transformação, poder e tudo o que está enterrado. Ele destrói para reconstruir, expondo sombras e verdades ocultas. Psicologicamente, revela os mecanismos de controle, obsessão e regeneração da pessoa. Sua posição tropical indica o campo onde a alma passa pelo fogo para renascer.",
+      "Plutão fala de transformação, de tudo o que está escondido e da coragem de olhar para a própria sombra. Ele governa os ciclos de morte e renascimento da psique, mostrando onde você precisa soltar o velho para nascer de novo. É o fogo que purifica, doloroso, mas necessário.",
     shadowText:
-      "A oitava de aprendizado de Plutão ensina que o poder sobre o outro é ilusão de segurança e que a regeneração exige entrega. O trabalho sombra é usar a intensidade como ferramenta de cura, não como arma de dominação.",
+      "O aprendizado de Plutão aparece quando a intensidade vira controle ou obsessão. A sombra é usar o poder sobre o outro como se fosse segurança. O caminho é deixar o velho morrer sem resistir, e usar a profundidade como ferramenta de cura, e não como arma.",
     dignities: {
       domicile: ["Escorpião"],
       exaltation: ["Áries"],
@@ -176,63 +179,63 @@ export const PLANET_FICHAMENTO: Record<string, PlanetFichamentoEntry> = {
     id: "nodo-norte",
     canonicalName: "Nodo Norte",
     functionText:
-      "O Nodo Norte é a bússola evolutiva: indica a direção de crescimento, os talentos a desenvolver e o terreno desconhecido a ser cultivado. Ele não é um corpo, mas um ponto de encontro entre caminhos lunares. Psicologicamente, aponta o que a alma veio aprender nesta vida — geralmente aquilo que foge da zona de conforto. Sua posição tropical mostra o destino a ser tecido com coragem.",
+      "O Nodo Norte aponta para onde você está crescendo. É a direção que foge da zona de conforto e que pede coragem para ser vivida. Ele mostra o que a sua alma veio aprender nesta vida, os talentos que ainda estão amadurecendo e o terreno desconhecido que você precisa cultivar.",
     shadowText:
-      "A oitava de aprendizado do Nodo Norte ensina que o futuro pede desapego do passado e que crescer exige desconforto. O trabalho sombra é deixar de lado as certezas kármicas para abraçar a vulnerabilidade do aprendizado.",
+      "O aprendizado do Nodo Norte aparece quando o medo do desconhecido faz você voltar para o velho. A sombra é achar que já sabe demais. O caminho é abrir mão das certezas do passado e permitir que o novo se ensine, aos poucos.",
   },
 
   "nodo-sul": {
     id: "nodo-sul",
     canonicalName: "Nodo Sul",
     functionText:
-      "O Nodo Sul é o arquivo da memória: traz dons, hábitos e padrões já dominados em outras estações da alma. Ele representa a zona de conforto e as tendências automáticas. Psicologicamente, revela os talentos naturais, mas também as armadilhas da repetição. Sua posição tropical indica o que está pronto para ser oferecido, não apegado.",
+      "O Nodo Sul fala do que você já trouxe consigo: talentos naturais, hábitos antigos e a zona de conforto. É a memória da alma, os dons que você já domina e que podem ser oferecidos ao mundo. Ele mostra o que já é seu, mas que não pode virar prisão.",
     shadowText:
-      "A oitava de aprendizado do Nodo Sul ensina que o dom natural, quando estagnado, vira preguiça espiritual. O trabalho sombra é usar o passado como recurso sem confundir familiaridade com destino.",
+      "O aprendizado do Nodo Sul aparece quando o dom natural vira repetição e o passado vira desculpa. A sombra é confundir familiaridade com destino. O caminho é usar o que você já sabe como ponto de partida, não como lugar para ficar.",
   },
 
   quiron: {
     id: "quiron",
     canonicalName: "Quíron",
     functionText:
-      "Quíron é o ferido curandeiro: uma ferida primordial que, quando reconhecida, se torna medicina para o mundo. Ele governa a vulnerabilidade iniciática e o dom de curar através da própria dor. Psicologicamente, indica o lugar da alma que nunca cicatriza totalmente — e que, por isso, ensina. Sua posição tropical aponta a ferida-sabedoria a ser honrada.",
+      "Quíron fala da ferida que, quando reconhecida, vira medicina. É a parte de você que carrega uma vulnerabilidade antiga e que, por ter passado por ela, sabe cuidar de quem também sofre. Ele mostra onde a dor se transforma em oferenda e onde a cura começa com a própria testemunha.",
     shadowText:
-      "A oitava de aprendizado de Quíron ensina que a ferida só cura quando é testemunhada, não escondida nem usada como identidade. O trabalho sombra é transformar o sofrimento em oferenda sem glorificar a dor.",
+      "O aprendizado de Quíron aparece quando a ferida vira identidade ou quando a dor é escondida. A sombra é usar o sofrimento como moeda. O caminho é ver a ferida sem dramatizar, deixando que ela seja fonte de compaixão, e não de exaustão.",
   },
 
   lilith: {
     id: "lilith",
     canonicalName: "Lilith",
     functionText:
-      "Lilith é a sombra da autonomia: o desejo selvagem, a recusa à submissão e a sexualidade não domesticada. Ela representa o instinto que não negocia a alma. Psicologicamente, revela onde a pessoa foi exilada por ser demais, e onde precisa reclamar sua voz sem pedir licença. Sua posição tropical indica o território da revolta santa.",
+      "Lilith fala da autonomia que não negocia a alma. É o desejo selvagem, a recusa à submissão e a parte de você que foi exilada por ser demais. Ela mostra onde você precisa reclamar a própria voz sem pedir licença e onde a liberdade é mais importante do que a aprovação.",
     shadowText:
-      "A oitava de aprendizado de Lilith ensina que o poder da recusa, quando cego, vira destruição e isolamento. O trabalho sombra é canalizar a fúria sã em limites claros — ser livre sem ferir gratuitamente.",
+      "O aprendizado de Lilith aparece quando a recusa vira destruição e a liberdade vira isolamento. A sombra é ferir para provar que é livre. O caminho é usar a fúria sã para desenhar limites claros: ser livre sem machucar quem não tem culpa.",
   },
 
   "roda-da-fortuna": {
     id: "roda-da-fortuna",
     canonicalName: "Roda da Fortuna",
     functionText:
-      "A Roda da Fortuna é o ponto de encontro entre destino e oportunidade: indica onde a vida oferece fluidez, sorte e sincronia quando o eu está alinhado. Ela não é um corpo celeste, mas um cálculo que sinaliza o campo da abundância. Psicologicamente, revela onde a pessoa floresce com menos esforço e onde a confiança abre portas. Sua posição tropical aponta o terreno da graça.",
+      "A Roda da Fortuna fala do lugar onde a vida flui com mais facilidade. É o ponto onde oportunidade, destino e confiança se encontram. Ela mostra onde você floresce com menos esforço e onde as portas parecem se abrir quando você está alinhado com o que é seu.",
     shadowText:
-      "A oitava de aprendizado da Roda da Fortuna ensina que a facilidade, quando não é compartilhada, gera complacência. O trabalho sombra é usar a sorte como responsabilidade — transformar o privilégio em serviço.",
+      "O aprendizado da Roda da Fortuna aparece quando a facilidade vira complacência. A sombra é achar que o privilégio é só seu. O caminho é usar a sorte como responsabilidade, transformando o que veio fácil em serviço ao que importa.",
   },
 
   asc: {
     id: "asc",
     canonicalName: "Ascendente",
     functionText:
-      "O Ascendente é a máscara transparente: o estilo de presença, o corpo como interface e a primeira impressão que o mundo recebe. Ele governa a maneira como a pessoa nasce no aqui-e-agora. Psicologicamente, revela o arquétipo de personalidade que conduz a alma ao encontro com o outro. Sua posição tropical indica a coragem de existir em carne e osso.",
+      "O Ascendente fala da sua presença, da primeira impressão que você deixa e do jeito como o mundo te lê antes de você abrir a boca. É o seu corpo no mundo, o estilo como você chega. Ele mostra como você nasce no aqui-e-agora e como se apresenta para a vida.",
     shadowText:
-      "A oitava de aprendizado do Ascendente ensina que a persona, quando rígida, vira prisão. O trabalho sombra é permitir que a máscara respire — ser um eu social sem trair o eu essencial.",
+      "O aprendizado do Ascendente aparece quando a persona vira prisão. A sombra é acreditar que precisa ser sempre a mesma máscara. O caminho é deixar o eu social respirar, para que ele sirva de ponte, e não de muralha.",
   },
 
   mc: {
     id: "mc",
     canonicalName: "Meio do Céu",
     functionText:
-      "O Meio do Céu é o ponto de realização pública: a vocação, a reputação e o legado que a pessoa constrói no mundo. Ele governa a ambição de sentido e o papel social que a alma veio desempenhar. Psicologicamente, indica onde o sucesso só floresce quando alinhado à verdade interior. Sua posição tropical aponta a montanha que a alma veio escalar.",
+      "O Meio do Céu fala da sua vocação, da reputação e do legado que você constrói no mundo. É o papel social que a sua alma veio desempenhar e a montanha que você veio escalar. Ele mostra onde o sucesso só faz sentido quando está alinhado com a sua verdade interior.",
     shadowText:
-      "A oitava de aprendizado do MC ensina que o prestígio vazio consome e que a carreira sem propósito vira fuga. O trabalho sombra é entregar-se à missão sem se perder no personagem do sucesso.",
+      "O aprendizado do Meio do Céu aparece quando o prestígio vira fuga e a carreira vira personagem. A sombra é buscar sucesso só para ser visto. O caminho é entregar-se à missão sem se perder no papel, construindo algo que seja seu de verdade.",
   },
 };
 

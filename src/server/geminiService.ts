@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CompleteAstrologicalProfile, signRulers, translatePlanetName } from "./astrology";
+import { ensureDrishtis } from "./astrologyProviders";
 import { getDigBalaStatus } from "./formatNatalContext";
 import { getTropicalHouseKnowledge } from "./tropicalKnowledge";
 import { getPlanetGlyphConfig } from "../lib/planetGlyphs";
@@ -2028,9 +2029,18 @@ Gere uma resposta em JSON que siga exatamente este tom magistral e as regras edi
     ? getDigBalaStatus(sideralRuler, sideralRulerHouse)
     : "—";
 
-  const drishtiText = Array.isArray(profile.vedic_natal.drishti) && profile.vedic_natal.drishti.length > 0
-    ? profile.vedic_natal.drishti.join("; ")
-    : "Nenhum";
+  const drishtiList = ensureDrishtis(profile);
+  const houseDrishtis = drishtiList
+    .filter((d: string) => new RegExp(`Casa\\s+${houseNum}\\b`, "i").test(d))
+    .map((d: string) => d.split(" olha ")[0] || d);
+  const drishtiText = houseDrishtis.length > 0 ? houseDrishtis.join(", ") : "Nenhum";
+
+  // Filter out transpersonal planets from vedic data sent to Gemini for house readings
+  const TRANSPERSONAL = new Set(["Urano", "Netuno", "Plutão"]);
+  const vedicNatalFiltered = {
+    ...profile.vedic_natal,
+    planets: (profile.vedic_natal?.planets || []).filter((p: any) => !TRANSPERSONAL.has(p.name)),
+  };
   const tropicalKnowledge = await getTropicalHouseKnowledge({
     house: houseNum,
     cuspSign: tropSign,
@@ -2045,7 +2055,7 @@ CASA REQUERIDA: Casa ${houseNum}
 GÊNERO DO USUÁRIO: ${gender}
 NOME DO USUÁRIO: ${profile.birthData.name}
 MAPA TROPICAL NATAL (Use APENAS para signos, casas e planetas presentes na Casa ${houseNum} na leitura tropical/psíquica): ${JSON.stringify(profile.tropical_natal)}
-${section !== "tropical" ? `MAPA VÉDICO NATAL (Use APENAS para a leitura sideral/kármica, nunca para a tropical): ${JSON.stringify(profile.vedic_natal)}
+${section !== "tropical" ? `MAPA VÉDICO NATAL (Use APENAS para a leitura sideral/kármica, nunca para a tropical): ${JSON.stringify(vedicNatalFiltered)}
 REGENTES E DETALHES VÉDICOS: ${JSON.stringify(profile.vedic_specifics)}
 FORÇAS (BALAS): ${JSON.stringify(profile.vedic_balas)}` : "LEITURA TROPICAL/PSÍQUICA: ignore completamente quaisquer dados védicos, nakshatras, drishtis ou signos siderais. Use somente o mapa tropical acima."}
 DADOS TROPICAIS CALCULADOS PARA A CASA ${houseNum}:
@@ -2564,6 +2574,104 @@ TODOS OS TEXTOS DESTA LEITURA DEVEM SER ESCRITOS FALANDO DIRETAMENTE COM O LEITO
     return response.text || "";
   } catch (error) {
     cleanLogError(`[Gemini API] Falha na leitura do ponto ${config.canonicalName}`, error);
+    throw error;
+  }
+}
+
+export interface VedicStructuralInput {
+  planet: string;
+  sign: string;
+  house: number;
+  dignity: string;
+  nakshatra?: string;
+  drishti?: string[];
+  shadbala?: number;
+}
+
+export const vedicStructuralSchema = {
+  type: Type.OBJECT,
+  properties: {
+    structuralText: { type: Type.STRING },
+  },
+  required: ["structuralText"],
+};
+
+export async function generateVedicStructural(
+  input: VedicStructuralInput,
+  gender: string = "neutro"
+): Promise<string> {
+  const drishtiText = input.drishti && input.drishti.length > 0
+    ? input.drishti.map(d => `- ${d}`)
+    : "- Nenhum aspecto recebido";
+
+  const shadbalaText = typeof input.shadbala === "number"
+    ? `Força direcional (Shadbala): ${input.shadbala.toFixed(2)}`
+    : "Força direcional não disponível";
+
+  const systemInstruction = `[PAPEL DO SISTEMA]
+Você é o algoritmo central da plataforma AQUAR.IA. Sua função é gerar uma análise ESTRUTURAL VÉDICA de um planeta específico no mapa natal do usuário. Esta análise deve focar nos dados estruturais do planeta (dignidade por signo, posicionamento por casa, aspectos), não em uma leitura psicológica genérica. O tom deve ser sensível, didático e acessível.
+
+[DIRETRIZES DE LINGUAGEM]
+1. PROIBIÇÃO ABSOLUTA: não use os termos "Astrologia Tropical", "Astrologia Védica", "Astrologia Sideral", "Védica" ou "Tropical" no corpo corrido. Os termos técnicos podem aparecer apenas como chancela entre parênteses.
+2. Terminologia branda: use "ponto de potência" em vez de "exaltado", "ponto de ajuste" em vez de "debilitado", "relação de desafio" em vez de "inimigo", "planeta de apoio" em vez de "benéfico", "planeta de transformação" em vez de "maléfico".
+3. O texto deve ser fluido, com correção gramatical perfeita e concordância adequada ao gênero do usuário.
+4. ${getGenderFlexionInstruction(gender)}
+5. É PROIBIDO referir-se ao leitor na terceira pessoa ("a usuária", "o usuário", "ela", "ele", "a pessoa"). Fale DIRETAMENTE com o leitor em segunda pessoa ("você", "sua", "seu", "seu"). Esta é uma conversa íntima e direta.
+
+[DADOS TÉCNICOS — POSIÇÃO VÉDICA]
+Planeta: ${input.planet}
+Signo: ${input.sign}
+Casa: ${input.house}
+Dignidade: ${input.dignity}
+Nakshatra: ${input.nakshatra || "Não informada"}
+Aspectos recebidos (planetas que lançam olhares para a casa onde ${input.planet} está):
+${drishtiText}
+${shadbalaText}
+
+[DIRETRIZES DE REDAÇÃO — FOCO ESTRUTURAL]
+OBRIGATÓRIO: Aborde os três pilares estruturais védicos abaixo, em ordem:
+
+1. DIGNIDADE POR SIGNO (RASHI):
+   - Se o planeta está em seu ponto de potência, explique como isso dá clareza e força à sua expressão.
+   - Se está em ponto de ajuste, explique como isso pede consciência e trabalho para acessar o potencial.
+   - Se está em signo próprio ou em relação de desafio/apoio, explique como isso modula a experiência.
+   - Explique o efeito prático dessa dignidade no funcionamento do planeta.
+
+2. POSICIONAMENTO POR CASA (BHAVA):
+   - Identifique se a casa é de destaque (1, 4, 7, 10) ou área de trabalho (6, 8, 12).
+   - Explique como essa casa específica molda onde e como a energia do planeta se manifesta.
+   - Mostre a interação entre a dignidade do signo e o tipo de casa.
+
+3. ASPECTOS (DRISHTI):
+   - REGRA OBRIGATÓRIA: ao mencionar cada aspecto, NOME EXPLICITAMENTE o planeta que lança o olhar (ex: "Júpiter olha para esta casa", "Saturno lança seu olhar sobre esta posição"). NUNCA diga "um planeta de apoio" ou "um planeta de transformação" sem nomear qual é.
+   - Identifique se há planetas de apoio (Júpiter, Vênus, Mercúrio, Lua crescente) ou de transformação (Saturno, Marte).
+   - Explique como esses aspectos modificam a dinâmica: suavizando, tensionando ou aprofundando.
+   - Se não houver aspectos, mencione que o planeta opera sem influências externas diretas.
+
+Nakshatra (se disponível): explique brevemente como ela adiciona uma camada qualitativa específica.
+
+Gere 2 a 3 parágrafos fluidos que cubram esses pilares estruturais. Evite metáforas psicológicas genéricas. Foque na estrutura do mapa.
+
+[FORMATO DE RESPOSTA OBRIGATÓRIO — JSON]
+Responda estritamente no JSON Schema fornecido:
+- structuralText: o texto de análise estrutural`;
+
+  try {
+    const client = getGeminiClient();
+    const response = await callGeminiWithRetry(client, {
+      model: "gemini-3.5-flash-lite",
+      contents: "Gere a análise estrutural védica seguindo rigorosamente o schema e as diretrizes.",
+      config: {
+        systemInstruction,
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+        responseMimeType: "application/json",
+        responseSchema: vedicStructuralSchema,
+      },
+    });
+    return response.text || "";
+  } catch (error) {
+    cleanLogError("[Gemini API] Falha na análise estrutural védica", error);
     throw error;
   }
 }

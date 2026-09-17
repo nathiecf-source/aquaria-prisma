@@ -1,5 +1,5 @@
 import { calculateSolarReturnChart } from "./solarReturnEngine";
-import { fetchAstrologyProviderResult, getBirthDetails, getNakshatraPada, getPlanetaryStates, getRasiChart, getVimsottariDasha, type AstrologyAPIResponse, type AstrologyProviderResult, type JHoraResponse } from "./astrologyProviders";
+import { fetchAstrologyProviderResult, getBirthDetails, calculateDrishti, getNakshatraPada, getPlanetaryStates, getRasiChart, getVimsottariDasha, type AstrologyAPIResponse, type AstrologyProviderResult, type JHoraResponse } from "./astrologyProviders";
 import { createClient } from '@supabase/supabase-js';
 
 let circularHoroscopeModule: any = null;
@@ -787,7 +787,8 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   timing.antardashaNakshatra = nakshatraFor(timing.antardasha);
   timing.pratyantardashaNakshatra = nakshatraFor(timing.pratyantardasha);
   const vedicSaturnTransits = extractSaturnTransits(result.jhora);
-  return { birthData, tropical_natal: tropical, tropical_transits: [], vedic_natal: { planets: mapped.planets, drishti: [] }, vedic_specifics: specifics, vedic_balas: { shadbala: shad, ashtakavarga: ashta }, vedic_timing: timing, vedic_vargas: mapVargas(result.jhora), vedic_saturn_transits: vedicSaturnTransits, dataSource: `${fromCache ? "cache:" : ""}${result.meta.source}:${result.meta.status}` };
+  const drishti = calculateDrishti(mapped.planets);
+  return { birthData, tropical_natal: tropical, tropical_transits: [], vedic_natal: { planets: mapped.planets, drishti }, vedic_specifics: specifics, vedic_balas: { shadbala: shad, ashtakavarga: ashta }, vedic_timing: timing, vedic_vargas: mapVargas(result.jhora), vedic_saturn_transits: vedicSaturnTransits, dataSource: `${fromCache ? "cache:" : ""}${result.meta.source}:${result.meta.status}` };
 }
 
 function normalizeEnglishSign(sign: string): string {

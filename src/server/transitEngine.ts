@@ -486,7 +486,20 @@ export function getMeanLunarNode(jde: number): number {
   return ((N % 360) + 360) % 360;
 }
 
-/** Varre os próximos `days` dias a partir de `startDate` e retorna eventos cósmicos maiores. */
+function getVigencyWindowDays(event: UpcomingEvent): number {
+  // Lua é rápida: permanece visível por 3 dias após a entrada.
+  // Demais planetas e eventos permanecem por 7 dias.
+  if (event.planet === "Lua" || event.type === "new_moon" || event.type === "full_moon" || event.type === "lunar_eclipse") {
+    return 3;
+  }
+  return 7;
+}
+
+/** Varre os próximos `days` dias a partir de `startDate` e retorna eventos cósmicos maiores.
+ *  Eventos permanecem visíveis por uma janela após a data de entrada:
+ *  - Lua: 3 dias
+ *  - Demais: 7 dias
+ */
 export async function getUpcomingCosmicEvents(
   startDate: Date = new Date(),
   days: number = 30
@@ -494,19 +507,23 @@ export async function getUpcomingCosmicEvents(
   const { julian } = await initAstronomia();
   const events: UpcomingEvent[] = [];
   const stepDays = 0.5; // passo de 12h
-  const totalSteps = Math.ceil(days / stepDays);
+
+  const msInDay = 1000 * 60 * 60 * 24;
+
+  // Varremos até 7 dias no passado para capturar eventos que ainda estão dentro da janela de vigência.
+  const maxWindowDays = 7;
+  const scanStart = new Date(startDate.getTime() - maxWindowDays * msInDay);
+  const scanEnd = new Date(startDate.getTime() + days * msInDay);
+  const totalSteps = Math.ceil((scanEnd.getTime() - scanStart.getTime()) / (stepDays * msInDay));
 
   const PLANETS_FOR_INGRESS = [
     "Sol", "Mercúrio", "Vênus", "Marte", "Júpiter", "Saturno", "Urano", "Netuno", "Plutão"
   ];
 
-  const msInDay = 1000 * 60 * 60 * 24;
-  const baseTime = startDate.getTime();
-
   let previous: { date: Date; positions: Record<string, number>; phase: number } | null = null;
 
   for (let i = 0; i <= totalSteps; i++) {
-    const currentDate = new Date(baseTime + i * stepDays * msInDay);
+    const currentDate = new Date(scanStart.getTime() + i * stepDays * msInDay);
     const positions = await getAllPlanetPositions(currentDate);
 
     // Fase lunar para detectar Lua Nova e Cheia
@@ -598,13 +615,19 @@ export async function getUpcomingCosmicEvents(
     previous = { date: currentDate, positions, phase };
   }
 
-  // Remove duplicatas e ordena por data
+  // Remove duplicatas, filtra pela janela de vigência e ordena por data
   const seen = new Set<string>();
+  const startTime = startDate.getTime();
+
   const unique = events.filter(e => {
     const key = `${e.type}|${e.planet}|${e.sign}|${e.date.slice(0, 10)}`;
     if (seen.has(key)) return false;
     seen.add(key);
-    return true;
+
+    // O evento permanece visível enquanto a data de entrada + sua janela de vigência for >= startDate
+    const eventTime = new Date(e.date).getTime();
+    const windowDays = getVigencyWindowDays(e);
+    return eventTime + windowDays * msInDay >= startTime;
   });
 
   unique.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
