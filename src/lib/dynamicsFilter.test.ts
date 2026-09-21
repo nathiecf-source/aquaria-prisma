@@ -2,43 +2,40 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   splitDynamicsCombinations,
-  PRIMARY_YOGA_COUNT,
-  PRIMARY_DOSHA_COUNT,
-  SECONDARY_YOGA_COUNT,
-  SECONDARY_DOSHA_COUNT,
+  POOL_YOGA_COUNT,
+  POOL_DOSHA_COUNT,
 } from "./dynamicsFilter";
 
-test("itens fora da whitelist são descartados absolutamente", () => {
-  const yogas = ["Vesai Yoga: r", "Kedara Yoga: r", "Subha Yoga: r", "Anaphaa Yoga: r"];
-  const doshas = ["Ghata Dosha: r", "Kalathra Dosha: r", "Shrapit Dosha: r"];
+test("itens fora dos dois tiers são descartados absolutamente", () => {
+  const yogas = ["Dharidhra Yoga: r", "Kapata Yoga: r", "Rajabhrashta Yoga: r", "Vanchana Chora Bheethi Yoga: r"];
+  const doshas = ["Dosha Inexistente: r"];
   const split = splitDynamicsCombinations(yogas, doshas);
   assert.equal(split.totalInterpreted, 0);
   assert.equal(split.secondaryCount, 0);
 });
 
-test("primary recebe no máximo 4 yogas e 2 doshas", () => {
+test("pool limitado a 5 yogas e 3 doshas, tudo na carga inicial", () => {
   const yogas = [
     "Hamsa Yoga: r", "Raja Yoga: r", "Gaja Kesari Yoga: r", "Dhana Yoga: r",
-    "Budhaditya Yoga: r", "Neecha Bhanga Raja Yoga: r", "Chandra-Mangala Yoga: r", "Lakshmi Yoga: r",
+    "Budhaditya Yoga: r", "Amala Yoga: r", "Vasumathi Yoga: r", "Parijatha Yoga: r",
   ];
   const doshas = [
-    "Kala Sarpa Dosha: r", "Manglik Dosha: r", "Guru Chandala Dosha: r", "Pitru Dosha: r", "Kemadruma Dosha: r",
+    "Kala Sarpa Dosha: r", "Manglik Dosha: r", "Guru Chandala Dosha: r", "Pitru Dosha: r", "Ghata Dosha: r",
   ];
   const split = splitDynamicsCombinations(yogas, doshas);
-  assert.equal(split.primary.yogas.length, PRIMARY_YOGA_COUNT);
-  assert.equal(split.primary.doshas.length, PRIMARY_DOSHA_COUNT);
-  assert.equal(split.secondary.yogas.length, SECONDARY_YOGA_COUNT);
-  assert.equal(split.secondary.doshas.length, SECONDARY_DOSHA_COUNT);
-  assert.equal(split.totalInterpreted, 13);
+  assert.equal(split.primary.yogas.length, POOL_YOGA_COUNT);
+  assert.equal(split.primary.doshas.length, POOL_DOSHA_COUNT);
+  assert.equal(split.secondaryCount, 0);
+  assert.equal(split.totalInterpreted, POOL_YOGA_COUNT + POOL_DOSHA_COUNT);
 });
 
-test("whitelist ordena por peso: Mahapurusha e Raja antes de Dhana", () => {
-  const yogas = ["Dhana Yoga: r", "Gaja Kesari Yoga: r", "Raja Yoga: r", "Hamsa Yoga: r"];
+test("tier 1 sempre precede tier 2, e tier 2 segue ordem de prioridade", () => {
+  const yogas = ["Vasumathi Yoga: r", "Subha Yoga: r", "Amala Yoga: r", "Dhana Yoga: r"];
   const split = splitDynamicsCombinations(yogas, []);
-  assert.equal(split.primary.yogas[0], "Hamsa Yoga: r");
-  assert.equal(split.primary.yogas[1], "Raja Yoga: r");
-  assert.equal(split.primary.yogas[2], "Gaja Kesari Yoga: r");
-  assert.equal(split.primary.yogas[3], "Dhana Yoga: r");
+  assert.equal(split.primary.yogas[0], "Dhana Yoga: r");   // tier 1
+  assert.equal(split.primary.yogas[1], "Amala Yoga: r");   // tier 2, prioridade 1
+  assert.equal(split.primary.yogas[2], "Vasumathi Yoga: r"); // tier 2, prioridade 2
+  assert.equal(split.primary.yogas[3], "Subha Yoga: r");   // tier 2, última
 });
 
 test("sem duplicatas entre primary e secondary", () => {

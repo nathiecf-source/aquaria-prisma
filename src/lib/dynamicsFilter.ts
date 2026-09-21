@@ -1,22 +1,23 @@
 /**
- * Strict relevance whitelist for Vedic Yogas/Doshas returned by JHora.
+ * Two-tier relevance whitelist for Vedic Yogas/Doshas returned by JHora.
  * Shared between the backend (generation split) and the frontend (paywall counter).
  *
- * Anything outside the whitelist is DISCARDED — it is not sent to the primary
- * reading nor to the "reveal more" secondary call. Whitelist order defines the
- * importance ranking used for sorting.
+ * Tier 1 (heavy classics) always wins. Tier 2 (intermediate) fills remaining
+ * slots in priority order. Anything outside both tiers is DISCARDED — it is not
+ * sent to the primary reading nor to the "reveal more" secondary call.
  *
  * JHora returns entries like "Raja Yoga: descrição..." — matching runs on the
  * combination name before the colon (and on dosha keys like "Pitru Dosha").
  */
 
-export const PRIMARY_YOGA_COUNT = 4;
-export const PRIMARY_DOSHA_COUNT = 2;
-export const SECONDARY_YOGA_COUNT = 4;
-export const SECONDARY_DOSHA_COUNT = 3;
+export const POOL_YOGA_COUNT = 5;
+export const POOL_DOSHA_COUNT = 3;
+// Single-stage reading: the whole pool is interpreted in the initial call.
+export const PRIMARY_YOGA_COUNT = POOL_YOGA_COUNT;
+export const PRIMARY_DOSHA_COUNT = POOL_DOSHA_COUNT;
 
-// The 8 indispensable yoga families, in descending order of weight.
-const YOGA_WHITELIST: RegExp[] = [
+// Tier 1 — the 8 indispensable yoga families, in descending order of weight.
+const YOGA_TIER1: RegExp[] = [
   /hamsa|malavya|ruchaka|bhadra|\bsasa\b|shasha|mahapurusha|pancha/i, // Pancha Mahapurusha
   /raja\s*yoga|raj\s*yoga|rajayoga|kendra.*trikona|trikona.*kendra/i, // Raja Yogas
   /gaja\s*kesari|gajakesari/i,                                       // Gaja Kesari
@@ -27,8 +28,21 @@ const YOGA_WHITELIST: RegExp[] = [
   /saraswati|sarasvati|lakshmi|laxmi|\badhi\b/i,                     // Saraswati / Lakshmi / Adhi
 ];
 
-// The 5 indispensable doshas, in descending order of weight.
-const DOSHA_WHITELIST: RegExp[] = [
+// Tier 2 — intermediate yogas recognized in Jyotish, in descending priority.
+// Covers the names JHora actually emits (e.g. "Vesai Yoga", "Sunaphaa Yoga").
+const YOGA_TIER2: RegExp[] = [
+  /amala|amla/i,                                                     // Amala
+  /vasumathi|vasumat|swaveeryaddhana|veeryaddhana|svaveerya/i,       // wealth yogas
+  /parijatha|parijata|kalpadruma/i,                                  // Parijatha / Kalpadruma
+  /brahma|harihara/i,                                                // Brahma / Harihara Brahma
+  /sunapha|anapha|durudhara|ubhayachara|obhayachara|kemadruma/i,     // lunar yogas
+  /vesai|\bvesi\b|vosi|ubhayachari/i,                                // solar yogas
+  /buddhimaturya|nipuna|medha|mati\b/i,                              // intellect yogas
+  /kartari|subha/i,                                                  // Kartari / Subha
+];
+
+// Tier 1 — the 5 indispensable doshas, in descending order of weight.
+const DOSHA_TIER1: RegExp[] = [
   /kala\s*sarpa|kaal\s*sarp|kalasarpa/i,  // Kala Sarpa
   /kuja|manglik|mangal|angarak/i,         // Mangal / Kuja
   /guru\s*chandal|chandala/i,             // Guru Chandal
@@ -36,15 +50,26 @@ const DOSHA_WHITELIST: RegExp[] = [
   /vish|kemadruma|kemdruma/i,             // Vish / Kemadruma
 ];
 
+// Tier 2 — secondary doshas, in descending priority.
+const DOSHA_TIER2: RegExp[] = [
+  /shrapit|shrapita/i,
+  /ganda\s*moola|gandmool|gandanta|ganda/i,
+  /kalathra/i,
+  /ghata/i,
+];
+
 function baseName(entry: string): string {
   return String(entry).split(":")[0].trim();
 }
 
 // Whitelist rank: lower = more important. -1 = not whitelisted (discard).
-function rankOf(entry: string, whitelist: RegExp[]): number {
+// Tier 1 ranks 0..n, tier 2 ranks 1000+ so tier 1 always precedes tier 2.
+function rankOf(entry: string, tiers: RegExp[][]): number {
   const name = baseName(entry);
-  for (let i = 0; i < whitelist.length; i++) {
-    if (whitelist[i].test(name)) return i;
+  for (let t = 0; t < tiers.length; t++) {
+    for (let i = 0; i < tiers[t].length; i++) {
+      if (tiers[t][i].test(name)) return t * 1000 + i;
+    }
   }
   return -1;
 }
@@ -59,10 +84,10 @@ function normalizeName(entry: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function filterAndSort(list: string[], whitelist: RegExp[]): string[] {
+function filterAndSort(list: string[], tiers: RegExp[][]): string[] {
   const seen = new Set<string>();
   return list
-    .map((entry, index) => ({ entry, index, rank: rankOf(entry, whitelist) }))
+    .map((entry, index) => ({ entry, index, rank: rankOf(entry, tiers) }))
     .filter((item) => {
       if (item.rank < 0) return false;
       const key = normalizeName(item.entry);
@@ -82,22 +107,24 @@ export interface DynamicsSplit {
 }
 
 export function splitDynamicsCombinations(yogas: string[], doshas: string[]): DynamicsSplit {
-  const sortedYogas = filterAndSort(yogas || [], YOGA_WHITELIST);
-  const sortedDoshas = filterAndSort(doshas || [], DOSHA_WHITELIST);
+  const pool = {
+    yogas: filterAndSort(yogas || [], [YOGA_TIER1, YOGA_TIER2]).slice(0, POOL_YOGA_COUNT),
+    doshas: filterAndSort(doshas || [], [DOSHA_TIER1, DOSHA_TIER2]).slice(0, POOL_DOSHA_COUNT),
+  };
 
   const primary = {
-    yogas: sortedYogas.slice(0, PRIMARY_YOGA_COUNT),
-    doshas: sortedDoshas.slice(0, PRIMARY_DOSHA_COUNT),
+    yogas: pool.yogas.slice(0, PRIMARY_YOGA_COUNT),
+    doshas: pool.doshas.slice(0, PRIMARY_DOSHA_COUNT),
   };
   const secondary = {
-    yogas: sortedYogas.slice(PRIMARY_YOGA_COUNT, PRIMARY_YOGA_COUNT + SECONDARY_YOGA_COUNT),
-    doshas: sortedDoshas.slice(PRIMARY_DOSHA_COUNT, PRIMARY_DOSHA_COUNT + SECONDARY_DOSHA_COUNT),
+    yogas: pool.yogas.slice(PRIMARY_YOGA_COUNT),
+    doshas: pool.doshas.slice(PRIMARY_DOSHA_COUNT),
   };
 
   return {
     primary,
     secondary,
     secondaryCount: secondary.yogas.length + secondary.doshas.length,
-    totalInterpreted: primary.yogas.length + primary.doshas.length + secondary.yogas.length + secondary.doshas.length,
+    totalInterpreted: pool.yogas.length + pool.doshas.length,
   };
 }
