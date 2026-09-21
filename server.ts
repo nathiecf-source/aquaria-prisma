@@ -54,6 +54,7 @@ import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEn
 import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarReturnInstant, getActiveSolarReturnYear, getSolarReturnCycles } from "./src/server/solarReturnEngine";
 import { createDashaSignature, createPortalSignature, createTransitSignature, CycleNoticeTab } from "./src/server/cycleNotice";
 import { calculateDailySky } from "./src/server/dailySkyEngine";
+import { splitDynamicsCombinations } from "./src/lib/dynamicsFilter";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -1313,13 +1314,14 @@ async function createApp(): Promise<express.Application> {
       // 5.5. Gerar Dinâmicas Planetárias em background (não bloqueia o onboard)
       if (activeUserId) {
         (async () => {
-          const readingId = `dinamicas-planetarias-v2-${activeUserId}`;
+          const readingId = `dinamicas-planetarias-v3-${activeUserId}`;
           const cached = await getCachedReading(activeUserId, readingId);
           if (!cached) {
             try {
               console.log(`[AQUAR.IA Backend] Gerando Dinâmicas Planetárias em background para usuário: ${activeUserId}`);
-              const readingText = await generatePlanetaryDynamicsReading(astrologicalProfile);
-              await saveReading(activeUserId, readingId, "dinamicas-planetarias", { text: readingText });
+              const split = splitDynamicsCombinations(astrologicalProfile.vedic_specifics?.yogas || [], astrologicalProfile.vedic_specifics?.doshas || []);
+              const readingText = await generatePlanetaryDynamicsReading(astrologicalProfile, split.primary);
+              await saveReading(activeUserId, readingId, "dinamicas-planetarias", { text: readingText, hasMore: split.secondaryCount > 0, remainingCount: split.secondaryCount, totalCount: split.totalInterpreted });
               console.log(`[AQUAR.IA Backend] Dinâmicas Planetárias salvas em background para usuário: ${activeUserId}`);
             } catch (dynErr: any) {
               console.error(`[AQUAR.IA Backend] Falha ao gerar Dinâmicas Planetárias em background para usuário ${activeUserId}:`, dynErr?.message || String(dynErr));
@@ -1391,19 +1393,56 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      const readingId = `dinamicas-planetarias-v2-${userId || "anon"}`;
+      const readingId = `dinamicas-planetarias-v3-${userId || "anon"}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached) {
         return res.json({ reading: cached, cached: true });
       }
 
-      const readingText = await generatePlanetaryDynamicsReading(profile);
-      await saveReading(userId, readingId, "dinamicas-planetarias", { text: readingText });
-      return res.json({ reading: { text: readingText }, cached: false });
+      const split = splitDynamicsCombinations(profile.vedic_specifics?.yogas || [], profile.vedic_specifics?.doshas || []);
+      const readingText = await generatePlanetaryDynamicsReading(profile, split.primary);
+      const payload = { text: readingText, hasMore: split.secondaryCount > 0, remainingCount: split.secondaryCount, totalCount: split.totalInterpreted };
+      await saveReading(userId, readingId, "dinamicas-planetarias", payload);
+      return res.json({ reading: payload, cached: false });
     } catch (err: any) {
       console.error("Erro ao gerar Dinâmicas Planetárias:", err);
       return res.status(500).json({
         error: "Erro ao gerar Dinâmicas Planetárias.",
+        details: err?.message || String(err)
+      });
+    }
+  });
+
+  // API Route: Remaining Planetary Dynamics (secondary yogas/doshas, on demand)
+  app.post("/api/planetary-dynamics-remaining", async (req, res) => {
+    try {
+      const { profile, userId } = req.body;
+      if (!profile) {
+        return res.status(400).json({ error: "Perfil astrológico é obrigatório." });
+      }
+
+      if (!(await requireFeatureAccess(req, res, "dinamicas-planetarias"))) {
+        return;
+      }
+
+      const split = splitDynamicsCombinations(profile.vedic_specifics?.yogas || [], profile.vedic_specifics?.doshas || []);
+      if (split.secondaryCount === 0) {
+        return res.json({ reading: { text: "" }, hasMore: false, cached: true });
+      }
+
+      const readingId = `dinamicas-planetarias-v3-extra-${userId || "anon"}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached) {
+        return res.json({ reading: cached, cached: true });
+      }
+
+      const readingText = await generatePlanetaryDynamicsReading(profile, split.secondary);
+      await saveReading(userId, readingId, "dinamicas-planetarias", { text: readingText });
+      return res.json({ reading: { text: readingText }, cached: false });
+    } catch (err: any) {
+      console.error("Erro ao gerar Dinâmicas Planetárias complementares:", err);
+      return res.status(500).json({
+        error: "Erro ao gerar Dinâmicas Planetárias complementares.",
         details: err?.message || String(err)
       });
     }
@@ -2332,7 +2371,9 @@ async function createApp(): Promise<express.Application> {
         .select("path_id, path_title, journal_text, updated_at")
         .eq("user_id", userId)
         .not("journal_text", "is", null)
-        .neq("journal_text", "");
+        .neq("journal_text", "")
+        .order("updated_at", { ascending: false })
+        .limit(20);
 
       return res.json({ entries: data || [] });
     } catch (err: any) {
@@ -2444,7 +2485,8 @@ async function createApp(): Promise<express.Application> {
         .from("journal_notes")
         .select("id, content, created_at, updated_at")
         .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(20);
 
       if (error) {
         return res.status(500).json({ error: "Erro ao buscar notas.", details: error.message });

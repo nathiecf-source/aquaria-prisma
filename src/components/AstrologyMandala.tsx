@@ -13,6 +13,7 @@ import { Accordion } from "./Accordion";
 import PlanetGlyphBar from "./PlanetGlyphBar";
 import { PlanetaryDynamicsPanel } from "./PlanetaryDynamicsPanel";
 import { hasPlusAccess, hasChamadoFeature } from "../lib/access";
+import { splitDynamicsCombinations } from "../lib/dynamicsFilter";
 import ChamadoTimer from "./ChamadoTimer";
 import PlanetReadingPanel from "./PlanetReadingPanel";
 import { PLANET_GLYPHS } from "../lib/planetGlyphs";
@@ -514,6 +515,9 @@ export default function AstrologyMandala({
   const [isDynamicsOpen, setIsDynamicsOpen] = React.useState(false);
   const [isFetchingDynamics, setIsFetchingDynamics] = React.useState(false);
   const [dynamicsText, setDynamicsText] = React.useState<string | null>(null);
+  const [dynamicsHasMore, setDynamicsHasMore] = React.useState(false);
+  const [dynamicsRemaining, setDynamicsRemaining] = React.useState(0);
+  const [isFetchingMoreDynamics, setIsFetchingMoreDynamics] = React.useState(false);
   const [paywallFeature, setPaywallFeature] = React.useState<"transits" | "insights" | "planets" | "caminhos" | "dynamics" | null>(null);
 
   const [selectedPlanetId, setSelectedPlanetId] = React.useState<string | null>(null);
@@ -681,10 +685,43 @@ export default function AstrologyMandala({
     .then(res => res.json())
     .then(data => {
       if (data.reading?.text) setDynamicsText(data.reading.text);
+      setDynamicsHasMore(Boolean(data.reading?.hasMore));
+      setDynamicsRemaining(Number(data.reading?.remainingCount) || 0);
     })
     .catch(err => console.error("Erro Dinâmicas Planetárias:", err))
     .finally(() => setIsFetchingDynamics(false));
   }, [profile, userProfile?.id, isFetchingDynamics, dynamicsText]);
+
+  const fetchMoreDynamics = React.useCallback(() => {
+    if (!profile || !userProfile?.id || isFetchingMoreDynamics || !dynamicsHasMore) return;
+    setIsFetchingMoreDynamics(true);
+    fetch("/api/planetary-dynamics-remaining", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, userId: userProfile.id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.reading?.text) {
+        setDynamicsText(prev => (prev ? `${prev}\n\n${data.reading.text}` : data.reading.text));
+      }
+      setDynamicsHasMore(false);
+      setDynamicsRemaining(0);
+    })
+    .catch(err => console.error("Erro Dinâmicas Planetárias complementares:", err))
+    .finally(() => setIsFetchingMoreDynamics(false));
+  }, [profile, userProfile?.id, isFetchingMoreDynamics, dynamicsHasMore]);
+
+  const dynamicsCounts = React.useMemo(() => {
+    const split = splitDynamicsCombinations(
+      profile?.vedic_specifics?.yogas || [],
+      profile?.vedic_specifics?.doshas || []
+    );
+    return {
+      yogas: split.primary.yogas.length + split.secondary.yogas.length,
+      doshas: split.primary.doshas.length + split.secondary.doshas.length,
+    };
+  }, [profile]);
 
   React.useEffect(() => {
     if (isDynamicsOpen && dynamicsText === null && !isFetchingDynamics && userProfile?.id) {
@@ -2320,6 +2357,10 @@ export default function AstrologyMandala({
           isLoading={isFetchingDynamics}
           text={dynamicsText}
           onRefresh={fetchPlanetaryDynamics}
+          hasMore={dynamicsHasMore}
+          remainingCount={dynamicsRemaining}
+          isLoadingMore={isFetchingMoreDynamics}
+          onLoadMore={fetchMoreDynamics}
         />
       </RightPanelDrawer>
 
@@ -2414,12 +2455,12 @@ export default function AstrologyMandala({
             paywallFeature === "transits"
               ? "Com o Passe de Expansão você acompanha o seu céu em movimento: a leitura dos regentes siderais, o Regente do Ano, a sua Revolução Solar e os Ciclos Planetários que estão ativos agora no seu mapa."
               : paywallFeature === "planets"
-                ? "Desbloqueie a leitura tropical completa deste ponto astrológico, incluindo a teia de aspectos que ele forma com os demais planetas do seu mapa."
+                ? "Desbloqueie a leitura tropical completa deste ponto astrológico, incluindo a teia de aspectos que ele forma com os demais planetas do seu mapa e a estrutura védica do planeta."
                 : paywallFeature === "caminhos"
                   ? "Desbloqueie os Caminhos de Potência e os Eixos Angulares para acessar as leituras profundas de cada direção da sua mandala."
                   : paywallFeature === "dynamics"
-                    ? `Seu mapa possui ${(profile?.vedic_specifics?.yogas || []).length} Fluxos de Potência e ${(profile?.vedic_specifics?.doshas || []).length} Pontos de Lapidação ativos. Assine o plano Premium para desbloquear sua matriz estrutural completa e entender os recursos ocultos da sua psique.`
-                    : "Guarde e revisite insights pessoais gerados nas suas leituras."
+                    ? `Seu mapa possui ${dynamicsCounts.yogas} Fluxos de Potência e ${dynamicsCounts.doshas} Pontos de Lapidação ativos. Assine o plano Premium para desbloquear sua matriz estrutural completa e entender os recursos ocultos da sua psique.`
+                    : "Guarde e revisite insights pessoais gerados nas suas leituras e acompanhe sua evolução das leituras do seu mapa natal."
           }
         >
           <div className="hidden" />

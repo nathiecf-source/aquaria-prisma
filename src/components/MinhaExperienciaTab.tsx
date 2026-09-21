@@ -42,6 +42,48 @@ interface JournalNote {
   updated_at: string;
 }
 
+async function loadDiaryData(userId: string | null): Promise<{ insights: Insight[]; journals: JournalEntry[]; notes: JournalNote[] }> {
+  const insightsPromise = (async () => {
+    if (isSupabaseConfigured && userId) {
+      const { data, error: sbErr } = await (supabase as any)
+        .from("user_insights")
+        .select("id, insight_text, category, transit_key, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (sbErr) throw sbErr;
+      return (data || []) as Insight[];
+    }
+    return JSON.parse(localStorage.getItem("user_insights") || "[]") as Insight[];
+  })();
+
+  const journalsPromise = (async () => {
+    if (!userId) return [] as JournalEntry[];
+    const res = await fetch(`/api/meditation/journal/list?userId=${userId}`);
+    if (!res.ok) return [] as JournalEntry[];
+    const json = await res.json();
+    return (json.entries || []) as JournalEntry[];
+  })();
+
+  const notesPromise = (async () => {
+    if (!userId) return [] as JournalNote[];
+    const res = await fetch(`/api/journal/notes?userId=${userId}`);
+    if (!res.ok) return [] as JournalNote[];
+    const json = await res.json();
+    return (json.notes || []) as JournalNote[];
+  })();
+
+  const [insights, journals, notes] = await Promise.all([insightsPromise, journalsPromise, notesPromise]);
+  return { insights, journals, notes };
+}
+
+let diaryPrefetch: { userId: string | null; promise: Promise<{ insights: Insight[]; journals: JournalEntry[]; notes: JournalNote[] }> } | null = null;
+
+function prefetchDiary(userId: string | null) {
+  if (!userId || (diaryPrefetch && diaryPrefetch.userId === userId)) return;
+  diaryPrefetch = { userId, promise: loadDiaryData(userId) };
+}
+
 const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
   const [insights, setInsights] = React.useState<Insight[]>([]);
   const [journals, setJournals] = React.useState<JournalEntry[]>([]);
@@ -56,36 +98,9 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
     setLoading(true);
     setError(null);
     try {
-      const insightsPromise = (async () => {
-        if (isSupabaseConfigured && userId) {
-          const { data, error: sbErr } = await (supabase as any)
-            .from("user_insights")
-            .select("id, insight_text, category, transit_key, created_at")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false });
-          if (sbErr) throw sbErr;
-          return (data || []) as Insight[];
-        }
-        return JSON.parse(localStorage.getItem("user_insights") || "[]") as Insight[];
-      })();
-
-      const journalsPromise = (async () => {
-        if (!userId) return [] as JournalEntry[];
-        const res = await fetch(`/api/meditation/journal/list?userId=${userId}`);
-        if (!res.ok) return [] as JournalEntry[];
-        const json = await res.json();
-        return (json.entries || []) as JournalEntry[];
-      })();
-
-      const notesPromise = (async () => {
-        if (!userId) return [] as JournalNote[];
-        const res = await fetch(`/api/journal/notes?userId=${userId}`);
-        if (!res.ok) return [] as JournalNote[];
-        const json = await res.json();
-        return (json.notes || []) as JournalNote[];
-      })();
-
-      const [insightsData, journalsData, notesData] = await Promise.all([insightsPromise, journalsPromise, notesPromise]);
+      const pending = diaryPrefetch && diaryPrefetch.userId === userId ? diaryPrefetch.promise : null;
+      diaryPrefetch = null;
+      const { insights: insightsData, journals: journalsData, notes: notesData } = await (pending || loadDiaryData(userId));
       setInsights(insightsData);
       setJournals(journalsData);
       setNotes(notesData);
@@ -221,11 +236,17 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-16 space-y-4">
-          <Loader2 className="w-6 h-6 text-[#8c6239] animate-spin" />
-          <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest animate-pulse">
-            Buscando seus registros...
-          </p>
+        <div className="space-y-3 animate-pulse" aria-busy="true" aria-label="Carregando seus registros">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-5 py-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="h-2.5 w-28 rounded bg-[#8c7f70]/20" />
+                <div className="h-4 w-24 rounded-full bg-[#8c7f70]/15" />
+              </div>
+              <div className="h-3 w-full rounded bg-[#8c7f70]/15" />
+              <div className="h-3 w-4/5 rounded bg-[#8c7f70]/15" />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 font-sans">
@@ -342,6 +363,8 @@ const MinhaExperienciaTab: React.FC<MinhaExperienciaTabProps> = ({ userId, userN
       <div className="flex items-center gap-2 mb-2 px-1">
         <button
           onClick={() => setView("diario")}
+          onMouseEnter={() => prefetchDiary(userId)}
+          onFocus={() => prefetchDiary(userId)}
           className={`flex-1 py-2.5 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-colors ${
             view === "diario"
               ? "bg-[#5c4d66] text-[#f4f1eb]"

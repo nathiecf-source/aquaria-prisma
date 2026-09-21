@@ -704,13 +704,23 @@ export async function fetchAstrologicalData(birthData: BirthData, currentDateStr
   const arudhaPadhas = record(horoscope.arudha_padhas) || {};
   const arudhaEntry = (label: string) => String(Object.entries(arudhaPadhas).find(([key]) => key.startsWith("D-1-") && key.includes(label))?.[1] || "");
   const yogaList = record(record(horoscope.yogas)?.yoga_list) || {};
-  const yogaText = (value: unknown) => Array.isArray(value) ? `${value[1] || "Yoga"}: ${value[3] || value[2] || ""}` : String(value || "");
+  // JHora yoga entry: [chart, name, combination rule, generic interpretation].
+  // Prefer the combination rule (index 2) — it is the technical explanation.
+  const yogaText = (value: unknown) => Array.isArray(value) ? `${value[1] || "Yoga"}: ${value[2] || value[3] || ""}` : String(value || "");
   const dhanaYogas = Object.entries(yogaList).filter(([key, value]) => /dhana|wealth|prosper/i.test(`${key} ${yogaText(value)}`)).map(([, value]) => yogaText(value));
   const karmaYoga = Object.entries(yogaList).find(([key]) => /karma/i.test(key));
   const allYogas = Object.entries(yogaList).map(([, value]) => yogaText(value)).filter(Boolean);
   const doshaList = record(horoscope.doshas) || {};
-  const doshaText = (value: unknown) => Array.isArray(value) ? value.filter(v => typeof v === "string").join(": ") : String(value || "");
-  const allDoshas = Object.entries(doshaList).map(([, value]) => doshaText(value)).filter(Boolean);
+  const stripHtml = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const doshaText = (value: unknown) => {
+    const raw = Array.isArray(value) ? value.filter(v => typeof v === "string").join(": ") : String(value || "");
+    return stripHtml(raw);
+  };
+  // JHora returns every checked dosha, including negative results
+  // ("There is no X dosha in this horoscope") — keep only present doshas.
+  const allDoshas = Object.entries(doshaList)
+    .map(([key, value]) => `${key}: ${doshaText(value)}`.trim())
+    .filter((text) => text && !/there is no .*dosha/i.test(text));
   const specifics: VedicSpecifics = {
     lagna, lagnaNakshatra: mapped.ascNakshatra, lagnesha: signRulers[lagna] || "", suryaLagna: mapped.planets.find(p => p.name === "Sol")?.sign || "", chandraLagna: mapped.planets.find(p => p.name === "Lua")?.sign || "", janmaNakshatra: mapped.planets.find(p => p.name === "Lua")?.nakshatra || "",
     karakas: mapCharaKarakas(charaKarakas), dharmaTrikona: "", arudhaLag_na: arudhaEntry("Arudha Lagna"), arudhaPadas: Object.fromEntries(Object.entries(arudhaPadhas).filter(([key]) => key.startsWith("D-1-")).map(([key, value]) => [key, String(value)])), upapadaLag_na: arudhaEntry("Upapada Lagna"), dhanaYogas, karmaYoga: karmaYoga ? yogaText(karmaYoga[1]) : "", yogas: allYogas, doshas: allDoshas, dusthanas: [], maranKarakaSthana: [],

@@ -1,6 +1,7 @@
 import React from "react";
 import { Loader2, ArrowRight, Trophy, ScrollText, Lock, Download } from "lucide-react";
 import { downloadReadingDocument, ExportDocumentKey } from "../lib/docxExport";
+import { cachedFetch } from "../lib/memoCache";
 
 type ItemStatus = "pending" | "in_progress" | "completed";
 
@@ -98,15 +99,22 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, userNam
       setLoading(false);
       return;
     }
-    setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/user-progress?userId=${userId}`);
-      if (!res.ok) throw new Error("Falha ao buscar progresso.");
-      const json = await res.json();
-      setData(json);
+      const { data: cached, promise } = cachedFetch<ProgressData>(`user-progress:${userId}`, async () => {
+        const res = await fetch(`/api/user-progress?userId=${userId}`);
+        if (!res.ok) throw new Error("Falha ao buscar progresso.");
+        return res.json();
+      });
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      setData(await promise);
     } catch (err: any) {
-      setError("Não foi possível carregar sua evolução.");
+      if (!data) setError("Não foi possível carregar sua evolução.");
       console.error("[EvolutionDashboard]", err);
     } finally {
       setLoading(false);
@@ -143,11 +151,19 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, userNam
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 space-y-4">
-        <Loader2 className="w-6 h-6 text-[#8c6239] animate-spin" />
-        <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest animate-pulse">
-          Calculando sua jornada...
-        </p>
+      <div className="w-full py-4 space-y-4 animate-pulse" aria-busy="true" aria-label="Carregando sua evolução">
+        <div className="rounded-2xl border border-[#8c7f70]/15 bg-[#f4f1eb] px-5 py-5 space-y-3">
+          <div className="h-2.5 w-32 rounded bg-[#8c7f70]/20" />
+          <div className="h-5 w-48 rounded bg-[#8c7f70]/25" />
+          <div className="h-2 w-full rounded-full bg-[#8c7f70]/15" />
+          <div className="h-16 w-full rounded-xl bg-[#8c7f70]/10" />
+        </div>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6]/60 px-4 py-3.5 flex items-center justify-between">
+            <div className="h-3.5 w-36 rounded bg-[#8c7f70]/20" />
+            <div className="h-3 w-20 rounded bg-[#8c7f70]/15" />
+          </div>
+        ))}
       </div>
     );
   }

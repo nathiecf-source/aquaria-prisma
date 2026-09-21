@@ -9,6 +9,10 @@ interface PlanetaryDynamicsPanelProps {
   isLoading: boolean;
   text: string | null;
   onRefresh?: () => void;
+  hasMore?: boolean;
+  remainingCount?: number;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 interface DynamicItem {
@@ -33,6 +37,9 @@ function parseItemBody(body: string): string {
     } else if (line.toLowerCase().startsWith("síntese terapêutica:")) {
       const synth = line.replace(/^síntese terapêutica[:：]\s*/i, "").trim();
       if (synth) out.push(synth);
+    } else if (line.toLowerCase().startsWith("combinação:")) {
+      const rule = line.replace(/^combinação[:：]\s*/i, "").trim();
+      if (rule) out.push(`*Formado por: ${rule}*`);
     } else if (line) {
       out.push(line);
     }
@@ -110,7 +117,14 @@ function parseDynamics(text: string): { sections: DynamicSection[]; fallback?: s
     }
 
     if (items.length > 0) {
-      sections.push({ title: `✦ ${title}`, intro: introLines.join(" "), items });
+      // A resposta do "revelar mais" repete os cabeçalhos de seção;
+      // mescla os itens na seção existente em vez de duplicar o título.
+      const existing = sections.find((s) => s.title === `✦ ${title}`);
+      if (existing) {
+        existing.items.push(...items);
+      } else {
+        sections.push({ title: `✦ ${title}`, intro: introLines.join(" "), items });
+      }
     }
   }
 
@@ -125,6 +139,10 @@ export const PlanetaryDynamicsPanel: React.FC<PlanetaryDynamicsPanelProps> = ({
   isLoading,
   text,
   onRefresh,
+  hasMore = false,
+  remainingCount = 0,
+  isLoadingMore = false,
+  onLoadMore,
 }) => {
   const { sections, fallback } = React.useMemo(() => {
     return text ? parseDynamics(text) : { sections: [] };
@@ -191,6 +209,26 @@ export const PlanetaryDynamicsPanel: React.FC<PlanetaryDynamicsPanelProps> = ({
                 ↺ Tentar novamente
               </button>
             )}
+          </div>
+        )}
+
+        {!isLoading && hasMore && remainingCount > 0 && (
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="flex items-center gap-2 rounded-full border border-[#8c7f70]/35 bg-[#f1eadf] px-5 py-2.5 font-sans text-[13px] font-medium text-[#6d5c49] transition hover:border-[#8c7f70]/60 hover:bg-[#eae3d6] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-[#8c7f70]" />
+                  Revelando combinações...
+                </>
+              ) : (
+                <>✨ Revelar mais {remainingCount} combinações ativas no seu mapa</>
+              )}
+            </button>
           </div>
         )}
       </div>

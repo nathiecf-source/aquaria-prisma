@@ -11,7 +11,7 @@
     "start": "node dist/server.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/server/*.test.ts"
+    "test": "tsx --test src/server/*.test.ts src/lib/*.test.ts"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.1",

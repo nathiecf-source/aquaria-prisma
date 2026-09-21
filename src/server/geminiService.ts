@@ -4660,10 +4660,13 @@ Ao longo da semana, observe os pensamentos sem precisar organizá-los de imediat
   }
 }
 
-export async function generatePlanetaryDynamicsReading(profile: CompleteAstrologicalProfile): Promise<string> {
+export async function generatePlanetaryDynamicsReading(
+  profile: CompleteAstrologicalProfile,
+  subset?: { yogas: string[]; doshas: string[] },
+): Promise<string> {
   const gender = getEffectiveGender(profile);
-  const yogas = profile.vedic_specifics?.yogas || [];
-  const doshas = profile.vedic_specifics?.doshas || [];
+  const yogas = subset?.yogas ?? profile.vedic_specifics?.yogas ?? [];
+  const doshas = subset?.doshas ?? profile.vedic_specifics?.doshas ?? [];
 
   const systemInstruction = `[PAPEL DO SISTEMA]
 Você é um analista astrológico terapêutico de abordagem junguiana que atua na plataforma Aquar.IA. Sua função é traduzir Yogas (combinações planetárias de potência) e Doshas (combinações planetárias de desafio estrutural) da astrologia védica para uma linguagem psicológica contemporânea, elegante e focada na autonomia do usuário.
@@ -4686,6 +4689,7 @@ Para cada Dosha listado, estruture exatamente assim:
 [ Tag: NOME DO DOSHA ] Título Terapêutico Criado por Você
 Tema: (uma linha curta resumindo o padrão)
 Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como integrar esse desafio na prática)
+Combinação: (uma linha explicando a regra astrológica que forma este dosha)
 
 ✦ Fluxos de Potência (Yogas)
 Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
@@ -4694,6 +4698,12 @@ Para cada Yoga listado, estruture exatamente assim:
 [ Tag: NOME DO YOGA ] Título Terapêutico Criado por Você
 Tema: (uma linha curta resumindo o arquétipo)
 Síntese Terapêutica: (um parágrafo de 3 a 4 linhas explicando como usar esse recurso na prática)
+Combinação: (uma linha explicando a regra astrológica que forma este yoga)
+
+[REGRA DA LINHA "COMBINAÇÃO"]
+- Os itens de entrada vêm no formato "NOME: <descrição técnica do provedor>". Quando a descrição trouxer a regra da combinação (ex: "Jupiter should be in a kendra from lagna"), traduza-a para português claro e conciso (ex: "Júpiter posicionado em casa angular em relação ao ascendente").
+- Quando a descrição não trouxer a regra, explique a combinação clássica do yoga/dosha em uma linha, com base no conhecimento tradicional do Jyotish.
+- A linha "Combinação" é o rodapé técnico do card: sem tom terapêutico, apenas a explicação objetiva da formação astrológica.
 
 [EXEMPLO DE CALIBRAÇÃO]
 Input simulado:
@@ -4707,6 +4717,7 @@ Padrões estruturais do mapa que exigem integração consciente, maturidade e li
 [ Tag: Kuja Dosha (Marte) ] Gestão de Limites & Assertividade nas Trocas
 Tema: Intensidade e necessidade de espaço pessoal nos relacionamentos.
 Síntese Terapêutica: Aponta para uma energia de ação muito viva dentro das parcerias. O aprendizado não é evitar o confronto por medo da ruptura, mas transformar o impulso em assertividade cristalina, comunicando o que você precisa sem cair em reatividade defensiva.
+Combinação: Marte posicionado na 1ª, 2ª, 4ª, 7ª, 8ª ou 12ª casa a partir do ascendente.
 
 ✦ Fluxos de Potência (Yogas)
 Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão natural.
@@ -4714,10 +4725,12 @@ Alinhamentos nativos que indicam facilidades, recursos e áreas de expansão nat
 [ Tag: Raja Yoga ] Autoridade & Reconhecimento Organizado
 Tema: Sinergia entre expressão pessoal e liderança.
 Síntese Terapêutica: Há um alinhamento fluído entre sua identidade e a capacidade de estruturar projetos no mundo. Quando você aplica método e consistência, o ambiente tende a responder com abertura de portas e respeito à sua autoridade. Evite a autossabotagem de se esconder nos bastidores.
+Combinação: Regentes das casas 9 e 10 associados por conjunção, troca de signos ou aspecto mútuo.
 
 [ Tag: Gaja Kesari Yoga ] Sabedoria Emocional & Inteligência Relacional
 Tema: Conexão entre a mente emocional e a busca por sentido.
 Síntese Terapêutica: Confere uma intuição afiada e maturidade psíquica. É um recurso nativo para aconselhar, acolher e manter a clareza mental em momentos em que o ambiente externo está sob forte pressão. Sua empatia é uma bússola de decisões, não apenas um traço de personalidade.
+Combinação: Júpiter posicionado em casa angular (1ª, 4ª, 7ª ou 10ª) a partir da Lua.
 
 [DADOS DO USUÁRIO]
 ${getGenderFlexionInstruction(gender)}
