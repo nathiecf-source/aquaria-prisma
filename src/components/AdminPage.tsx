@@ -1,8 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import GlobalBanner from "./GlobalBanner";
 import { StoryCard } from "./StoryCard";
-import { Calendar, Mail, Send, Bell, Rocket } from "lucide-react";
+import { DailySkyStoryCard } from "./DailySkyStoryCard";
+import { DailySkySummaryCard } from "./DailySkySummaryCard";
+import { DailySkyNakshatraCard } from "./DailySkyNakshatraCard";
+import { DailySkyPillarsCard } from "./DailySkyPillarsCard";
+import { Calendar, Mail, Send, Bell, Rocket, Copy, Download, Sparkles } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
+import { downloadImage, generatePngFromElement } from "./share/shareUtils";
 
 interface AdminPageProps {
   userProfile?: any;
@@ -55,6 +60,7 @@ const TABS = [
   { id: "chamado", label: "O Chamado" },
   { id: "feedbacks", label: "Feedbacks" },
   { id: "push", label: "Push" },
+  { id: "ceu-do-dia", label: "Céu do Dia" },
   { id: "avisos", label: "Avisos Globais" },
   { id: "suporte", label: "Suporte Técnico" },
 ];
@@ -90,6 +96,27 @@ const EMAIL_TEMPLATES: Record<string, { id: string; label: string; subject: stri
 
 function formatEventLabel(eventName: string): { label: string; icon: string } {
   return EVENT_LABELS[eventName] || { label: eventName.replace(/_/g, " "), icon: "●" };
+}
+
+interface DailySkyResult {
+  date: string;
+  timezone: string;
+  referenceTime: string;
+  payload: any;
+  content: {
+    theme: string;
+    stories: Array<{ screen: number; title: string; text: string }>;
+    aspectCoverage: Array<{ aspectId: string; usedIn: string[]; interpretation: string; role: string }>;
+    nakshatraCardText: string;
+    pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
+    feedParagraphs: string[];
+    closing: string;
+    cardSummary: string;
+  };
+}
+
+function todayInSaoPaulo(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 export default function AdminPage({ userProfile }: AdminPageProps) {
@@ -136,6 +163,15 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const [pushTestTitle, setPushTestTitle] = useState("Aquar.IA — Teste de notificação");
   const [pushTestMessage, setPushTestMessage] = useState("Se você recebeu esta mensagem, o push está funcionando.");
   const [pushLoading, setPushLoading] = useState(false);
+  const [dailySkyDate, setDailySkyDate] = useState(todayInSaoPaulo);
+  const [dailySkyLoading, setDailySkyLoading] = useState(false);
+  const [dailySkyResult, setDailySkyResult] = useState<DailySkyResult | null>(null);
+  const [dailySkyError, setDailySkyError] = useState<string | null>(null);
+  const [dailySkyTechnicalOpen, setDailySkyTechnicalOpen] = useState(false);
+  const storyCardRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const nakshatraCardRef = useRef<HTMLDivElement | null>(null);
+  const pillarsCardRef = useRef<HTMLDivElement | null>(null);
+  const summaryCardRef = useRef<HTMLDivElement | null>(null);
 
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -237,6 +273,50 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     } finally {
       setPushLoading(false);
     }
+  }
+
+  async function handleGenerateDailySky() {
+    setDailySkyLoading(true);
+    setDailySkyError(null);
+    try {
+      const token = await getToken();
+      const response = await fetch("/api/admin/daily-sky-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: token ? `Bearer ${token}` : "" },
+        body: JSON.stringify({ date: dailySkyDate }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível gerar o Céu do Dia.");
+      setDailySkyResult(data);
+    } catch (error: any) {
+      setDailySkyError(error?.message || "Não foi possível gerar o Céu do Dia.");
+    } finally {
+      setDailySkyLoading(false);
+    }
+  }
+
+  async function copyDailySkyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage({ type: "success", text: "Conteúdo copiado." });
+    } catch {
+      setMessage({ type: "error", text: "Não foi possível copiar o conteúdo." });
+    }
+  }
+
+  async function downloadDailySkyCard(element: HTMLDivElement | null, filename: string) {
+    if (!element) return;
+    const dataUrl = await generatePngFromElement(element, { pixelRatio: 2 });
+    downloadImage(dataUrl, filename);
+  }
+
+  async function downloadAllDailySkyCards() {
+    if (!dailySkyResult) return;
+    await downloadDailySkyCard(storyCardRefs.current[0], `aquaria-ceu-${dailySkyDate}-ceu-de-hoje.png`);
+    await downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`);
+    await downloadDailySkyCard(storyCardRefs.current[1], `aquaria-ceu-${dailySkyDate}-polindo-arestas.png`);
+    await downloadDailySkyCard(pillarsCardRef.current, `aquaria-ceu-${dailySkyDate}-pilares-do-dia.png`);
+    await downloadDailySkyCard(summaryCardRef.current, `aquaria-ceu-${dailySkyDate}-resumo.png`);
   }
 
   async function loadMetrics() {
@@ -1125,6 +1205,78 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                 {pushLoading ? "Disparando..." : "Disparar trânsito do dia"}
               </button>
             </div>
+          </section>
+        )}
+
+        {activeTab === "ceu-do-dia" && (
+          <section className="space-y-6">
+            <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#6e6356]"><Sparkles className="h-4 w-4" /> Céu do Dia</h2>
+                  <p className="mt-2 text-xs text-[#8c7f70]">Conteúdo privado para redes sociais · referência às 08:00 em Brasília</p>
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-[10px] uppercase tracking-widest text-[#6e6356]">Data
+                    <input type="date" value={dailySkyDate} onChange={(event) => setDailySkyDate(event.target.value)} className="mt-1 block rounded-lg border border-[#e6e2d8] bg-white px-3 py-2 text-sm text-[#3c352d]" />
+                  </label>
+                  <button onClick={handleGenerateDailySky} disabled={dailySkyLoading || !dailySkyDate} className="rounded-lg bg-[#2b3c5c] px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-[#22304a] disabled:opacity-50">
+                    {dailySkyLoading ? "Calculando e escrevendo..." : "Gerar conteúdo"}
+                  </button>
+                </div>
+              </div>
+              {dailySkyError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{dailySkyError}</p>}
+            </div>
+
+            {dailySkyResult && (
+              <>
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="text-[10px] uppercase tracking-widest text-[#8c6239]">Tema do Dia</p><h3 className="mt-2 font-serif text-xl text-[#3c352d]">{dailySkyResult.content.theme}</h3></div>
+                    <button onClick={() => copyDailySkyText(dailySkyResult.content.theme)} className="rounded-lg border border-[#e6e2d8] p-2 text-[#6e6356] hover:bg-[#f4f1eb]" title="Copiar tema"><Copy className="h-4 w-4" /></button>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {dailySkyResult.content.stories.map((story, index) => (
+                    <React.Fragment key={story.screen}>
+                      <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm">
+                        <DailySkyStoryCard ref={(node) => { storyCardRefs.current[index] = node; }} title={story.title} text={story.text} date={dailySkyResult.date} />
+                        <div className="mt-3 flex gap-2"><button onClick={() => copyDailySkyText(`${story.title}\n\n${story.text}`)} className="flex items-center gap-1 rounded-lg border border-[#e6e2d8] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#6e6356]"><Copy className="h-3.5 w-3.5" /> Copiar</button><button onClick={() => downloadDailySkyCard(storyCardRefs.current[index], `aquaria-ceu-${dailySkyDate}-${story.title.toLowerCase().replace(/\s+/g, "-")}.png`)} className="flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>
+                      </div>
+                      {index === 0 && <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyNakshatraCard ref={nakshatraCardRef} date={dailySkyResult.date} {...dailySkyResult.payload.vedic.nakshatra} text={dailySkyResult.content.nakshatraCardText} /><button onClick={() => downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>}
+                    </React.Fragment>
+                  ))}
+                  <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyPillarsCard ref={pillarsCardRef} date={dailySkyResult.date} vedic={dailySkyResult.payload.vedic} guidance={dailySkyResult.content.pillarGuidance} /><button onClick={() => downloadDailySkyCard(pillarsCardRef.current, `aquaria-ceu-${dailySkyDate}-pilares-do-dia.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>
+                  <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm">
+                    <DailySkySummaryCard ref={summaryCardRef} theme={dailySkyResult.content.theme} summary={dailySkyResult.content.cardSummary} date={dailySkyResult.date} />
+                    <button onClick={() => downloadDailySkyCard(summaryCardRef.current, `aquaria-ceu-${dailySkyDate}-resumo.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> Baixar resumo PNG</button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between"><h3 className="text-xs uppercase tracking-widest text-[#6e6356]">Legenda para o Feed</h3><button onClick={() => copyDailySkyText([...dailySkyResult.content.feedParagraphs, dailySkyResult.content.closing].join("\n\n"))} className="flex items-center gap-1 rounded-lg border border-[#e6e2d8] px-3 py-2 text-[10px] font-bold uppercase tracking-wider"><Copy className="h-3.5 w-3.5" /> Copiar</button></div>
+                  <div className="space-y-3 text-sm leading-relaxed text-[#5c544d]">{dailySkyResult.content.feedParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}<p className="font-medium text-[#3c352d]">{dailySkyResult.content.closing}</p></div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={() => copyDailySkyText(`TEMA DO DIA\n${dailySkyResult.content.theme}\n\n${dailySkyResult.content.stories.map((story) => `TELA ${story.screen}: ${story.title}\n${story.text}`).join("\n\n")}\n\nLEGENDA\n${[...dailySkyResult.content.feedParagraphs, dailySkyResult.content.closing].join("\n\n")}`)} className="flex items-center gap-2 rounded-lg border border-[#3c352d] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#3c352d]"><Copy className="h-4 w-4" /> Copiar roteiro completo</button>
+                  <button onClick={downloadAllDailySkyCards} className="flex items-center gap-2 rounded-lg bg-[#8c6239] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white"><Download className="h-4 w-4" /> Baixar todos os PNGs</button>
+                </div>
+
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+                  <h3 className="mb-4 text-xs uppercase tracking-widest text-[#6e6356]">Auditoria dos Dados Usados</h3>
+                  <div className="mb-5 grid gap-3 text-xs sm:grid-cols-2"><p><strong>Origem:</strong> efemérides locais / astronomia</p><p><strong>Referência:</strong> {dailySkyResult.date} às {dailySkyResult.referenceTime} BRT</p><p><strong>Lua tropical:</strong> {dailySkyResult.payload.tropical.moon.phase} em {dailySkyResult.payload.tropical.moon.sign} {dailySkyResult.payload.tropical.moon.degree}°</p><p><strong>Nakshatra:</strong> {dailySkyResult.payload.vedic.nakshatra.name}, Pada {dailySkyResult.payload.vedic.nakshatra.pada}, até {dailySkyResult.payload.vedic.nakshatra.activeUntil}</p></div>
+                  <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-b border-[#e6e2d8] text-[10px] uppercase tracking-wider text-[#8c7f70]"><tr><th className="p-2">Aspecto exato</th><th className="p-2">Hora/orb</th><th className="p-2">Peso</th><th className="p-2">Uso editorial</th></tr></thead><tbody>{dailySkyResult.payload.tropical.exactMoonAspects.map((aspect: any) => { const coverage = dailySkyResult.content.aspectCoverage.find((item) => item.aspectId === aspect.id); return <tr key={aspect.id} className="border-b border-[#e6e2d8]/60"><td className="p-2 font-medium">{aspect.body1} {aspect.aspect} {aspect.body2}</td><td className="p-2">{aspect.exactTime} · {aspect.orb}°</td><td className="p-2">{aspect.role === "tension" ? "Tensão principal" : aspect.role === "support" ? "Apoio" : "Conjunção"}</td><td className="p-2">{coverage ? `${coverage.usedIn.join(", ")} — ${coverage.interpretation}` : "Não coberto"}</td></tr>; })}</tbody></table></div>
+                  <div className="mt-5 grid gap-2 text-xs sm:grid-cols-2"><p><strong>Regente do dia:</strong> {dailySkyResult.payload.vedic.vara.name} · {dailySkyResult.payload.vedic.vara.ruler}</p><p><strong>Dia lunar:</strong> {dailySkyResult.payload.vedic.tithi.name}</p><p><strong>Atmosfera:</strong> {dailySkyResult.payload.vedic.yoga.name} · {dailySkyResult.payload.vedic.yoga.nature}</p><p><strong>Ação prática:</strong> {dailySkyResult.payload.vedic.karana.name}</p></div>
+                </div>
+
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4">
+                  <button onClick={() => setDailySkyTechnicalOpen((open) => !open)} className="w-full text-left text-[10px] font-bold uppercase tracking-widest text-[#6e6356]">{dailySkyTechnicalOpen ? "Ocultar dados técnicos" : "Ver dados técnicos usados"}</button>
+                  {dailySkyTechnicalOpen && <pre className="mt-4 max-h-[500px] overflow-auto rounded-lg bg-[#2b3c5c] p-4 text-[11px] text-[#f4f1eb]">{JSON.stringify(dailySkyResult.payload, null, 2)}</pre>}
+                </div>
+              </>
+            )}
           </section>
         )}
 
