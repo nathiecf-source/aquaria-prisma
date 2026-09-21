@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeSolarReturnChart, calculateLocalTropicalPositions, calculateSolarReturnChart, findExactSolarReturnInstant, getSolarReturnLunarPhase } from "./solarReturnEngine";
+import { analyzeSolarReturnChart, calculateLocalTropicalPositions, calculateSolarReturnChart, findExactSolarReturnInstant, getSolarReturnCycles, getSolarReturnLunarPhase } from "./solarReturnEngine";
 
 const birthData = {
   birthDate: "1990-01-01",
@@ -38,6 +38,28 @@ test("keeps the return instant while changing the annual location", () => {
   });
   assert.equal(first.exactReturnInstant, second.exactReturnInstant);
   assert.notEqual(first.houses[0].longitude, second.houses[0].longitude);
+});
+
+test("exposes current and next cycles with a 60-day unlock window", () => {
+  const cycles = getSolarReturnCycles(birthData, new Date("2026-06-01T00:00:00.000Z"), natal);
+  assert.equal(cycles.currentCycle.year, 2026);
+  assert.equal(cycles.currentCycle.age, 36);
+  assert.equal(cycles.nextCycle.year, 2027);
+  assert.equal(cycles.nextCycle.age, 37);
+  assert.equal(cycles.nextCycle.startsAt, cycles.currentCycle.endsAt);
+  const expectedUnlock = new Date(cycles.nextCycle.startsAt).getTime() - 60 * 24 * 60 * 60 * 1000;
+  assert.equal(new Date(cycles.unlockDate).getTime(), expectedUnlock);
+});
+
+test("locks the next cycle until 60 days before the return", () => {
+  const reference = getSolarReturnCycles(birthData, new Date("2026-06-01T00:00:00.000Z"), natal);
+  const day = 24 * 60 * 60 * 1000;
+  const beforeUnlock = getSolarReturnCycles(birthData, new Date(new Date(reference.unlockDate).getTime() - day), natal);
+  const afterUnlock = getSolarReturnCycles(birthData, new Date(new Date(reference.unlockDate).getTime() + day), natal);
+  assert.equal(beforeUnlock.isNextCycleUnlocked, false);
+  assert.equal(afterUnlock.isNextCycleUnlocked, true);
+  assert.equal(beforeUnlock.currentCycle.year, reference.currentCycle.year);
+  assert.equal(afterUnlock.currentCycle.year, reference.currentCycle.year);
 });
 
 test("classifies lunar phases across the zodiac boundary", () => {

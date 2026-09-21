@@ -69,7 +69,7 @@ export const FAQModal: React.FC<FAQModalProps> = ({ onClose }) => {
           <div>
             <h3 className="font-serif text-[#5c4d66] mb-1">O que acontece quando encerra o meu período no Passe de Expansão?</h3>
             <p>
-              Faltando 15 dias para o término dos seus 6 ou 12 meses de acesso, você receberá um convite na própria interface para ativar a sua assinatura mensal de manutenção (por um valor menor) e continuar navegando por tudo. Caso opte por não assinar a manutenção, sua conta retornará automaticamente para o plano Gratuito. Para não perder o seu conteúdo, você poderá baixar o histórico de conversas do Chat em PDF, fazer o download dos áudios das 7 meditações para o seu celular ou computador, e copiar os textos das suas leituras da interface sempre que quiser.
+              Faltando 15 dias para o término dos seus 6 ou 12 meses de acesso, você receberá um convite na própria interface para ativar a sua assinatura mensal de manutenção (por um valor menor) e continuar navegando por tudo. Caso opte por não assinar a manutenção, sua conta retornará automaticamente para o plano Gratuito. Para não perder o seu conteúdo, você poderá baixar o histórico de conversas do Chat em PDF, fazer o download dos áudios das 7 meditações para o seu celular ou computador, e baixar o DOCX das suas leituras em "Minha Evolução" (bônus liberado ao completar um bloco completo).
             </p>
           </div>
 

@@ -107,6 +107,7 @@ interface DailySkyResult {
     theme: string;
     stories: Array<{ screen: number; title: string; text: string }>;
     aspectCoverage: Array<{ aspectId: string; usedIn: string[]; interpretation: string; role: string }>;
+    nakshatraCardTitle: string;
     nakshatraCardText: string;
     pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
     feedParagraphs: string[];
@@ -314,7 +315,6 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     if (!dailySkyResult) return;
     await downloadDailySkyCard(storyCardRefs.current[0], `aquaria-ceu-${dailySkyDate}-ceu-de-hoje.png`);
     await downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`);
-    await downloadDailySkyCard(storyCardRefs.current[1], `aquaria-ceu-${dailySkyDate}-polindo-arestas.png`);
     await downloadDailySkyCard(pillarsCardRef.current, `aquaria-ceu-${dailySkyDate}-pilares-do-dia.png`);
     await downloadDailySkyCard(summaryCardRef.current, `aquaria-ceu-${dailySkyDate}-resumo.png`);
   }
@@ -1244,7 +1244,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                         <DailySkyStoryCard ref={(node) => { storyCardRefs.current[index] = node; }} title={story.title} text={story.text} date={dailySkyResult.date} />
                         <div className="mt-3 flex gap-2"><button onClick={() => copyDailySkyText(`${story.title}\n\n${story.text}`)} className="flex items-center gap-1 rounded-lg border border-[#e6e2d8] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#6e6356]"><Copy className="h-3.5 w-3.5" /> Copiar</button><button onClick={() => downloadDailySkyCard(storyCardRefs.current[index], `aquaria-ceu-${dailySkyDate}-${story.title.toLowerCase().replace(/\s+/g, "-")}.png`)} className="flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>
                       </div>
-                      {index === 0 && <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyNakshatraCard ref={nakshatraCardRef} date={dailySkyResult.date} {...dailySkyResult.payload.vedic.nakshatra} text={dailySkyResult.content.nakshatraCardText} /><button onClick={() => downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>}
+                      {index === 0 && <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyNakshatraCard ref={nakshatraCardRef} date={dailySkyResult.date} title={dailySkyResult.content.nakshatraCardTitle} pada={dailySkyResult.payload.vedic.nakshatra.pada} padaElement={dailySkyResult.payload.vedic.nakshatra.padaElement} activeUntil={dailySkyResult.payload.vedic.nakshatra.activeUntil} next={dailySkyResult.payload.vedic.nakshatra.next} text={dailySkyResult.content.nakshatraCardText} /><button onClick={() => downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>}
                     </React.Fragment>
                   ))}
                   <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyPillarsCard ref={pillarsCardRef} date={dailySkyResult.date} vedic={dailySkyResult.payload.vedic} guidance={dailySkyResult.content.pillarGuidance} /><button onClick={() => downloadDailySkyCard(pillarsCardRef.current, `aquaria-ceu-${dailySkyDate}-pilares-do-dia.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>

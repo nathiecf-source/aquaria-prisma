@@ -335,7 +335,7 @@ const MinhaExperienciaTab: React.FC<MinhaExperienciaTabProps> = ({ userId, userN
     <div className="w-full">
       <div className="mb-4">
         <h2 className="font-serif text-[#3c352d] text-base tracking-widest uppercase px-1">
-          Minha Experiência
+          Minha Evolução
         </h2>
       </div>
 

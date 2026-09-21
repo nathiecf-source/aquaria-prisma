@@ -790,7 +790,7 @@ export default function App() {
           }}
           onClose={() => setShowChatPaywall(false)}
           title="Chat Astrológico Bloqueado"
-          description="Converse com a Aquar.IA sobre o seu mapa. Este recurso é exclusivo para assinantes PLUS."
+          description="Com o Passe de Expansão, o Oráculo conversa diretamente sobre o seu mapa: você pode aprofundar trânsitos, ciclos e caminhos em diálogo aberto, e registrar seus processos no Diário Alquímico integrado às suas leituras."
         >
           <></>
         </PaywallBarrier>

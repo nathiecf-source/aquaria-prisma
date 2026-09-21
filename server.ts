@@ -51,7 +51,7 @@ import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
 import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getAllPlanetPositions, getVedicTransitTerrain } from "./src/server/transitEngine";
 import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
-import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarReturnInstant, getActiveSolarReturnYear } from "./src/server/solarReturnEngine";
+import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarReturnInstant, getActiveSolarReturnYear, getSolarReturnCycles } from "./src/server/solarReturnEngine";
 import { createDashaSignature, createPortalSignature, createTransitSignature, CycleNoticeTab } from "./src/server/cycleNotice";
 import { calculateDailySky } from "./src/server/dailySkyEngine";
 
@@ -1903,13 +1903,54 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
-  app.post("/api/cycles/solar-return", async (req: any, res) => {
+  app.post("/api/cycles/solar-return/status", async (req: any, res) => {
     try {
-      const { profile, userId, location } = req.body;
+      const { profile, userId } = req.body;
       if (!profile?.birthData || !profile?.tropical_natal) {
         return res.status(400).json({ error: "Perfil astrológico completo é obrigatório." });
       }
       if (!(await requirePlusAccess(req, res))) return;
+
+      const cycles = getSolarReturnCycles(profile.birthData, new Date(), profile.tropical_natal);
+      const years = [cycles.currentCycle.year, cycles.nextCycle.year];
+      const readings: Record<string, any> = {};
+      for (const year of years) {
+        const cached = await getCachedReading(userId, `revolucao-solar-v1-${year}`);
+        readings[String(year)] = cached?.analysis && cached?.reading ? { ...cached, cached: true } : null;
+      }
+      return res.json({ cycles, readings });
+    } catch (err: any) {
+      console.error("Erro ao consultar Revolução Solar:", err);
+      return res.status(500).json({ error: "Erro ao consultar Revolução Solar.", details: err?.message || String(err) });
+    }
+  });
+
+  app.post("/api/cycles/solar-return", async (req: any, res) => {
+    try {
+      const { profile, userId, location, targetYear } = req.body;
+      if (!profile?.birthData || !profile?.tropical_natal) {
+        return res.status(400).json({ error: "Perfil astrológico completo é obrigatório." });
+      }
+      if (!(await requirePlusAccess(req, res))) return;
+
+      const cycles = getSolarReturnCycles(profile.birthData, new Date(), profile.tropical_natal);
+      const requestedYear = Number(targetYear);
+      const isCurrent = requestedYear === cycles.currentCycle.year;
+      const isNextUnlocked = requestedYear === cycles.nextCycle.year && cycles.isNextCycleUnlocked;
+      if (!Number.isInteger(requestedYear) || (!isCurrent && !isNextUnlocked)) {
+        return res.status(403).json({
+          error: requestedYear === cycles.nextCycle.year
+            ? `A leitura do próximo ciclo será liberada a partir de ${cycles.unlockDate}.`
+            : "Ciclo de Revolução Solar inválido.",
+        });
+      }
+      const solarReturnYear = requestedYear;
+
+      const readingId = `revolucao-solar-v1-${solarReturnYear}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached?.analysis && cached?.reading) {
+        return res.json({ ...cached, cached: true });
+      }
 
       const latitude = Number(location?.latitude);
       const longitude = Number(location?.longitude);
@@ -1925,14 +1966,6 @@ async function createApp(): Promise<express.Application> {
       }
 
       const selectedLocation = { name, latitude, longitude, timezone };
-      const solarReturnYear = getActiveSolarReturnYear(profile.birthData, new Date(), profile.tropical_natal);
-      const locationHash = hashInput({ latitude: latitude.toFixed(5), longitude: longitude.toFixed(5), timezone });
-      const readingId = `revolucao-solar-v1-${solarReturnYear}-${locationHash}`;
-      const cached = await getCachedReading(userId, readingId);
-      if (cached?.analysis && cached?.reading) {
-        return res.json({ ...cached, cached: true });
-      }
-
       const chart = calculateSolarReturnChart(profile.birthData, solarReturnYear, profile.tropical_natal, { location: selectedLocation });
       const age = solarReturnYear - Number(String(profile.birthData.birthDate).slice(0, 4));
       const analysis = analyzeSolarReturnChart(chart, profile.tropical_natal, age, selectedLocation);

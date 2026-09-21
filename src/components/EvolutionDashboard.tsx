@@ -198,6 +198,7 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, userNam
       {/* Mapeamento da Jornada */}
       <div className="space-y-2.5">
         <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-[0.2em] px-1">Mapeamento da Jornada</p>
+        <p className="font-sans text-[11px] text-[#8c7f70] px-1">Conclua o bloco para liberar o download das leituras em DOCX.</p>
 
         {/* O Alicerce */}
         <RingAccordion
@@ -441,7 +442,7 @@ const RingAccordion: React.FC<{
         aria-label={isComplete ? `Baixar ${title} em DOCX` : `${title}: download bloqueado até concluir a seção`}
         className="mr-3 flex-shrink-0 p-2 rounded-lg border border-[#8c6239]/20 text-[#8c6239] hover:bg-[#8c6239]/10 transition-colors disabled:border-[#8c7f70]/10 disabled:text-[#8c7f70]/30 disabled:cursor-not-allowed"
       >
-        {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : isComplete ? <Download className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+        {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
       </button>
     </div>
     <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>

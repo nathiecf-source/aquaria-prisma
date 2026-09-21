@@ -273,6 +273,43 @@ export function getActiveSolarReturnYear(
   return referenceDate >= currentReturn ? currentYear : currentYear - 1;
 }
 
+const NEXT_CYCLE_UNLOCK_DAYS = 60;
+
+export interface SolarReturnCycles {
+  currentCycle: { year: number; age: number; startsAt: string; endsAt: string };
+  nextCycle: { year: number; age: number; startsAt: string };
+  /** Exact instant when the next cycle becomes available (60 days before the return). */
+  unlockDate: string;
+  isNextCycleUnlocked: boolean;
+}
+
+export function getSolarReturnCycles(
+  data: SolarReturnBirthData,
+  referenceDate: Date = new Date(),
+  natal?: SolarReturnNatalInput,
+): SolarReturnCycles {
+  const currentYear = getActiveSolarReturnYear(data, referenceDate, natal);
+  const birthYear = Number(String(data.birthDate).slice(0, 4));
+  const startsAt = findExactSolarReturnInstant(data, currentYear, natal);
+  const endsAt = findExactSolarReturnInstant(data, currentYear + 1, natal);
+  const unlockDate = new Date(endsAt.getTime() - NEXT_CYCLE_UNLOCK_DAYS * 24 * 60 * 60 * 1000);
+  return {
+    currentCycle: {
+      year: currentYear,
+      age: currentYear - birthYear,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+    },
+    nextCycle: {
+      year: currentYear + 1,
+      age: currentYear + 1 - birthYear,
+      startsAt: endsAt.toISOString(),
+    },
+    unlockDate: unlockDate.toISOString(),
+    isNextCycleUnlocked: referenceDate >= unlockDate,
+  };
+}
+
 const ELEMENTS: Record<string, string> = {
   "Áries": "Fogo", "Leão": "Fogo", "Sagitário": "Fogo",
   "Touro": "Terra", "Virgem": "Terra", "Capricórnio": "Terra",

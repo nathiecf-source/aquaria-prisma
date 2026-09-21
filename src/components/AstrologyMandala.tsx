@@ -1038,7 +1038,7 @@ export default function AstrologyMandala({
                   }}
                   className="flex items-center gap-1 px-2 py-1 rounded bg-[#5c4d66]/10 text-[#5c4d66] hover:bg-[#5c4d66] hover:text-[#f4f1eb] transition-all text-[9px] font-mono tracking-wider uppercase cursor-pointer"
                 >
-                  Minha Experiência
+                  Minha Evolução
                 </button>
                 <button
                   id="tour-btn-dados-mapa"
@@ -2327,7 +2327,7 @@ export default function AstrologyMandala({
       <RightPanelDrawer
         isOpen={isInsightsOpen}
         onClose={() => setIsInsightsOpen(false)}
-        title="Minha Experiência"
+        title="Minha Evolução"
       >
         <MinhaExperienciaTab
           userId={userProfile?.id ?? null}
@@ -2408,11 +2408,11 @@ export default function AstrologyMandala({
                   ? "PASSE DE EXPANSÃO"
                   : paywallFeature === "dynamics"
                     ? "Dinâmicas Planetárias"
-                    : "Minha Experiência"
+                    : "Minha Evolução"
           }
           description={
             paywallFeature === "transits"
-              ? "Desbloqueie a análise viva dos trânsitos planetários e ciclos atuais do seu mapa."
+              ? "Com o Passe de Expansão você acompanha o seu céu em movimento: a leitura dos regentes siderais, o Regente do Ano, a sua Revolução Solar e os Ciclos Planetários que estão ativos agora no seu mapa."
               : paywallFeature === "planets"
                 ? "Desbloqueie a leitura tropical completa deste ponto astrológico, incluindo a teia de aspectos que ele forma com os demais planetas do seu mapa."
                 : paywallFeature === "caminhos"

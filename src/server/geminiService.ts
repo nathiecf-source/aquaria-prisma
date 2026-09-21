@@ -4756,6 +4756,7 @@ export interface DailySkyContent {
   theme: string;
   stories: Array<{ screen: number; title: string; text: string }>;
   aspectCoverage: Array<{ aspectId: string; usedIn: string[]; interpretation: string; role: string }>;
+  nakshatraCardTitle: string;
   nakshatraCardText: string;
   pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
   feedParagraphs: string[];
@@ -4769,13 +4770,14 @@ const dailySkyContentSchema = {
     theme: { type: Type.STRING },
     stories: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { screen: { type: Type.NUMBER }, title: { type: Type.STRING }, text: { type: Type.STRING } }, required: ["screen", "title", "text"] } },
     aspectCoverage: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { aspectId: { type: Type.STRING }, usedIn: { type: Type.ARRAY, items: { type: Type.STRING } }, interpretation: { type: Type.STRING }, role: { type: Type.STRING } }, required: ["aspectId", "usedIn", "interpretation", "role"] } },
+    nakshatraCardTitle: { type: Type.STRING },
     nakshatraCardText: { type: Type.STRING },
     pillarGuidance: { type: Type.OBJECT, properties: { vara: { type: Type.STRING }, tithi: { type: Type.STRING }, yoga: { type: Type.STRING }, karana: { type: Type.STRING } }, required: ["vara", "tithi", "yoga", "karana"] },
     feedParagraphs: { type: Type.ARRAY, items: { type: Type.STRING } },
     closing: { type: Type.STRING },
     cardSummary: { type: Type.STRING },
   },
-  required: ["theme", "stories", "aspectCoverage", "nakshatraCardText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
+  required: ["theme", "stories", "aspectCoverage", "nakshatraCardTitle", "nakshatraCardText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
 };
 
 export async function generateDailySkyContent(payload: DailySkyPayload): Promise<DailySkyContent> {
@@ -4787,10 +4789,10 @@ REGRAS ABSOLUTAS:
 - Explique jargões pelo efeito prático. Tropical descreve psique, humor, mente e relações; Védico descreve ritmo arquetípico e intenção invisível.
 - Se aspectos maiores incluírem Saturno, Urano, Netuno ou Plutão, traduza o macro para como essa força pode ser sentida nas próximas 24 horas. Não faça previsões de longo prazo.
 - Ignore completamente listas vazias. Não mencione ausência de evento.
-- stories deve conter exatamente dois itens: screen 1 "O Céu de Hoje" e screen 3 "Polindo Arestas". Não gere o card "Pausa". Não escreva os termos tela, story, screen ou números nos títulos/textos.
-- Cada bloco deve ter texto curto e respirado.
+- stories deve conter exatamente UM item: screen 1 "O Céu de Hoje". Não gere os cards "Polindo Arestas" nem "Pausa". Não escreva os termos tela, story, screen ou números nos títulos/textos.
+- "O Céu de Hoje" deve falar exclusivamente do céu tropical: a Lua tropical (fase, signo e grau), os aspectos exatos da Lua e os aspectos maiores presentes no dia. É a leitura psicológica e relacional do momento, com texto curto e respirado.
 - Para CADA item de exactMoonAspects, crie um aspectCoverage com o ID exato, interpretação, papel e blocos usados. Nenhum aspecto pode ser omitido.
-- Quadratura e oposição têm precedência: nomeie seu atrito com clareza no Céu de Hoje, em Polindo Arestas e no primeiro parágrafo do feed. Não suavize a ponto de apagar pressão, confusão, fricção ou conflito de necessidades.
+- Quadratura e oposição têm precedência: nomeie seu atrito com clareza no Céu de Hoje e no primeiro parágrafo do feed. Não suavize a ponto de apagar pressão, confusão, fricção ou conflito de necessidades.
 - Trígono e sextil devem aparecer explicitamente como apoio ou via de regulação, sem cancelar a tensão principal.
 - theme é uma frase curta e poética sem nomes de planetas.
 - cardSummary resume o tema e a síntese do dia em no máximo 280 caracteres, sem repetir o título.
@@ -4800,7 +4802,7 @@ REGRAS DO PANCHANGA (leitura védica do dia):
 1. Foque em "Alinhamento de Ação" em vez de "Previsão Sentimental". O Jyotish pergunta: "Para qual tipo de ação este momento no tempo está fértil?". Traduza cada pilar como um convite prático de onde colocar esforço e onde soltar o controle.
 2. O Panchanga é a Matemática Sol-Lua (Atman e Manas). Vāra, Tithi, Yoga e Karana medem como a mente (Lua) refrata a luz da consciência (Sol). Mostre essa relação como uma "frequência de fundo" do dia, sem isolar o signo zodiacal.
 3. A Nakshatra é o 5º Pilar do Panchanga, ligada ao elemento Ar/Vayu: o impulso do desejo, a motivação profunda e a circulação do Prana. Nunca a omita ou reduza a signo ocidental.
-4. Traduza as Divindades (Devatas) como Forças Arquetípicas de Ação. Não fale em deuses como dogma. Extraia a sabedoria funcional do mito: Durga corta ilusões, Brahma estrutura, etc. Aplique isso à Nakshatra do dia.
+4. Omita totalmente qualquer menção a divindades (Devatas como Vishvedevas, Rudra, Durga, Brahma etc.) nos textos voltados ao usuário. Extraia apenas a função prática do arquétipo, sem nomeá-lo.
 5. Estruture a síntese diária em quatro movimentos: a Base (Vāra — vitalidade do corpo), o Terreno (Tithi — solo mental), a Frequência (Yoga — atmosfera sutil) e o Passo Prático (Karana — execução material).
 
 FORMATAÇÃO DOS VALORES/SUBTÍTULOS DO PANCHANGA (use como referência visual):
@@ -4811,8 +4813,9 @@ Use obrigatoriamente o separador " · " entre nome sânscrito e qualificador em 
 - Karana: "KAULAVA · COOPERAÇÃO GENTIL", "BAVA · INICIATIVA & AÇÃO"
 
 INSTRUÇÕES ESPECÍFICAS:
-- nakshatraCardText: Explique conjuntamente a energia da Nakshatra, o símbolo, a divindade/arquétipo como força de ação e a nuance do Pada/elemento em 2 a 4 frases curtas. Foque em que tipo de ação o dia favorece. Sem jargão religioso ou ocidentalizado. Não cite signos tropicais.
-- pillarGuidance: Cada orientação (Vāra, Tithi, Yoga, Karana) deve ser uma frase imperativa, acolhedora e prática, alinhada à ação sugerida pelo pilar. Pergunte: onde colocar esforço? Onde soltar o controle? Qual terreno mental está fértil? Até duas frases curtas cada.
+- nakshatraCardTitle: o subtítulo da Nakshatra no formato "[NOME DA NAKSHATRA] · [PALAVRA 1] & [PALAVRA 2]" em CAIXA ALTA, onde as duas palavras-chave resumem a essência e o propósito prático da Nakshatra (ex: "UTTARA ASHADHA · CONSTRUÇÃO & ÉTICA"). Não use a tradução literal do símbolo.
+- nakshatraCardText: texto em três camadas obrigatórias, em 3 a 5 frases curtas. Camada 1 — introduza o símbolo oficial de forma fluida e explique o que ele representa na prática (ex: "Representada pela presa de elefante, esta constelação simboliza a força inabalável para concluir grandes projetos."). Camada 2 — as qualidades do dia e o comportamento recomendado, sem nenhuma divindade. Camada 3 — o contexto da Pada ativa, correlacionando número e elemento (Fogo, Terra, Ar, Água) com uma postura prática. Tom direto e acolhedor, focado em como agir hoje, sem jargões esotéricos e sem citar signos tropicais.
+- pillarGuidance: cada orientação (Vāra, Tithi, Yoga, Karana) em até duas frases curtas. REGRAS RÍGIDAS: (a) é proibido usar verbos no imperativo — nada de "conclua", "reduza", "dedique", "entregue-se"; use apenas frases sugestivas e acolhedoras como "O dia favorece...", "O momento pede...", "A atmosfera é propícia para...", "O ritmo convida a...", "O momento facilita...". (b) O texto NUNCA deve repetir o rótulo do pilar, o termo em sânscrito nem os qualificadores do subtítulo (ex: não repita LUA, DASHAMI, ATIGANDA, GARA). (c) Inicie diretamente com a interpretação, sem prefixos, numerações ou rótulos antes de dois-pontos.
 - feedParagraphs: exatamente três parágrafos curtos: (1) cenário tropical com aspectos do dia; (2) profundidade da Nakshatra como frequência de fundo; (3) ação e desapego a partir de Tithi, Yoga e Karana.
 - closing: uma pergunta reflexiva que ajude a pessoa a alinhar sua vontade com a qualidade do tempo, convidando ao comentário.`;
   const client = getGeminiClient();
@@ -4822,7 +4825,7 @@ INSTRUÇÕES ESPECÍFICAS:
     config: { systemInstruction, temperature: 0.5, maxOutputTokens: 3072, responseMimeType: "application/json", responseSchema: dailySkyContentSchema },
   });
   const parsed = JSON.parse((response.text || "{}").replace(/```json\s*/g, "").replace(/```/g, "").trim());
-  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 2 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
+  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 1 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardTitle || !parsed.nakshatraCardText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
   const expectedIds = payload.tropical.exactMoonAspects.map((aspect) => aspect.id).sort();
   const coveredIds = parsed.aspectCoverage.map((item: any) => String(item.aspectId)).sort();
   if (JSON.stringify(expectedIds) !== JSON.stringify(coveredIds)) throw new Error("Gemini omitiu ou alterou aspectos exatos na auditoria editorial.");
