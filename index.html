@@ -24,6 +24,7 @@
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(function (OneSignal) {
+        if (window.location.hostname !== "aquar-ia.app" && window.location.hostname !== "localhost") return;
         OneSignal.init({
           appId: "%VITE_ONESIGNAL_APP_ID%",
           allowLocalhostAsSecureOrigin: true,

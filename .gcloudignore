@@ -4,7 +4,6 @@
 .gitignore
 node_modules
 dist
-.env
-.env.local
-.env.deploy.yaml
+.env*
+**/.env*
 build-log.txt

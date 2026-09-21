@@ -5,6 +5,7 @@ import rehypeSanitize from "rehype-sanitize";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { SenhorDoAnoCard } from "./SenhorDoAnoCard";
 import { AtivacoesRapidasPanel } from "./AtivacoesRapidasPanel";
+import SolarReturnCard from "./SolarReturnCard";
 
 export interface ActiveTransit {
   planetaTransito: string;
@@ -28,6 +29,8 @@ interface RestructuringCycle {
   concurrentTransits?: string[];
 }
 
+export type TransitPanelTab = "dashas" | "portal" | "transits";
+
 interface TransitPanelProps {
   isOpen: boolean;
   isLoading: boolean;
@@ -46,6 +49,8 @@ interface TransitPanelProps {
   rapidActivationsData?: any;
   isFetchingProfection?: boolean;
   isFetchingRapidActivations?: boolean;
+  subscriptionTier: "FREE" | "PLUS";
+  initialTab?: TransitPanelTab;
 }
 
 const PLANET_ICONS: Record<string, string> = {
@@ -750,10 +755,16 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
   rapidActivationsData,
   isFetchingProfection,
   isFetchingRapidActivations,
+  subscriptionTier,
+  initialTab = "dashas",
 }) => {
   const userId: string | null = userIdProp ?? profile?.user_id ?? null;
   const [activeKey, setActiveKey] = React.useState<string | null>(null);
-  const [activeTab, setActiveTab] = React.useState<"dashas" | "portal" | "transits">("dashas");
+  const [activeTab, setActiveTab] = React.useState<TransitPanelTab>(initialTab);
+
+  React.useEffect(() => {
+    if (isOpen) setActiveTab(initialTab);
+  }, [initialTab, isOpen]);
 
   const allTransits = React.useMemo(() => {
     if (!text) return [];
@@ -910,6 +921,7 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
             reading={rapidActivationsData?.reading}
             isLoading={isFetchingRapidActivations}
           />
+          <SolarReturnCard profile={profile} userId={userId} subscriptionTier={subscriptionTier} />
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import React from "react";
-import { Loader2, ArrowRight, Trophy, ScrollText, Lock } from "lucide-react";
+import { Loader2, ArrowRight, Trophy, ScrollText, Lock, Download } from "lucide-react";
+import { downloadReadingDocument, ExportDocumentKey } from "../lib/docxExport";
 
 type ItemStatus = "pending" | "in_progress" | "completed";
 
@@ -63,6 +64,7 @@ interface ProgressData {
 
 interface EvolutionDashboardProps {
   userId: string | null;
+  userName?: string;
   onNavigateToElement?: (elementId: string) => void;
 }
 
@@ -80,10 +82,12 @@ function StatusIcon({ status }: { status: ItemStatus }) {
   return <span className="text-[#8c7f70]/50">◯</span>;
 }
 
-const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavigateToElement }) => {
+const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, userName, onNavigateToElement }) => {
   const [data, setData] = React.useState<ProgressData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [downloading, setDownloading] = React.useState<ExportDocumentKey | null>(null);
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [openRing, setOpenRing] = React.useState<string | null>("alicerce");
   const [mobileSubTab, setMobileSubTab] = React.useState<"badges" | "timeline">("badges");
   const [timelineExpanded, setTimelineExpanded] = React.useState(false);
@@ -117,10 +121,23 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavig
 
   const navigate = (targetId: string) => {
     if (!targetId || !onNavigateToElement) return;
-    if (targetId.startsWith("casa-")) {
-      onNavigateToElement(targetId);
-    } else {
-      onNavigateToElement(targetId);
+    onNavigateToElement(targetId);
+  };
+
+  const downloadSection = async (key: ExportDocumentKey) => {
+    if (!userId || downloading) return;
+    setDownloading(key);
+    setDownloadError(null);
+    try {
+      const res = await fetch(`/api/user-readings?userId=${encodeURIComponent(userId)}`);
+      if (!res.ok) throw new Error("Não foi possível buscar as leituras concluídas.");
+      const { readings } = await res.json();
+      await downloadReadingDocument(key, readings || {}, userName || "Seu mapa astrológico");
+    } catch (err: any) {
+      console.error("[EvolutionDashboard] Erro ao gerar DOCX:", err);
+      setDownloadError(err?.message || "Não foi possível gerar o documento.");
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -189,6 +206,8 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavig
           isComplete={data.alicerce.completed === data.alicerce.total}
           isOpen={openRing === "alicerce"}
           onToggle={() => toggleRing("alicerce")}
+          onDownload={() => downloadSection("alicerce")}
+          isDownloading={downloading === "alicerce"}
         >
           <div className="space-y-2">
             {data.alicerce.items.map(item => (
@@ -213,6 +232,8 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavig
           isComplete={data.cenario.completed === data.cenario.total}
           isOpen={openRing === "cenario"}
           onToggle={() => toggleRing("cenario")}
+          onDownload={() => downloadSection("cenario")}
+          isDownloading={downloading === "cenario"}
         >
           <div className="grid grid-cols-4 gap-2">
             {data.cenario.houses.map(house => (
@@ -241,6 +262,8 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavig
           isComplete={data.planetas.completed === data.planetas.total}
           isOpen={openRing === "planetas"}
           onToggle={() => toggleRing("planetas")}
+          onDownload={() => downloadSection("planetas")}
+          isDownloading={downloading === "planetas"}
         >
           <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-9 gap-2">
             {data.planetas.items.map(item => (
@@ -267,6 +290,8 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavig
           isComplete={data.caminhos.completed === data.caminhos.total}
           isOpen={openRing === "caminhos"}
           onToggle={() => toggleRing("caminhos")}
+          onDownload={() => downloadSection("caminhos")}
+          isDownloading={downloading === "caminhos"}
         >
           <div className="space-y-2">
             {data.caminhos.items.map(item => (
@@ -282,6 +307,12 @@ const EvolutionDashboard: React.FC<EvolutionDashboardProps> = ({ userId, onNavig
           </div>
         </RingAccordion>
       </div>
+
+      {downloadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-sans">
+          {downloadError}
+        </div>
+      )}
 
       {/* Bloco Duplo: Insígnias & Histórico */}
       <div className="rounded-2xl border border-[#8c7f70]/15 bg-[#faf9f6] overflow-hidden">
@@ -381,24 +412,38 @@ const RingAccordion: React.FC<{
   isComplete: boolean;
   isOpen: boolean;
   onToggle: () => void;
+  onDownload: () => void;
+  isDownloading: boolean;
   children: React.ReactNode;
-}> = ({ title, metric, isComplete, isOpen, onToggle, children }) => (
+}> = ({ title, metric, isComplete, isOpen, onToggle, onDownload, isDownloading, children }) => (
   <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6]/60 overflow-hidden">
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-[#f4f1eb] transition-colors"
-    >
-      <div className="flex items-center gap-2">
-        <span className="font-serif text-[#3c352d] text-[13.5px] tracking-wide">{title}</span>
-        {isComplete && (
-          <span className="font-mono text-[8px] text-[#8c6239] uppercase tracking-widest bg-[#8c6239]/10 px-2 py-0.5 rounded-full">
-            ✦ Seção Integrada
-          </span>
-        )}
-      </div>
-      <span className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-widest">{metric}</span>
-    </button>
+    <div className="flex items-center hover:bg-[#f4f1eb] transition-colors">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="min-w-0 flex-1 flex items-center justify-between px-4 py-3 text-left"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="font-serif text-[#3c352d] text-[13.5px] tracking-wide">{title}</span>
+          {isComplete && (
+            <span className="hidden sm:inline font-mono text-[8px] text-[#8c6239] uppercase tracking-widest bg-[#8c6239]/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+              ✦ Seção Integrada
+            </span>
+          )}
+        </div>
+        <span className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-widest whitespace-nowrap ml-2">{metric}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onDownload}
+        disabled={!isComplete || isDownloading}
+        title={isComplete ? `Baixar ${title} em DOCX` : "Complete todas as leituras desta seção para desbloquear o DOCX"}
+        aria-label={isComplete ? `Baixar ${title} em DOCX` : `${title}: download bloqueado até concluir a seção`}
+        className="mr-3 flex-shrink-0 p-2 rounded-lg border border-[#8c6239]/20 text-[#8c6239] hover:bg-[#8c6239]/10 transition-colors disabled:border-[#8c7f70]/10 disabled:text-[#8c7f70]/30 disabled:cursor-not-allowed"
+      >
+        {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : isComplete ? <Download className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+      </button>
+    </div>
     <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
       <div className="overflow-hidden">
         <div className="px-4 pb-4 pt-1">{children}</div>

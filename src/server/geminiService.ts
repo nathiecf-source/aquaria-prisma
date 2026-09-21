@@ -5,6 +5,8 @@ import { getDigBalaStatus } from "./formatNatalContext";
 import { getTropicalHouseKnowledge } from "./tropicalKnowledge";
 import { getPlanetGlyphConfig } from "../lib/planetGlyphs";
 import { getPlanetFichamento, PlanetFichamentoEntry } from "./planetFichamento";
+import type { SolarReturnAnalysis } from "./solarReturnEngine";
+import type { DailySkyPayload } from "./dailySkyEngine";
 
 // Verbos arquetípicos determinísticos para cada signo — aplicados ao domínio do planeta/ponto.
 // O domínio é fornecido pelo planeta (Sol=identidade, Lua=emocional, Ascendente=estilo de presença,
@@ -4407,6 +4409,140 @@ Use markdown simples com subtítulos em negrito. Não use listas. Não use emoji
   }
 }
 
+export interface SolarReturnReading {
+  opening: string;
+  ascendant: { title: string; introduction: string; atmosphere: string; rhythmAdjustment: string; activation: string; compass: string };
+  stellium: { title: string; introduction: string; mirror: string; bucketHandle: string };
+  lunarPhase: { title: string; introduction: string; instinctiveClimate: string; emotionalAlchemy: string };
+  midheaven: { title: string; introduction: string; delivery: string };
+  majorCycles: { introduction: string; items: Array<{ title: string; text: string }> };
+  synthesisRows: Array<{ point: string; placement: string; compass: string }>;
+  closing: string;
+}
+
+const solarReturnSectionSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING }, introduction: { type: Type.STRING },
+    atmosphere: { type: Type.STRING }, rhythmAdjustment: { type: Type.STRING },
+    activation: { type: Type.STRING }, compass: { type: Type.STRING },
+  },
+  required: ["title", "introduction", "atmosphere", "rhythmAdjustment", "activation", "compass"],
+};
+
+const solarReturnReadingSchema = {
+  type: Type.OBJECT,
+  properties: {
+    opening: { type: Type.STRING },
+    ascendant: solarReturnSectionSchema,
+    stellium: {
+      type: Type.OBJECT,
+      properties: { title: { type: Type.STRING }, introduction: { type: Type.STRING }, mirror: { type: Type.STRING }, bucketHandle: { type: Type.STRING } },
+      required: ["title", "introduction", "mirror", "bucketHandle"],
+    },
+    lunarPhase: {
+      type: Type.OBJECT,
+      properties: { title: { type: Type.STRING }, introduction: { type: Type.STRING }, instinctiveClimate: { type: Type.STRING }, emotionalAlchemy: { type: Type.STRING } },
+      required: ["title", "introduction", "instinctiveClimate", "emotionalAlchemy"],
+    },
+    midheaven: {
+      type: Type.OBJECT,
+      properties: { title: { type: Type.STRING }, introduction: { type: Type.STRING }, delivery: { type: Type.STRING } },
+      required: ["title", "introduction", "delivery"],
+    },
+    majorCycles: {
+      type: Type.OBJECT,
+      properties: {
+        introduction: { type: Type.STRING },
+        items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, text: { type: Type.STRING } }, required: ["title", "text"] } },
+      },
+      required: ["introduction", "items"],
+    },
+    synthesisRows: {
+      type: Type.ARRAY,
+      items: { type: Type.OBJECT, properties: { point: { type: Type.STRING }, placement: { type: Type.STRING }, compass: { type: Type.STRING } }, required: ["point", "placement", "compass"] },
+    },
+    closing: { type: Type.STRING },
+  },
+  required: ["opening", "ascendant", "stellium", "lunarPhase", "midheaven", "majorCycles", "synthesisRows", "closing"],
+};
+
+function formatSolarDegree(degree: number): string {
+  const safeDegree = Math.min(29.9999, Math.max(0, degree));
+  const whole = Math.floor(safeDegree);
+  const minutes = Math.floor((safeDegree - whole) * 60);
+  return `${whole}°${String(minutes).padStart(2, "0")}’`;
+}
+
+export async function generateSolarReturnReading(
+  analysis: SolarReturnAnalysis,
+  gender: string,
+): Promise<SolarReturnReading> {
+  const facts = {
+    cidade_aniversario: analysis.location.name,
+    idade_usuario: analysis.age,
+    ascendente_rs: `${analysis.ascendant.sign} ${formatSolarDegree(analysis.ascendant.degree)}`,
+    signo_asc_rs: analysis.ascendant.sign,
+    elemento_asc_rs: analysis.ascendant.element,
+    elemento_asc_natal: analysis.ascendant.natalElement,
+    casa_natal_asc_rs: analysis.ascendant.natalHouse,
+    regente_rs: analysis.ruler,
+    stellium: analysis.stellium,
+    planeta_alca: analysis.bucketHandle,
+    fase_lunar_rs: analysis.lunarPhase,
+    sol_rs: `${analysis.sun.sign} ${formatSolarDegree(analysis.sun.degree)}`,
+    lua_rs: `${analysis.moon.sign} ${formatSolarDegree(analysis.moon.degree)}`,
+    signo_lua_rs: analysis.moon.sign,
+    mc_rs: `${analysis.midheaven.sign} ${formatSolarDegree(analysis.midheaven.degree)}`,
+    casa_natal_mc_rs: analysis.midheaven.natalHouse,
+    ciclos: analysis.cycles,
+  };
+
+  const systemInstruction = `[CONTEXTO E PAPEL]
+Você é um astrólogo alquímico e analista arquetípico sênior do sistema Aquar.IA Prisma. Gere uma leitura sintética e transformadora da Revolução Solar tropical sobreposta ao Mapa Natal. Sua linguagem é profunda, poética, acolhedora, focada em autonomia psíquica e desprovida de fatalismo, jargões rasos ou previsões engessadas.
+
+[DADOS DETERMINÍSTICOS]
+${JSON.stringify(facts, null, 2)}
+
+${getGenderFlexionInstruction(gender)}
+
+[REGRAS ABSOLUTAS]
+- Não calcule, corrija ou substitua nenhum dado. Reproduza signos, casas, graus, planetas, movimento e flags exatamente como recebidos.
+- Fale diretamente com a pessoa usando você, sua e seu.
+- Mencione sutilmente na abertura que as coordenadas da cidade do aniversário definiram a arquitetura invisível do ano.
+- Se os elementos do Ascendente anual e natal forem diferentes, explique a quebra de ritmo e o ajuste físico/energético; se forem iguais, explique a continuidade e intensificação.
+- stellium deve ficar totalmente vazio quando o dado stellium for null. Quando existir, explique os planetas reunidos, o signo e a casa natal informada.
+- bucketHandle deve ficar vazio quando planeta_alca for null. Quando existir junto ao stellium, descreva esse planeta como via de canalização da concentração anual.
+- majorCycles.items deve conter SOMENTE ciclos cuja flag seja verdadeira. Se nenhum estiver ativo, introduction deve ser vazio e items deve ser [].
+- Para ciclo lento sobre o Sol, cite o planeta recebido e não invente outro.
+- Não mencione termos védicos, ayanamsha, Nakshatras ou Drishtis.
+- Não use emojis. Não faça previsões de acontecimentos inevitáveis. Não afirme periodicidades que não constam nos dados.
+
+[ESTRUTURA]
+1. Ascendente: título com signo/grau e casa natal; introdução; Atmosfera do Ciclo; Ajuste de Ritmo; A Ativação; A Bússola do Ano, integrando regente, signo, casa anual e movimento.
+2. Stellium: apenas se existir, com título “O Grande Palco”, introdução e Espelho Alquímico; alça apenas se existir.
+3. Fase de Lunação: título com fase e signo da Lua; introdução; Clima Instintivo; Alquimia Emocional.
+4. Meio do Céu: título com signo/grau e casa natal; introdução; A Entrega.
+5. Marcas do Tempo: apenas ciclos ativos. Use os títulos Retorno Metônico da Lua, Espelho dos Ângulos, Raridade do Regente Retrógrado e Trânsito sobre a Identidade conforme as flags.
+6. Síntese: linhas Lente (Ascendente), Guia da Ação, Solo Emocional, A Grande Obra e Ciclo de Vida somente quando houver ciclo maior.
+7. Encerramento poético sobre habitar o novo ano com reverência e ancoragem no próprio centro.`;
+
+  const client = getGeminiClient();
+  const response = await callGeminiWithRetry(client, {
+    model: "gemini-3.5-flash-lite",
+    contents: "Gere a leitura da Revolução Solar obedecendo integralmente ao schema e às regras do sistema.",
+    config: {
+      systemInstruction,
+      temperature: 0.55,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+      responseSchema: solarReturnReadingSchema,
+    },
+  });
+  const cleaned = (response.text || "").replace(/```json\s*/g, "").replace(/```/g, "").trim();
+  return JSON.parse(cleaned) as SolarReturnReading;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // ATIVAÇÕES RÁPIDAS — TRÂNSITOS + PROFECÇÃO
 // ═══════════════════════════════════════════════════════════════
@@ -4614,5 +4750,82 @@ ${doshas.length ? doshas.map((d, i) => `${i + 1}. ${d}`).join("\n") : "Nenhum Do
     cleanLogError("[Gemini API] Falha na geração das Dinâmicas Planetárias", error);
     throw error;
   }
+}
+
+export interface DailySkyContent {
+  theme: string;
+  stories: Array<{ screen: number; title: string; text: string }>;
+  aspectCoverage: Array<{ aspectId: string; usedIn: string[]; interpretation: string; role: string }>;
+  nakshatraCardText: string;
+  pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
+  feedParagraphs: string[];
+  closing: string;
+  cardSummary: string;
+}
+
+const dailySkyContentSchema = {
+  type: Type.OBJECT,
+  properties: {
+    theme: { type: Type.STRING },
+    stories: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { screen: { type: Type.NUMBER }, title: { type: Type.STRING }, text: { type: Type.STRING } }, required: ["screen", "title", "text"] } },
+    aspectCoverage: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { aspectId: { type: Type.STRING }, usedIn: { type: Type.ARRAY, items: { type: Type.STRING } }, interpretation: { type: Type.STRING }, role: { type: Type.STRING } }, required: ["aspectId", "usedIn", "interpretation", "role"] } },
+    nakshatraCardText: { type: Type.STRING },
+    pillarGuidance: { type: Type.OBJECT, properties: { vara: { type: Type.STRING }, tithi: { type: Type.STRING }, yoga: { type: Type.STRING }, karana: { type: Type.STRING } }, required: ["vara", "tithi", "yoga", "karana"] },
+    feedParagraphs: { type: Type.ARRAY, items: { type: Type.STRING } },
+    closing: { type: Type.STRING },
+    cardSummary: { type: Type.STRING },
+  },
+  required: ["theme", "stories", "aspectCoverage", "nakshatraCardText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
+};
+
+export async function generateDailySkyContent(payload: DailySkyPayload): Promise<DailySkyContent> {
+  const systemInstruction = `Você é a voz astrológica e editorial da Aquaria / Portal 36_, focada em psicologia arquetípica, presença e desaceleração. Escreva para mulheres que buscam habitar a si mesmas com reverência e polir as arestas das relações através da presença.
+
+REGRAS ABSOLUTAS:
+- Use somente os dados do payload. Não recalcule, corrija, substitua ou invente signos, fases, aspectos, ingressos, movimentos, horários, Nakshatra, Tithi, Yoga ou Karana.
+- Tom de elegância silenciosa, respiro e clareza, sem fatalismo, misticismo exagerado ou regras rígidas.
+- Explique jargões pelo efeito prático. Tropical descreve psique, humor, mente e relações; Védico descreve ritmo arquetípico e intenção invisível.
+- Se aspectos maiores incluírem Saturno, Urano, Netuno ou Plutão, traduza o macro para como essa força pode ser sentida nas próximas 24 horas. Não faça previsões de longo prazo.
+- Ignore completamente listas vazias. Não mencione ausência de evento.
+- stories deve conter exatamente dois itens: screen 1 "O Céu de Hoje" e screen 3 "Polindo Arestas". Não gere o card "Pausa". Não escreva os termos tela, story, screen ou números nos títulos/textos.
+- Cada bloco deve ter texto curto e respirado.
+- Para CADA item de exactMoonAspects, crie um aspectCoverage com o ID exato, interpretação, papel e blocos usados. Nenhum aspecto pode ser omitido.
+- Quadratura e oposição têm precedência: nomeie seu atrito com clareza no Céu de Hoje, em Polindo Arestas e no primeiro parágrafo do feed. Não suavize a ponto de apagar pressão, confusão, fricção ou conflito de necessidades.
+- Trígono e sextil devem aparecer explicitamente como apoio ou via de regulação, sem cancelar a tensão principal.
+- theme é uma frase curta e poética sem nomes de planetas.
+- cardSummary resume o tema e a síntese do dia em no máximo 280 caracteres, sem repetir o título.
+- Português brasileiro correto.
+
+REGRAS DO PANCHANGA (leitura védica do dia):
+1. Foque em "Alinhamento de Ação" em vez de "Previsão Sentimental". O Jyotish pergunta: "Para qual tipo de ação este momento no tempo está fértil?". Traduza cada pilar como um convite prático de onde colocar esforço e onde soltar o controle.
+2. O Panchanga é a Matemática Sol-Lua (Atman e Manas). Vāra, Tithi, Yoga e Karana medem como a mente (Lua) refrata a luz da consciência (Sol). Mostre essa relação como uma "frequência de fundo" do dia, sem isolar o signo zodiacal.
+3. A Nakshatra é o 5º Pilar do Panchanga, ligada ao elemento Ar/Vayu: o impulso do desejo, a motivação profunda e a circulação do Prana. Nunca a omita ou reduza a signo ocidental.
+4. Traduza as Divindades (Devatas) como Forças Arquetípicas de Ação. Não fale em deuses como dogma. Extraia a sabedoria funcional do mito: Durga corta ilusões, Brahma estrutura, etc. Aplique isso à Nakshatra do dia.
+5. Estruture a síntese diária em quatro movimentos: a Base (Vāra — vitalidade do corpo), o Terreno (Tithi — solo mental), a Frequência (Yoga — atmosfera sutil) e o Passo Prático (Karana — execução material).
+
+FORMATAÇÃO DOS VALORES/SUBTÍTULOS DO PANCHANGA (use como referência visual):
+Use obrigatoriamente o separador " · " entre nome sânscrito e qualificador em português em CAIXA ALTA:
+- Vāra: "DOMINGO · SOL" / "QUARTA-FEIRA · MERCÚRIO"
+- Tithi: "NAVAMI · 9º DIA LUNAR (CRESCENTE)", "AMAVASYA · LUA NOVA (RECOLHIMENTO)"
+- Yoga: "SHOBHANA · HARMONIA & BELEZA", "VISHKAMBHA · RESISTÊNCIA & SUPERAÇÃO"
+- Karana: "KAULAVA · COOPERAÇÃO GENTIL", "BAVA · INICIATIVA & AÇÃO"
+
+INSTRUÇÕES ESPECÍFICAS:
+- nakshatraCardText: Explique conjuntamente a energia da Nakshatra, o símbolo, a divindade/arquétipo como força de ação e a nuance do Pada/elemento em 2 a 4 frases curtas. Foque em que tipo de ação o dia favorece. Sem jargão religioso ou ocidentalizado. Não cite signos tropicais.
+- pillarGuidance: Cada orientação (Vāra, Tithi, Yoga, Karana) deve ser uma frase imperativa, acolhedora e prática, alinhada à ação sugerida pelo pilar. Pergunte: onde colocar esforço? Onde soltar o controle? Qual terreno mental está fértil? Até duas frases curtas cada.
+- feedParagraphs: exatamente três parágrafos curtos: (1) cenário tropical com aspectos do dia; (2) profundidade da Nakshatra como frequência de fundo; (3) ação e desapego a partir de Tithi, Yoga e Karana.
+- closing: uma pergunta reflexiva que ajude a pessoa a alinhar sua vontade com a qualidade do tempo, convidando ao comentário.`;
+  const client = getGeminiClient();
+  const response = await callGeminiWithRetry(client, {
+    model: "gemini-3.5-flash-lite",
+    contents: `Gere o Céu do Dia para as redes sociais com base neste payload técnico:\n${JSON.stringify(payload, null, 2)}`,
+    config: { systemInstruction, temperature: 0.5, maxOutputTokens: 3072, responseMimeType: "application/json", responseSchema: dailySkyContentSchema },
+  });
+  const parsed = JSON.parse((response.text || "{}").replace(/```json\s*/g, "").replace(/```/g, "").trim());
+  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 2 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
+  const expectedIds = payload.tropical.exactMoonAspects.map((aspect) => aspect.id).sort();
+  const coveredIds = parsed.aspectCoverage.map((item: any) => String(item.aspectId)).sort();
+  if (JSON.stringify(expectedIds) !== JSON.stringify(coveredIds)) throw new Error("Gemini omitiu ou alterou aspectos exatos na auditoria editorial.");
+  return parsed as DailySkyContent;
 }
 

@@ -4,6 +4,7 @@ import { Star, Eye, EyeOff, Sparkles, Loader2, MessageSquare, ShieldCheck } from
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { Footer } from "./Footer";
 import GlobalBanner from "./GlobalBanner";
+import StarfieldBackground from "./StarfieldBackground";
 
 interface AuthScreenProps {
   onAuthSuccess: (session: any) => void;
@@ -134,16 +135,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f1eb] flex flex-col items-center justify-center p-4 text-[#3c352d] font-sans selection:bg-[#5c4d66]/15 selection:text-[#5c4d66]">
+    <div className="relative min-h-screen overflow-hidden bg-[#f4f1eb] flex flex-col items-center justify-center p-4 text-[#3c352d] font-sans selection:bg-[#5c4d66]/15 selection:text-[#5c4d66]">
+      <StarfieldBackground />
       <GlobalBanner />
       
       {/* Dynamic Environment Indicator */}
-      <div className="mb-6 flex items-center gap-2 px-3 py-1.5 bg-white border border-[#e6e2d8] rounded-full text-[10px] tracking-wider uppercase font-mono text-[#8c7f70] shadow-sm">
+      <div className="relative z-10 mb-6 flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-[#e6e2d8] rounded-full text-[10px] tracking-wider uppercase font-mono text-[#8c7f70] shadow-sm">
         <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`} />
         <span>{isSupabaseConfigured ? 'Supabase Conectado' : 'Simulador Offline Ativo'}</span>
       </div>
 
-      <div className="max-w-md w-full bg-[#fbf9f5] rounded-2xl border border-[#e6e2d8] p-8 shadow-md relative overflow-hidden">
+      <div className="relative z-10 max-w-md w-full bg-[#fbf9f5]/95 backdrop-blur-sm rounded-2xl border border-[#e6e2d8] p-8 shadow-md overflow-hidden">
         {/* Subtle decorative stars */}
         <Star className="absolute top-6 right-6 w-4 h-4 text-[#a37c5c]/10 animate-spin" style={{ animationDuration: '20s' }} />
         <Star className="absolute bottom-6 left-6 w-3 h-3 text-[#a37c5c]/10" />

@@ -1,5 +1,17 @@
 import { CompleteAstrologicalProfile, translateSignName } from "./astrology";
 
+/** Planetas e pontos válidos no contexto védico do chat.
+ *  Fora desta lista: Urano, Netuno, Plutão, Quíron, Lilith e Roda da Fortuna
+ *  não devem aparecer na aba sideral do oráculo. */
+const VEDIC_GRAHAS = new Set([
+  "Sol", "Lua", "Mercúrio", "Vênus", "Marte", "Júpiter", "Saturno",
+  "Rahu", "Ketu", "Nodo Norte", "Nodo Sul",
+]);
+
+export function isVedicGraha(name: string): boolean {
+  return VEDIC_GRAHAS.has(name);
+}
+
 export function getDigBalaStatus(planetName: string, house: number): string {
   const digBalaFull: Record<string, number[]> = {
     "Sol": [10],
@@ -110,15 +122,17 @@ export function formatNatalContext(
     }
 
     lines.push("-- PLANETAS SIDERAIS --");
-    profile.vedic_natal.planets.forEach((p) => {
-      const retro = p.isRetrograde ? " (R)" : "";
-      const combust = p.isCombust ? " (Combusto)" : "";
-      const sign = translateSignName(p.sign);
-      const digBala = getDigBalaStatus(p.name, p.house);
-      lines.push(
-        `- ${p.name}: ${sign} ${p.degree.toFixed(2)}°, Casa ${p.house}, Nakshatra ${p.nakshatra} (pada ${p.pada}), Dignidade ${p.dignity}, Dig Bala: ${digBala}${retro}${combust}`
-      );
-    });
+    profile.vedic_natal.planets
+      .filter((p) => isVedicGraha(p.name))
+      .forEach((p) => {
+        const retro = p.isRetrograde ? " (R)" : "";
+        const combust = p.isCombust ? " (Combusto)" : "";
+        const sign = translateSignName(p.sign);
+        const digBala = getDigBalaStatus(p.name, p.house);
+        lines.push(
+          `- ${p.name}: ${sign} ${p.degree.toFixed(2)}°, Casa ${p.house}, Nakshatra ${p.nakshatra} (pada ${p.pada}), Dignidade ${p.dignity}, Dig Bala: ${digBala}${retro}${combust}`
+        );
+      });
 
     if (profile.vedic_natal.drishti?.length) {
       lines.push("");
@@ -142,9 +156,11 @@ export function formatNatalContext(
     if (profile.vedic_balas?.shadbala) {
       lines.push("");
       lines.push("-- BALAS (FORÇAS) --");
-      Object.entries(profile.vedic_balas.shadbala).forEach(([planet, value]) => {
-        lines.push(`- ${planet}: ${value}`);
-      });
+      Object.entries(profile.vedic_balas.shadbala)
+        .filter(([planet]) => isVedicGraha(planet))
+        .forEach(([planet, value]) => {
+          lines.push(`- ${planet}: ${value}`);
+        });
     }
   }
 

@@ -1,12 +1,12 @@
 import React from "react";
 import { getReadingForId, ReadingData } from "../lib/mockReadings";
 import ReadingPanel from "./ReadingPanel";
-import { ArrowLeft, User, X, Loader2 } from "lucide-react";
+import { ArrowLeft, BellRing, User, X, Loader2 } from "lucide-react";
 import TechnicalDataModal from "./TechnicalDataModal";
 import Markdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
-import TransitPanel, { ActiveTransit } from "./TransitPanel";
+import TransitPanel, { ActiveTransit, TransitPanelTab } from "./TransitPanel";
 import MinhaExperienciaTab from "./MinhaExperienciaTab";
 import { PaywallBarrier } from "./PaywallBarrier";
 import { Accordion } from "./Accordion";
@@ -498,6 +498,9 @@ export default function AstrologyMandala({
   const [hoveredDiretrizElements, setHoveredDiretrizElements] = React.useState<string[]>([]);
 
   const [isTransitsModalOpen, setIsTransitsModalOpen] = React.useState(false);
+  const [transitInitialTab, setTransitInitialTab] = React.useState<TransitPanelTab>("dashas");
+  const [cycleChanges, setCycleChanges] = React.useState<Array<{ tab: TransitPanelTab; label: string }>>([]);
+  const cycleChangesCheckedFor = React.useRef<string | null>(null);
   const [transitsText, setTransitsText] = React.useState<string | null>(null);
   const [restructuringCycles, setRestructuringCycles] = React.useState<any[]>([]);
   const [isFetchingTransits, setIsFetchingTransits] = React.useState(false);
@@ -520,6 +523,22 @@ export default function AstrologyMandala({
   const [activeTransit, setActiveTransit] = React.useState<ActiveTransit | null>(null);
   const subscriptionTier: "FREE" | "PLUS" = hasPlusAccess(userProfile) ? "PLUS" : "FREE";
   const portalAge = calculateAge(profile?.birthData?.birthDate);
+
+  React.useEffect(() => {
+    const userId = userProfile?.id;
+    if (!profile || !userId || !hasChamadoFeature(userProfile, "ciclos") || cycleChangesCheckedFor.current === userId) return;
+    cycleChangesCheckedFor.current = userId;
+    fetch("/api/cycles/changes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, userId }),
+    })
+      .then(async response => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(data => {
+        if (Array.isArray(data.changes)) setCycleChanges(data.changes);
+      })
+      .catch(error => console.warn("[CycleChanges] Falha ao verificar mudanças:", error));
+  }, [profile, userProfile]);
 
   // Fase lunar natal, usada para destacar a lua correta no onboarding.
   const natalMoonPhase = profile ? getNatalMoonPhase(profile) : null;
@@ -620,7 +639,7 @@ export default function AstrologyMandala({
     .finally(() => setIsFetchingRapidActivations(false));
   };
 
-  const handleOpenTransits = () => {
+  const handleOpenTransits = (targetTab?: TransitPanelTab) => {
     setIsPanelOpen(false);
     setIsPlanetPanelOpen(false);
     setIsDynamicsOpen(false);
@@ -628,7 +647,8 @@ export default function AstrologyMandala({
       setPaywallFeature("transits");
       return;
     }
-    const willOpen = !isTransitsModalOpen;
+    if (targetTab) setTransitInitialTab(targetTab);
+    const willOpen = targetTab ? true : !isTransitsModalOpen;
     setIsTransitsModalOpen(willOpen);
     if (willOpen && profile) {
       if (dashaText === null) fetchDashas();
@@ -991,7 +1011,7 @@ export default function AstrologyMandala({
                 </button>
                 <button
                   id="tour-btn-ciclos-ativos"
-                  onClick={handleOpenTransits}
+                  onClick={() => handleOpenTransits()}
                   className="flex items-center gap-1 px-2 py-1 rounded bg-[#8c6239]/10 text-[#8c6239] hover:bg-[#8c6239] hover:text-[#f4f1eb] transition-all text-[9px] font-mono tracking-wider uppercase cursor-pointer"
                 >
                   Ciclos Ativos
@@ -1039,6 +1059,38 @@ export default function AstrologyMandala({
           bannerText={userProfile?.chamado_banner_text || undefined}
         />
       </div>
+
+      {cycleChanges.length > 0 && (
+        <div className="w-full max-w-3xl rounded-xl border border-[#5c4d66]/15 bg-[#faf8f3] px-4 py-3 shadow-sm sm:px-5">
+          <div className="flex items-start gap-3">
+            <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-[#5c4d66]" />
+            <div className="min-w-0 flex-1">
+              <p className="font-serif text-sm text-[#3c352d]">Seu céu temporal se movimentou</p>
+              <p className="mt-0.5 text-xs text-[#8c7f70]">Há novidades nas áreas abaixo:</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {cycleChanges.map(change => (
+                  <button
+                    key={change.tab}
+                    type="button"
+                    onClick={() => handleOpenTransits(change.tab)}
+                    className="rounded-full border border-[#5c4d66]/15 bg-[#5c4d66]/5 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[#5c4d66] transition-colors hover:bg-[#5c4d66] hover:text-[#f4f1eb]"
+                  >
+                    {change.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCycleChanges([])}
+              aria-label="Fechar aviso de mudanças nos ciclos"
+              className="rounded-full p-1 text-[#8c7f70] transition-colors hover:bg-[#8c7f70]/10 hover:text-[#3c352d]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="w-full flex flex-col items-center justify-center gap-6 lg:gap-12 transition-all duration-500 ease-in-out relative">
       {/* Mandala Wrapper */}
@@ -2232,6 +2284,8 @@ export default function AstrologyMandala({
           rapidActivationsData={rapidActivationsData}
           isFetchingProfection={isFetchingProfection}
           isFetchingRapidActivations={isFetchingRapidActivations}
+          subscriptionTier={subscriptionTier}
+          initialTab={transitInitialTab}
           onActiveTransitChange={(t) => {
             try {
               setActiveTransit(t);
@@ -2275,7 +2329,11 @@ export default function AstrologyMandala({
         onClose={() => setIsInsightsOpen(false)}
         title="Minha Experiência"
       >
-        <MinhaExperienciaTab userId={userProfile?.id ?? null} onNavigateToElement={handleNavigateFromProgress} />
+        <MinhaExperienciaTab
+          userId={userProfile?.id ?? null}
+          userName={profile?.birthData?.name || userProfile?.full_name || ""}
+          onNavigateToElement={handleNavigateFromProgress}
+        />
       </RightPanelDrawer>
 
       {/* Planet Reading Panel — drawer lateral (Régua de Glifos) */}

@@ -20,6 +20,7 @@ interface JournalEntry {
 
 interface MinhaExperienciaTabProps {
   userId: string | null;
+  userName?: string;
   onNavigateToElement?: (elementId: string) => void;
 }
 
@@ -327,7 +328,7 @@ const DiarioAlquimico: React.FC<{ userId: string | null }> = ({ userId }) => {
   );
 };
 
-const MinhaExperienciaTab: React.FC<MinhaExperienciaTabProps> = ({ userId, onNavigateToElement }) => {
+const MinhaExperienciaTab: React.FC<MinhaExperienciaTabProps> = ({ userId, userName, onNavigateToElement }) => {
   const [view, setView] = React.useState<"diario" | "evolucao">("evolucao");
 
   return (
@@ -364,7 +365,7 @@ const MinhaExperienciaTab: React.FC<MinhaExperienciaTabProps> = ({ userId, onNav
       {view === "diario" ? (
         <DiarioAlquimico userId={userId} />
       ) : (
-        <EvolutionDashboard userId={userId} onNavigateToElement={onNavigateToElement} />
+        <EvolutionDashboard userId={userId} userName={userName} onNavigateToElement={onNavigateToElement} />
       )}
     </div>
   );

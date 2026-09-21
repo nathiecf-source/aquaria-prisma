@@ -41,7 +41,7 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
 import { ensureDrishtis } from "./src/server/astrologyProviders";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, HouseReadingSection } from "./src/server/geminiService";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, HouseReadingSection } from "./src/server/geminiService";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -51,6 +51,9 @@ import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
 import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getAllPlanetPositions, getVedicTransitTerrain } from "./src/server/transitEngine";
 import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
+import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarReturnInstant, getActiveSolarReturnYear } from "./src/server/solarReturnEngine";
+import { createDashaSignature, createPortalSignature, createTransitSignature, CycleNoticeTab } from "./src/server/cycleNotice";
+import { calculateDailySky } from "./src/server/dailySkyEngine";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -216,6 +219,23 @@ async function requireAuth(req: any, res: any, next: any): Promise<void> {
   }
 }
 
+async function requirePlusAccess(req: any, res: any): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    res.status(500).json({ error: "Supabase não configurado." });
+    return false;
+  }
+  const userId = req.userId || req.body?.userId;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("has_access, access_expires_at, subscription_tier")
+    .eq("id", userId)
+    .single();
+  if (hasActiveAccess(profile)) return true;
+  res.status(403).json({ error: "Revolução Solar disponível apenas para assinantes PLUS." });
+  return false;
+}
+
 async function requireFeatureAccess(req: any, res: any, featureKey: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
@@ -357,6 +377,39 @@ function getNextSundayMidnight(date: Date): Date {
   return d;
 }
 
+async function registerCycleSignature(userId: string, tab: CycleNoticeTab, signature: string, identities: string[]): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) throw new Error("Supabase não configurado.");
+
+  const { data: existing, error: selectError } = await supabase
+    .from("user_cycle_notice_state")
+    .select("signature")
+    .eq("user_id", userId)
+    .eq("tab", tab)
+    .maybeSingle();
+  if (selectError) throw selectError;
+
+  if (!existing) {
+    const { error: insertError } = await supabase
+      .from("user_cycle_notice_state")
+      .insert({ user_id: userId, tab, signature, identities, updated_at: new Date().toISOString() });
+    if (insertError && insertError.code !== "23505") throw insertError;
+    return false;
+  }
+
+  if (existing.signature === signature) return false;
+
+  const { data: updated, error: updateError } = await supabase
+    .from("user_cycle_notice_state")
+    .update({ signature, identities, updated_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("tab", tab)
+    .eq("signature", existing.signature)
+    .select("signature");
+  if (updateError) throw updateError;
+  return Array.isArray(updated) && updated.length > 0;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Minha Evolução — mapeamento estático dos itens rastreáveis
 // ═══════════════════════════════════════════════════════════════
@@ -400,7 +453,7 @@ const PLANET_PROGRESS_ITEMS = PLANET_GLYPHS.map(p => ({
   id: p.id,
   canonicalName: p.canonicalName,
   label: p.label,
-  readingId: `planeta-${p.id}-tropical`,
+  readingId: `planeta-v4-${p.id}-tropical`,
 }));
 
 function getMappingLevel(percent: number): string {
@@ -694,9 +747,7 @@ async function createApp(): Promise<express.Application> {
       // ── Os Caminhos de Potência ──
       const caminhos = CAMINHO_ITEMS.map(item => {
         const hasReading = readingMap.has(item.id);
-        const journal = journalMap.get(item.id);
-        const hasJournal = !!journal?.journal_text && journal.journal_text.trim().length > 0;
-        const status = hasReading && hasJournal ? "completed" : hasReading ? "in_progress" : "pending";
+        const status = hasReading ? "completed" : "pending";
         return { ...item, status };
       });
       const caminhosCompletedCount = caminhos.filter(c => c.status === "completed").length;
@@ -718,7 +769,7 @@ async function createApp(): Promise<express.Application> {
       const isRead = (readingId: string) => readingMap.has(readingId);
       const isHouseCompleted = (num: number) => houses.find(h => h.id === num)?.status === "completed";
       const isCaminhoCompleted = (id: string) => caminhos.find(c => c.id === id)?.status === "completed";
-      const isPlanetRead = (id: string) => isRead(`planeta-${id}-tropical`);
+      const isPlanetRead = (id: string) => isRead(`planeta-v4-${id}-tropical`);
       const isElementRead = (id: string) => readingMap.has(id);
       const isCasaDeSignoCompleted = (signo: string) => {
         const casa = houses.find((h: typeof houses[number]) => h.sign?.toLowerCase() === signo.toLowerCase());
@@ -1026,8 +1077,8 @@ async function createApp(): Promise<express.Application> {
       }
 
       const currentCount = usageRow?.count || 0;
-      if (currentCount >= 30) {
-        return res.status(429).json({ error: "Limite de 30 perguntas mensais atingido." });
+      if (currentCount >= 50) {
+        return res.status(429).json({ error: "Limite de 50 perguntas mensais atingido." });
       }
 
       // Busca o mapa astral completo
@@ -1073,7 +1124,7 @@ async function createApp(): Promise<express.Application> {
 
       return res.json({
         ...response,
-        remaining: 30 - newCount,
+        remaining: 50 - newCount,
       });
     } catch (err: any) {
       console.error("Erro em /api/chat:", err);
@@ -1601,6 +1652,68 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
+  app.post("/api/cycles/changes", async (req, res) => {
+    try {
+      const { profile, userId } = req.body;
+      if (!profile?.birthData || !profile?.tropical_natal || !userId) {
+        return res.status(400).json({ error: "Perfil astrológico completo e userId são obrigatórios." });
+      }
+      if (!(await requireFeatureAccess(req, res, "ciclos"))) return;
+
+      const referenceDate = new Date();
+      const checks: Array<Promise<{ tab: CycleNoticeTab; signature: string; identities: string[] } | null>> = [
+        Promise.resolve().then(() => {
+          const value = createDashaSignature(profile.vedic_timing || {});
+          return { tab: "dashas" as const, ...value };
+        }).catch((error) => {
+          console.warn("[CYCLE CHANGES] Falha ao verificar Dashas:", error?.message || error);
+          return null;
+        }),
+        calculateProfectionLord(profile, referenceDate, { allowSolarReturnFetch: true }).then((profection) => {
+          const solarReturnYear = getActiveSolarReturnYear(profile.birthData, referenceDate, profile.tropical_natal);
+          const value = createPortalSignature(profection, solarReturnYear);
+          return { tab: "portal" as const, ...value };
+        }).catch((error) => {
+          console.warn("[CYCLE CHANGES] Falha ao verificar Portal:", error?.message || error);
+          return null;
+        }),
+        Promise.all([
+          getTropicalTransitDegrees(referenceDate, true),
+          calculateRestructuringCycles(profile, referenceDate),
+        ]).then(([transitDegrees, cycles]) => {
+          const natalPlanets = getNatalDegrees(profile);
+          const payload = calculateAspects(transitDegrees, natalPlanets);
+          const value = createTransitSignature([...payload.transitos_estruturais, ...payload.transitos_dinamicos], cycles);
+          return { tab: "transits" as const, ...value };
+        }).catch((error) => {
+          console.warn("[CYCLE CHANGES] Falha ao verificar trânsitos:", error?.message || error);
+          return null;
+        }),
+      ];
+
+      const results = (await Promise.all(checks)).filter((item): item is NonNullable<typeof item> => item !== null);
+      const labels: Record<CycleNoticeTab, string> = {
+        dashas: "A Tríade do Tempo Cósmico",
+        portal: `Portal dos ${calculateCurrentAge(profile.birthData.birthDate, referenceDate)}`,
+        transits: "Ciclos Planetários",
+      };
+      const changes: Array<{ tab: CycleNoticeTab; label: string }> = [];
+      for (const result of results) {
+        try {
+          if (await registerCycleSignature(userId, result.tab, result.signature, result.identities)) {
+            changes.push({ tab: result.tab, label: labels[result.tab] });
+          }
+        } catch (error: any) {
+          console.warn(`[CYCLE CHANGES] Falha ao persistir ${result.tab}:`, error?.message || error);
+        }
+      }
+      return res.json({ changes });
+    } catch (err: any) {
+      console.error("[CYCLE CHANGES] Erro inesperado:", err);
+      return res.status(500).json({ error: "Não foi possível verificar mudanças nos ciclos." });
+    }
+  });
+
   // API Route: Generate Transit Cycles (30 Days)
   app.post("/api/generate-transit-cycles", async (req, res) => {
     try {
@@ -1787,6 +1900,57 @@ async function createApp(): Promise<express.Application> {
         error: "Erro ao gerar Senhor do Ano.",
         details: err?.message || String(err)
       });
+    }
+  });
+
+  app.post("/api/cycles/solar-return", async (req: any, res) => {
+    try {
+      const { profile, userId, location } = req.body;
+      if (!profile?.birthData || !profile?.tropical_natal) {
+        return res.status(400).json({ error: "Perfil astrológico completo é obrigatório." });
+      }
+      if (!(await requirePlusAccess(req, res))) return;
+
+      const latitude = Number(location?.latitude);
+      const longitude = Number(location?.longitude);
+      const timezone = String(location?.timezone || "");
+      const name = String(location?.name || "").trim();
+      if (!name || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || !timezone) {
+        return res.status(400).json({ error: "Selecione uma cidade válida para o aniversário." });
+      }
+      try {
+        new Intl.DateTimeFormat("pt-BR", { timeZone: timezone }).format(new Date());
+      } catch {
+        return res.status(400).json({ error: "Fuso horário inválido para a cidade selecionada." });
+      }
+
+      const selectedLocation = { name, latitude, longitude, timezone };
+      const solarReturnYear = getActiveSolarReturnYear(profile.birthData, new Date(), profile.tropical_natal);
+      const locationHash = hashInput({ latitude: latitude.toFixed(5), longitude: longitude.toFixed(5), timezone });
+      const readingId = `revolucao-solar-v1-${solarReturnYear}-${locationHash}`;
+      const cached = await getCachedReading(userId, readingId);
+      if (cached?.analysis && cached?.reading) {
+        return res.json({ ...cached, cached: true });
+      }
+
+      const chart = calculateSolarReturnChart(profile.birthData, solarReturnYear, profile.tropical_natal, { location: selectedLocation });
+      const age = solarReturnYear - Number(String(profile.birthData.birthDate).slice(0, 4));
+      const analysis = analyzeSolarReturnChart(chart, profile.tropical_natal, age, selectedLocation);
+      const validUntil = findExactSolarReturnInstant(profile.birthData, solarReturnYear + 1, profile.tropical_natal).toISOString();
+      const reading = await generateSolarReturnReading(analysis, profile.birthData.gender || "neutro");
+      const payload = {
+        analysis,
+        reading,
+        solarReturnYear,
+        validFrom: chart.exactReturnInstant,
+        validUntil,
+        generatedAt: new Date().toISOString(),
+      };
+      await saveReading(userId, readingId, "solar-return", payload);
+      return res.json({ ...payload, cached: false });
+    } catch (err: any) {
+      console.error("Erro ao gerar Revolução Solar:", err);
+      return res.status(500).json({ error: "Erro ao gerar Revolução Solar.", details: err?.message || String(err) });
     }
   });
 
@@ -3926,6 +4090,28 @@ async function createApp(): Promise<express.Application> {
     } catch (err: any) {
       console.error("[Admin] Erro em send-email:", err);
       return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  app.post("/api/admin/daily-sky-content", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const date = String(req.body?.date || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Data inválida. Use YYYY-MM-DD." });
+      const year = Number(date.slice(0, 4));
+      if (year < 1900 || year > 2100) return res.status(400).json({ error: "A data deve estar entre 1900 e 2100." });
+      const payload = await calculateDailySky(date);
+      try {
+        const content = await generateDailySkyContent(payload);
+        return res.json({ date, timezone: payload.timezone, referenceTime: payload.referenceTime, payload, content });
+      } catch (error: any) {
+        console.error("[Admin] Falha editorial do Céu do Dia:", error);
+        return res.status(502).json({ error: "Os dados do céu foram calculados, mas o conteúdo não pôde ser gerado.", payload, details: error?.message || String(error) });
+      }
+    } catch (error: any) {
+      console.error("[Admin] Erro no Céu do Dia:", error);
+      return res.status(500).json({ error: "Não foi possível calcular o Céu do Dia.", details: error?.message || String(error) });
     }
   });
 
