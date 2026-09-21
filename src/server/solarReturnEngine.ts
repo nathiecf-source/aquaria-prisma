@@ -48,11 +48,39 @@ export interface SolarReturnChart {
   exactReturnInstant?: string;
 }
 
+export interface SolarReturnLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+}
+
 export interface SolarReturnOptions {
   /** Major-aspect orb in degrees (natal-style default: 8°). */
   aspectOrb?: number;
   /** Override position calculation, principally useful for deterministic tests. */
   positionsAt?: (instant: Date) => Record<string, number>;
+  location?: SolarReturnLocation;
+}
+
+export interface SolarReturnAnalysis {
+  age: number;
+  location: SolarReturnLocation;
+  exactReturnInstant: string;
+  ascendant: { sign: string; degree: number; longitude: number; element: string; natalHouse: number; natalElement: string };
+  ruler: { name: string; sign: string; house: number; isRetrograde: boolean };
+  midheaven: { sign: string; degree: number; longitude: number; natalHouse: number };
+  sun: { sign: string; degree: number; longitude: number };
+  moon: { sign: string; degree: number; longitude: number };
+  lunarPhase: string;
+  stellium: { planets: string[]; sign: string; natalHouse: number } | null;
+  bucketHandle: { planet: string; sign: string; house: number } | null;
+  cycles: {
+    metonic: boolean;
+    angularMirror: boolean;
+    rareRetrogradeRuler: boolean;
+    slowPlanetOnSun: { planet: string; orb: number } | null;
+  };
 }
 
 const SIGNS = ["Áries", "Touro", "Gêmeos", "Câncer", "Leão", "Virgem", "Libra", "Escorpião", "Sagitário", "Capricórnio", "Aquário", "Peixes"];
@@ -64,6 +92,7 @@ const RULERS: Record<string, string> = {
 const BODY_NAMES: Record<string, string> = {
   sun: "Sol", moon: "Lua", mercury: "Mercúrio", venus: "Vênus", mars: "Marte",
   jupiter: "Júpiter", saturn: "Saturno", uranus: "Urano", neptune: "Netuno", pluto: "Plutão",
+  chiron: "Quíron",
 };
 const circularHoroscope = (circularHoroscopeRaw as any).default ?? circularHoroscopeRaw;
 const { Origin, Horoscope } = circularHoroscope as any;
@@ -203,9 +232,10 @@ export function calculateSolarReturnChart(
   data: SolarReturnBirthData, year: number, natal?: SolarReturnNatalInput, options: SolarReturnOptions = {},
 ): SolarReturnChart {
   const instant = findExactSolarReturnInstant(data, year, natal);
-  const lp = localParts(instant, data.birthPlace.timezone);
+  const location = options.location ?? data.birthPlace;
+  const lp = localParts(instant, location.timezone);
   const horoscope = new Horoscope({
-    origin: new Origin({ ...lp, latitude: data.birthPlace.latitude, longitude: data.birthPlace.longitude }),
+    origin: new Origin({ ...lp, latitude: location.latitude, longitude: location.longitude }),
     houseSystem: "placidus", zodiac: "tropical", aspectPoints: [], aspectWithPoints: [], aspectTypes: [],
     customOrbs: {}, language: "en",
   });
@@ -219,6 +249,8 @@ export function calculateSolarReturnChart(
   // VSOP87 has no Pluto series; retain the library's locally-computed Pluto when available.
   const pluto = horoscope.CelestialBodies?.pluto?.ChartPosition?.Ecliptic?.DecimalDegrees;
   if (typeof pluto === "number") positions.Plutão = normalizeAngle(pluto);
+  const chiron = horoscope.CelestialBodies?.chiron?.ChartPosition?.Ecliptic?.DecimalDegrees;
+  if (typeof chiron === "number") positions.Quíron = normalizeAngle(chiron);
   const planets = Object.entries(positions).map(([name, longitude]) => {
     const sign = SIGNS[Math.floor(normalizeAngle(longitude) / 30)];
     const bodyKey = Object.keys(BODY_NAMES).find(k => BODY_NAMES[k] === name);
@@ -229,6 +261,147 @@ export function calculateSolarReturnChart(
     };
   });
   return { planets, houses, aspects: aspectsFor(planets, options.aspectOrb ?? 8), exactReturnInstant: instant.toISOString() };
+}
+
+export function getActiveSolarReturnYear(
+  data: SolarReturnBirthData,
+  referenceDate: Date = new Date(),
+  natal?: SolarReturnNatalInput,
+): number {
+  const currentYear = referenceDate.getUTCFullYear();
+  const currentReturn = findExactSolarReturnInstant(data, currentYear, natal);
+  return referenceDate >= currentReturn ? currentYear : currentYear - 1;
+}
+
+const ELEMENTS: Record<string, string> = {
+  "Áries": "Fogo", "Leão": "Fogo", "Sagitário": "Fogo",
+  "Touro": "Terra", "Virgem": "Terra", "Capricórnio": "Terra",
+  "Gêmeos": "Ar", "Libra": "Ar", "Aquário": "Ar",
+  "Câncer": "Água", "Escorpião": "Água", "Peixes": "Água",
+};
+const METONIC_AGES = new Set([19, 38, 57]);
+const METONIC_MOON_ORB = 8;
+const ANGULAR_MIRROR_ORB = 8;
+const SLOW_PLANET_SUN_ORB = 3;
+
+function angularDistance(a: number, b: number): number {
+  const distance = Math.abs(normalizeAngle(a) - normalizeAngle(b));
+  return distance > 180 ? 360 - distance : distance;
+}
+
+function natalHouseFor(longitude: number, houses: SolarReturnChart["houses"]): number {
+  const sorted = [...houses].sort((a, b) => a.house - b.house);
+  return houseFor(normalizeAngle(longitude), sorted);
+}
+
+export function getSolarReturnLunarPhase(sunLongitude: number, moonLongitude: number): string {
+  const elongation = normalizeAngle(moonLongitude - sunLongitude);
+  if (elongation < 22.5 || elongation >= 337.5) return "Lua Nova";
+  if (elongation < 67.5) return "Lua Crescente";
+  if (elongation < 112.5) return "Quarto Crescente";
+  if (elongation < 157.5) return "Lua Gibosa Crescente";
+  if (elongation < 202.5) return "Lua Cheia";
+  if (elongation < 247.5) return "Lua Gibosa Minguante";
+  if (elongation < 292.5) return "Quarto Minguante";
+  return "Lua Minguante";
+}
+
+function findStellium(
+  planets: SolarReturnPlanetPosition[],
+  natalHouses: SolarReturnChart["houses"],
+): SolarReturnAnalysis["stellium"] {
+  const eligible = planets;
+  const groups = new Map<string, SolarReturnPlanetPosition[]>();
+  eligible.forEach(planet => groups.set(planet.sign, [...(groups.get(planet.sign) || []), planet]));
+  const candidates = [...groups.entries()]
+    .map(([sign, grouped]) => {
+      const houses = grouped.map(planet => natalHouseFor(planet.longitude!, natalHouses));
+      return { sign, grouped, houses };
+    })
+    .filter(candidate => candidate.grouped.length >= 3 && new Set(candidate.houses).size === 1)
+    .sort((a, b) => b.grouped.length - a.grouped.length ||
+      (Math.max(...a.grouped.map(p => p.degree)) - Math.min(...a.grouped.map(p => p.degree))) -
+      (Math.max(...b.grouped.map(p => p.degree)) - Math.min(...b.grouped.map(p => p.degree))));
+  const primary = candidates[0];
+  return primary ? { planets: primary.grouped.map(p => p.name), sign: primary.sign, natalHouse: primary.houses[0] } : null;
+}
+
+function clusterArc(planets: SolarReturnPlanetPosition[]): { span: number; midpoint: number } {
+  const sorted = planets.map(p => normalizeAngle(p.longitude!)).sort((a, b) => a - b);
+  let largestGap = -1;
+  let gapIndex = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const gap = normalizeAngle(sorted[(i + 1) % sorted.length] - sorted[i]);
+    if (gap > largestGap) { largestGap = gap; gapIndex = i; }
+  }
+  const start = sorted[(gapIndex + 1) % sorted.length];
+  const span = 360 - largestGap;
+  return { span, midpoint: normalizeAngle(start + span / 2) };
+}
+
+function findBucketHandle(planets: SolarReturnPlanetPosition[]): SolarReturnAnalysis["bucketHandle"] {
+  const eligible = planets.filter(p => p.name !== "Quíron");
+  if (eligible.length < 8) return null;
+  const candidates = eligible.flatMap((candidate) => {
+    const cluster = eligible.filter(p => p !== candidate);
+    const arc = clusterArc(cluster);
+    const oppositionDelta = angularDistance(candidate.longitude!, normalizeAngle(arc.midpoint + 180));
+    return arc.span <= 180 && oppositionDelta <= 45 ? [{ candidate, oppositionDelta }] : [];
+  }).sort((a, b) => a.oppositionDelta - b.oppositionDelta);
+  if (candidates.length !== 1) return null;
+  const planet = candidates[0].candidate;
+  return { planet: planet.name, sign: planet.sign, house: planet.house };
+}
+
+export function analyzeSolarReturnChart(
+  chart: SolarReturnChart,
+  natal: { planets: SolarReturnPlanetPosition[]; houses: SolarReturnChart["houses"] },
+  age: number,
+  location: SolarReturnLocation,
+): SolarReturnAnalysis {
+  const asc = chart.houses.find(h => h.house === 1)!;
+  const mc = chart.houses.find(h => h.house === 10)!;
+  const natalAsc = natal.houses.find(h => h.house === 1)!;
+  const natalMc = natal.houses.find(h => h.house === 10)!;
+  const sun = chart.planets.find(p => p.name === "Sol")!;
+  const moon = chart.planets.find(p => p.name === "Lua")!;
+  const natalSun = natal.planets.find(p => p.name === "Sol")!;
+  const natalMoon = natal.planets.find(p => p.name === "Lua")!;
+  if (!asc || !mc || !natalAsc || !natalMc || !sun || !moon || !natalSun || !natalMoon) {
+    throw new Error("Dados insuficientes para analisar a Revolução Solar.");
+  }
+  const rulerName = RULERS[asc.sign];
+  const rulerPlanet = chart.planets.find(p => p.name === rulerName);
+  if (!rulerPlanet) throw new Error(`Regente ${rulerName} não encontrado na Revolução Solar.`);
+  const slowPlanet = ["Urano", "Netuno", "Plutão"]
+    .map(name => chart.planets.find(p => p.name === name))
+    .filter((planet): planet is SolarReturnPlanetPosition => !!planet)
+    .map(planet => ({ planet: planet.name, orb: round2(angularDistance(planet.longitude!, natalSun.longitude!)) }))
+    .filter(item => item.orb <= SLOW_PLANET_SUN_ORB)
+    .sort((a, b) => a.orb - b.orb)[0] || null;
+
+  return {
+    age,
+    location,
+    exactReturnInstant: chart.exactReturnInstant || "",
+    ascendant: {
+      sign: asc.sign, degree: asc.cuspDegree, longitude: asc.longitude!, element: ELEMENTS[asc.sign],
+      natalHouse: natalHouseFor(asc.longitude!, natal.houses), natalElement: ELEMENTS[natalAsc.sign],
+    },
+    ruler: { name: rulerPlanet.name, sign: rulerPlanet.sign, house: rulerPlanet.house, isRetrograde: rulerPlanet.isRetrograde },
+    midheaven: { sign: mc.sign, degree: mc.cuspDegree, longitude: mc.longitude!, natalHouse: natalHouseFor(mc.longitude!, natal.houses) },
+    sun: { sign: sun.sign, degree: sun.degree, longitude: sun.longitude! },
+    moon: { sign: moon.sign, degree: moon.degree, longitude: moon.longitude! },
+    lunarPhase: getSolarReturnLunarPhase(sun.longitude!, moon.longitude!),
+    stellium: findStellium(chart.planets, natal.houses),
+    bucketHandle: findBucketHandle(chart.planets),
+    cycles: {
+      metonic: METONIC_AGES.has(age) && angularDistance(moon.longitude!, natalMoon.longitude!) <= METONIC_MOON_ORB,
+      angularMirror: (age === 29 || age === 33) && angularDistance(asc.longitude!, natalAsc.longitude!) <= ANGULAR_MIRROR_ORB && angularDistance(mc.longitude!, natalMc.longitude!) <= ANGULAR_MIRROR_ORB,
+      rareRetrogradeRuler: (rulerPlanet.name === "Mercúrio" || rulerPlanet.name === "Vênus") && rulerPlanet.isRetrograde,
+      slowPlanetOnSun: slowPlanet,
+    },
+  };
 }
 
 /** Alias matching the former API-oriented naming while remaining cycle-free. */
