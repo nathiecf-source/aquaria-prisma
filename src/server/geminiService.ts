@@ -7,6 +7,7 @@ import { getPlanetGlyphConfig } from "../lib/planetGlyphs";
 import { getPlanetFichamento, PlanetFichamentoEntry } from "./planetFichamento";
 import type { SolarReturnAnalysis } from "./solarReturnEngine";
 import type { DailySkyPayload } from "./dailySkyEngine";
+import { getNakshatraKnowledge } from "../knowledge/nakshatras";
 
 // Verbos arquetípicos determinísticos para cada signo — aplicados ao domínio do planeta/ponto.
 // O domínio é fornecido pelo planeta (Sol=identidade, Lua=emocional, Ascendente=estilo de presença,
@@ -4771,6 +4772,7 @@ export interface DailySkyContent {
   aspectCoverage: Array<{ aspectId: string; usedIn: string[]; interpretation: string; role: string }>;
   nakshatraCardTitle: string;
   nakshatraCardText: string;
+  nakshatraDeepText: string;
   pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
   feedParagraphs: string[];
   closing: string;
@@ -4785,12 +4787,13 @@ const dailySkyContentSchema = {
     aspectCoverage: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { aspectId: { type: Type.STRING }, usedIn: { type: Type.ARRAY, items: { type: Type.STRING } }, interpretation: { type: Type.STRING }, role: { type: Type.STRING } }, required: ["aspectId", "usedIn", "interpretation", "role"] } },
     nakshatraCardTitle: { type: Type.STRING },
     nakshatraCardText: { type: Type.STRING },
+    nakshatraDeepText: { type: Type.STRING },
     pillarGuidance: { type: Type.OBJECT, properties: { vara: { type: Type.STRING }, tithi: { type: Type.STRING }, yoga: { type: Type.STRING }, karana: { type: Type.STRING } }, required: ["vara", "tithi", "yoga", "karana"] },
     feedParagraphs: { type: Type.ARRAY, items: { type: Type.STRING } },
     closing: { type: Type.STRING },
     cardSummary: { type: Type.STRING },
   },
-  required: ["theme", "stories", "aspectCoverage", "nakshatraCardTitle", "nakshatraCardText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
+  required: ["theme", "stories", "aspectCoverage", "nakshatraCardTitle", "nakshatraCardText", "nakshatraDeepText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
 };
 
 export async function generateDailySkyContent(payload: DailySkyPayload): Promise<DailySkyContent> {
@@ -4815,7 +4818,7 @@ REGRAS DO PANCHANGA (leitura védica do dia):
 1. Foque em "Alinhamento de Ação" em vez de "Previsão Sentimental". O Jyotish pergunta: "Para qual tipo de ação este momento no tempo está fértil?". Traduza cada pilar como um convite prático de onde colocar esforço e onde soltar o controle.
 2. O Panchanga é a Matemática Sol-Lua (Atman e Manas). Vāra, Tithi, Yoga e Karana medem como a mente (Lua) refrata a luz da consciência (Sol). Mostre essa relação como uma "frequência de fundo" do dia, sem isolar o signo zodiacal.
 3. A Nakshatra é o 5º Pilar do Panchanga, ligada ao elemento Ar/Vayu: o impulso do desejo, a motivação profunda e a circulação do Prana. Nunca a omita ou reduza a signo ocidental.
-4. Omita totalmente qualquer menção a divindades (Devatas como Vishvedevas, Rudra, Durga, Brahma etc.) nos textos voltados ao usuário. Extraia apenas a função prática do arquétipo, sem nomeá-lo.
+4. Omita totalmente qualquer menção a divindades (Devatas como Vishvedevas, Rudra, Durga, Brahma etc.) nos textos voltados ao usuário (theme, stories, nakshatraCardTitle, nakshatraCardText, pillarGuidance, feedParagraphs, closing, cardSummary). Extraia apenas a função prática do arquétipo, sem nomeá-lo. EXCEÇÃO: o campo nakshatraDeepText DEVE citar a deidade regente explicitamente — ele é um bloco editorial de conteúdo aprofundado.
 5. Estruture a síntese diária em quatro movimentos: a Base (Vāra — vitalidade do corpo), o Terreno (Tithi — solo mental), a Frequência (Yoga — atmosfera sutil) e o Passo Prático (Karana — execução material).
 
 FORMATAÇÃO DOS VALORES/SUBTÍTULOS DO PANCHANGA (use como referência visual):
@@ -4830,7 +4833,36 @@ INSTRUÇÕES ESPECÍFICAS:
 - nakshatraCardText: texto em três camadas obrigatórias, em 3 a 5 frases curtas. Camada 1 — introduza o símbolo oficial de forma fluida e explique o que ele representa na prática (ex: "Representada pela presa de elefante, esta constelação simboliza a força inabalável para concluir grandes projetos."). Camada 2 — as qualidades do dia e o comportamento recomendado, sem nenhuma divindade. Camada 3 — o contexto da Pada ativa, correlacionando número e elemento (Fogo, Terra, Ar, Água) com uma postura prática. Tom direto e acolhedor, focado em como agir hoje, sem jargões esotéricos e sem citar signos tropicais.
 - pillarGuidance: cada orientação (Vāra, Tithi, Yoga, Karana) em até duas frases curtas. REGRAS RÍGIDAS: (a) é proibido usar verbos no imperativo — nada de "conclua", "reduza", "dedique", "entregue-se"; use apenas frases sugestivas e acolhedoras como "O dia favorece...", "O momento pede...", "A atmosfera é propícia para...", "O ritmo convida a...", "O momento facilita...". (b) O texto NUNCA deve repetir o rótulo do pilar, o termo em sânscrito nem os qualificadores do subtítulo (ex: não repita LUA, DASHAMI, ATIGANDA, GARA). (c) Inicie diretamente com a interpretação, sem prefixos, numerações ou rótulos antes de dois-pontos.
 - feedParagraphs: exatamente três parágrafos curtos: (1) cenário tropical com aspectos do dia; (2) profundidade da Nakshatra como frequência de fundo; (3) ação e desapego a partir de Tithi, Yoga e Karana.
-- closing: uma pergunta reflexiva que ajude a pessoa a alinhar sua vontade com a qualidade do tempo, convidando ao comentário.`;
+- closing: uma pergunta reflexiva que ajude a pessoa a alinhar sua vontade com a qualidade do tempo, convidando ao comentário.
+
+NAKSHATRA APROFUNDADA (nakshatraDeepText):
+Escreva um texto aprofundado sobre a Nakshatra ativa do dia (informada no payload como vedic.nakshatra.name). Este bloco é destinado a copiar e colar como conteúdo editorial sobre a mansão lunar. Estruture em 4 camadas:
+
+1. SIMBOLO — introduza o símbolo oficial da Nakshatra (disponível em vedic.nakshatra.symbol) de forma fluida e poética, explicando o que ele representa como arquétipo.
+2. DEIDADE — apresente a deidade regente (vedic.nakshatra.deity) com nome e função mitológica. Explique quem ela é, o que governa e como sua energia se manifesta.
+3. MITOLOGIA E TEMAS KÁRMICOS — conte a história ou a lenda central da Nakshatra em 3-5 frases, conectando ao tema kármico que ela carrega.
+4. QUALIDADES DO DIA — como essa Nakshatra colore a atmosfera do dia de forma prática. Sem imperativos, sem jargão.
+
+Use os dados de vedic.nakshatra (name, symbol, deity, pada, padaElement) e complemente com o CONHECIMENTO DE REFERÊNCIA abaixo. Tom literário e acolhedor. Mínimo 200 palavras, máximo 400.
+
+CONHECIMENTO DE REFERÊNCIA DA NAKSHATRA ATIVA:
+${(() => {
+  const nk = getNakshatraKnowledge(payload.vedic.nakshatra.name);
+  if (!nk) return `(dados limitados — use conhecimento clássico da tradição védica)`;
+  return [
+    `Nome: ${nk.name}`,
+    `Símbolo: ${nk.symbol}`,
+    `Deidade: ${nk.deity} — ${nk.deityDescription}`,
+    `Planeta regente: ${nk.rulingPlanet}`,
+    `Elemento: ${nk.element} · Gana: ${nk.gana} · Animal: ${nk.animal}`,
+    `Faixa: ${nk.signRange}`,
+    `Cor: ${nk.color} · Gema: ${nk.gemstone} · Direção: ${nk.direction}`,
+    `Sílabas sagradas: ${nk.syllables.join(", ")}`,
+    `Mitologia: ${nk.mythology}`,
+    `Temas kármicos: ${nk.karmicThemes.join(" | ")}`,
+    `Qualidades práticas: ${nk.practicalQualities}`,
+  ].join("\n");
+})()}`;
   const client = getGeminiClient();
   const response = await callGeminiWithRetry(client, {
     model: "gemini-3.5-flash-lite",
@@ -4838,7 +4870,7 @@ INSTRUÇÕES ESPECÍFICAS:
     config: { systemInstruction, temperature: 0.5, maxOutputTokens: 3072, responseMimeType: "application/json", responseSchema: dailySkyContentSchema },
   });
   const parsed = JSON.parse((response.text || "{}").replace(/```json\s*/g, "").replace(/```/g, "").trim());
-  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 1 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardTitle || !parsed.nakshatraCardText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
+  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 1 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardTitle || !parsed.nakshatraCardText || !parsed.nakshatraDeepText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
   const expectedIds = payload.tropical.exactMoonAspects.map((aspect) => aspect.id).sort();
   const coveredIds = parsed.aspectCoverage.map((item: any) => String(item.aspectId)).sort();
   if (JSON.stringify(expectedIds) !== JSON.stringify(coveredIds)) throw new Error("Gemini omitiu ou alterou aspectos exatos na auditoria editorial.");

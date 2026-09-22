@@ -109,6 +109,7 @@ interface DailySkyResult {
     aspectCoverage: Array<{ aspectId: string; usedIn: string[]; interpretation: string; role: string }>;
     nakshatraCardTitle: string;
     nakshatraCardText: string;
+    nakshatraDeepText: string;
     pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
     feedParagraphs: string[];
     closing: string;
@@ -1259,8 +1260,13 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                   <div className="space-y-3 text-sm leading-relaxed text-[#5c544d]">{dailySkyResult.content.feedParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}<p className="font-medium text-[#3c352d]">{dailySkyResult.content.closing}</p></div>
                 </div>
 
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between"><h3 className="text-xs uppercase tracking-widest text-[#6e6356]">Nakshatra do Dia — Símbolo &amp; Deidade</h3><button onClick={() => copyDailySkyText(dailySkyResult.content.nakshatraDeepText)} className="flex items-center gap-1 rounded-lg border border-[#e6e2d8] px-3 py-2 text-[10px] font-bold uppercase tracking-wider"><Copy className="h-3.5 w-3.5" /> Copiar</button></div>
+                  <p className="text-sm leading-relaxed text-[#5c544d]">{dailySkyResult.content.nakshatraDeepText}</p>
+                </div>
+
                 <div className="flex flex-wrap gap-3">
-                  <button onClick={() => copyDailySkyText(`TEMA DO DIA\n${dailySkyResult.content.theme}\n\n${dailySkyResult.content.stories.map((story) => `TELA ${story.screen}: ${story.title}\n${story.text}`).join("\n\n")}\n\nLEGENDA\n${[...dailySkyResult.content.feedParagraphs, dailySkyResult.content.closing].join("\n\n")}`)} className="flex items-center gap-2 rounded-lg border border-[#3c352d] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#3c352d]"><Copy className="h-4 w-4" /> Copiar roteiro completo</button>
+                  <button onClick={() => copyDailySkyText(`TEMA DO DIA\n${dailySkyResult.content.theme}\n\n${dailySkyResult.content.stories.map((story) => `TELA ${story.screen}: ${story.title}\n${story.text}`).join("\n\n")}\n\nNAKSHATRA DO DIA\n${dailySkyResult.content.nakshatraDeepText}\n\nLEGENDA\n${[...dailySkyResult.content.feedParagraphs, dailySkyResult.content.closing].join("\n\n")}`)} className="flex items-center gap-2 rounded-lg border border-[#3c352d] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#3c352d]"><Copy className="h-4 w-4" /> Copiar roteiro completo</button>
                   <button onClick={downloadAllDailySkyCards} className="flex items-center gap-2 rounded-lg bg-[#8c6239] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white"><Download className="h-4 w-4" /> Baixar todos os PNGs</button>
                 </div>
 
