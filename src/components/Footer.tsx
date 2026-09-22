@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { FileText, Instagram, Users } from "lucide-react";
+import { FileText, Instagram, RefreshCw, Users } from "lucide-react";
 import { AboutModal } from "./AboutModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { FAQModal } from "./FAQModal";
 import { BookingModal } from "./BookingModal";
 import { FeedbackSection } from "./FeedbackSection";
+import { useVersionCheck } from "../hooks/useVersionCheck";
 
 interface FooterProps {
   userProfile?: any;
@@ -16,13 +17,26 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
   const [showFAQ, setShowFAQ] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const { updateAvailable, refresh } = useVersionCheck();
+
+  const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
 
   return (
     <>
       <footer className="max-w-3xl mx-auto text-center mt-6 sm:mt-10 py-6 border-t border-[#e6e2d8]">
         <p className="text-[10px] text-[#8c7f70] tracking-wider font-mono mb-3">
-          Copyright (2026 Aquar.IA. Todos os direitos reservados.)
+          Copyright (2026 Aquar.IA. Todos os direitos reservados.){appVersion && <span className="ml-2">v{appVersion}</span>}
         </p>
+
+        {updateAvailable && (
+          <button
+            onClick={refresh}
+            className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-[#5c4d66]/10 px-4 py-1.5 text-[11px] font-medium text-[#5c4d66] transition-colors hover:bg-[#5c4d66] hover:text-[#f4f1eb]"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Nova versão disponível — toque para atualizar
+          </button>
+        )}
 
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-[#8c7f70]">
           <button

@@ -500,6 +500,8 @@ async function createApp(): Promise<express.Application> {
     "/analytics/track",
     "/chat/upcoming-events",
     "/generate-vedic-structural",
+    "/cosmic-events/today",
+    "/version",
   ]);
 
   app.use("/api", (req: any, res: any, next: any) => {
@@ -973,6 +975,26 @@ async function createApp(): Promise<express.Application> {
         error: "Erro ao calcular progresso do usuário.",
         details: err?.message || String(err)
       });
+    }
+  });
+
+  // API Route: Eventos cósmicos do dia (público — todos os usuários)
+  app.get("/api/cosmic-events/today", async (_req, res) => {
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(startOfDay.getTime() + 86_400_000);
+      const events = await getUpcomingCosmicEvents(startOfDay, 1);
+      const today = events
+        .filter((e) => { const d = new Date(e.date); return d >= startOfDay && d < endOfDay; })
+        .map((e) => {
+          const dateStr = new Date(e.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+          return { label: `${dateStr} ㆍ ${e.event} ㆍ Confira no chat ciclos`, event: e.event, date: e.date };
+        });
+      return res.json({ events: today });
+    } catch (err: any) {
+      console.error("Erro ao calcular eventos cósmicos do dia:", err);
+      return res.status(500).json({ error: "Erro ao calcular eventos cósmicos do dia.", details: err?.message || String(err) });
     }
   });
 
@@ -3426,6 +3448,11 @@ async function createApp(): Promise<express.Application> {
   // Admin Panel API
   // ============================================================
 
+  // GET /api/version — versão do app (pública, usada pelo frontend para detectar atualização)
+  app.get("/api/version", (_req, res) => {
+    res.json({ version: process.env.npm_package_version || "0.0.0" });
+  });
+
   // GET /api/health - diagnóstico mascarado de configuração e conexão básica
   app.get("/api/health", async (req: any, res) => {
     const required = {
@@ -4377,8 +4404,17 @@ async function createApp(): Promise<express.Application> {
   } else {
     console.log("Iniciando servidor em modo produção...");
     const distPath = path.join(process.cwd(), "dist");
+
+    // sw.js e index.html nunca devem ficar presos no cache HTTP — garante
+    // que o navegador sempre pega a versão nova após cada deploy.
+    app.get("/sw.js", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.sendFile(path.join(distPath, "sw.js"));
+    });
+
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

@@ -528,6 +528,24 @@ export default function AstrologyMandala({
   const subscriptionTier: "FREE" | "PLUS" = hasPlusAccess(userProfile) ? "PLUS" : "FREE";
   const portalAge = calculateAge(profile?.birthData?.birthDate);
 
+  // Cosmic events do dia (público — todos os usuários)
+  const cosmicCheckedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (cosmicCheckedRef.current) return;
+    cosmicCheckedRef.current = true;
+    fetch("/api/cosmic-events/today")
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((data) => {
+        if (Array.isArray(data.events) && data.events.length > 0) {
+          setCycleChanges((prev) => [
+            ...data.events.map((e: any) => ({ tab: "transits" as TransitPanelTab, label: e.label })),
+            ...prev,
+          ]);
+        }
+      })
+      .catch((err) => console.warn("[CosmicEvents] Falha:", err));
+  }, []);
+
   React.useEffect(() => {
     const userId = userProfile?.id;
     if (!profile || !userId || !hasChamadoFeature(userProfile, "ciclos") || cycleChangesCheckedFor.current === userId) return;
@@ -539,7 +557,7 @@ export default function AstrologyMandala({
     })
       .then(async response => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then(data => {
-        if (Array.isArray(data.changes)) setCycleChanges(data.changes);
+        if (Array.isArray(data.changes)) setCycleChanges((prev) => [...prev, ...data.changes]);
       })
       .catch(error => console.warn("[CycleChanges] Falha ao verificar mudanças:", error));
   }, [profile, userProfile]);

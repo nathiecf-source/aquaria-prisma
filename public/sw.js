@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aquaria-v1';
+const CACHE_NAME = 'aquaria-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
