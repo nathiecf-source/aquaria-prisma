@@ -3449,8 +3449,16 @@ async function createApp(): Promise<express.Application> {
   // ============================================================
 
   // GET /api/version — versão do app (pública, usada pelo frontend para detectar atualização)
-  app.get("/api/version", (_req, res) => {
-    res.json({ version: process.env.npm_package_version || "0.0.0" });
+  app.get("/api/version", async (_req, res) => {
+    let version = process.env.npm_package_version;
+    if (!version) {
+      try {
+        const fs = await import("fs");
+        const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8"));
+        version = pkg.version;
+      } catch { /* ignore */ }
+    }
+    res.json({ version: version || "0.0.0" });
   });
 
   // GET /api/health - diagnóstico mascarado de configuração e conexão básica
