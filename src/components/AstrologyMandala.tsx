@@ -93,6 +93,7 @@ interface AstrologyMandalaProps {
   userName?: string;
   userProfile?: any;
   onUpgradeSuccess?: () => void;
+  onOpenChat?: () => void;
 }
 
 // Elementos da mandala gratuitos no plano FREE.
@@ -440,7 +441,8 @@ export default function AstrologyMandala({
   onBackToForm,
   userName,
   userProfile,
-  onUpgradeSuccess
+  onUpgradeSuccess,
+  onOpenChat
 }: AstrologyMandalaProps) {
   // 1. Gestão de Estado (State):
   // Controla quais elementos do mapa possuem uma concentração maior de 'diretrizes de força' e iniciam acesos (em destaque).
@@ -504,7 +506,7 @@ export default function AstrologyMandala({
 
   const [isTransitsModalOpen, setIsTransitsModalOpen] = React.useState(false);
   const [transitInitialTab, setTransitInitialTab] = React.useState<TransitPanelTab>("dashas");
-  const [cycleChanges, setCycleChanges] = React.useState<Array<{ tab: TransitPanelTab; label: string }>>([]);
+  const [cycleChanges, setCycleChanges] = React.useState<Array<{ tab: TransitPanelTab; label: string; cosmic?: boolean }>>([]);
   const cycleChangesCheckedFor = React.useRef<string | null>(null);
   const [transitsText, setTransitsText] = React.useState<string | null>(null);
   const [restructuringCycles, setRestructuringCycles] = React.useState<any[]>([]);
@@ -542,7 +544,7 @@ export default function AstrologyMandala({
       .then((data) => {
         if (Array.isArray(data.events) && data.events.length > 0) {
           setCycleChanges((prev) => [
-            ...data.events.map((e: any) => ({ tab: "transits" as TransitPanelTab, label: e.label })),
+            ...data.events.map((e: any) => ({ tab: "transits" as TransitPanelTab, label: e.label, cosmic: true })),
             ...prev,
           ]);
         }
@@ -1129,9 +1131,15 @@ export default function AstrologyMandala({
               <div className="mt-2 flex flex-wrap gap-2">
                 {cycleChanges.map(change => (
                   <button
-                    key={change.tab}
+                    key={change.tab + change.label}
                     type="button"
-                    onClick={() => handleOpenTransits(change.tab)}
+                    onClick={() => {
+                      if (change.cosmic && onOpenChat) {
+                        onOpenChat();
+                      } else {
+                        handleOpenTransits(change.tab);
+                      }
+                    }}
                     className="rounded-full border border-[#5c4d66]/15 bg-[#5c4d66]/5 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[#5c4d66] transition-colors hover:bg-[#5c4d66] hover:text-[#f4f1eb]"
                   >
                     {change.label}

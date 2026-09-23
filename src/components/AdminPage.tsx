@@ -142,6 +142,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const [selectedUser, setSelectedUser] = useState<FoundUser | null>(null);
   const [grantPlanId, setGrantPlanId] = useState("annual-launch");
   const [grantDate, setGrantDate] = useState("");
+  const [chatQuota, setChatQuota] = useState(3);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -548,6 +549,15 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   async function handleResetChart() {
     if (!selectedUser) return;
     await callAction("/api/admin/users/reset-chart", { userId: selectedUser.id }, "Resetar Mapa/Sessão");
+  }
+
+  async function handleGrantChatQuota() {
+    if (!selectedUser) return;
+    await callAction(
+      "/api/admin/users/grant-chat-quota",
+      { userId: selectedUser.id, quota: chatQuota },
+      `Liberar ${chatQuota} Pergunta${chatQuota !== 1 ? "s" : ""} de Chat`
+    );
   }
 
   async function loadUserEvents(userId: string) {
@@ -1439,6 +1449,44 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                   >
                     {actionLoading === "Resetar Mapa/Sessão" ? "Resetando..." : "Resetar Mapa/Sessão"}
                   </button>
+                </div>
+
+                {/* Liberação de perguntas gratuitas de chat */}
+                <div className="mb-8 p-4 bg-[#f0ebe1] border border-[#d6cfc1] rounded-xl">
+                  <h3 className="text-[10px] uppercase tracking-widest text-[#6e6356] mb-3">
+                    Perguntas Gratuitas de Chat
+                  </h3>
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-widest text-[#6e6356] mb-1">Quantidade (1-5)</label>
+                      <select
+                        value={chatQuota}
+                        onChange={(e) => setChatQuota(Number(e.target.value))}
+                        className="px-3 py-2 bg-white border border-[#d6d2c8] rounded-lg text-sm text-[#3c352d] focus:outline-none focus:border-[#8c6239]"
+                      >
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <option key={n} value={n}>{n} pergunta{n !== 1 ? "s" : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      onClick={handleGrantChatQuota}
+                      disabled={actionLoading !== null}
+                      className="px-4 py-2.5 bg-[#5c4d66] text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-[#4a3d52] disabled:opacity-60"
+                    >
+                      {actionLoading?.startsWith("Liberar") && actionLoading.includes("Pergunta")
+                        ? "Liberando..."
+                        : `Liberar ${chatQuota} Pergunta${chatQuota !== 1 ? "s" : ""} de Chat`}
+                    </button>
+                    {selectedUser.profile?.chat_free_quota > 0 && (
+                      <span className="text-xs text-[#6e6356]">
+                        Atual: <strong>{selectedUser.profile.chat_free_quota}</strong> restante{selectedUser.profile.chat_free_quota !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[11px] text-[#8c7f70]">
+                    Permite que usuários FREE façam perguntas no chat astrológico. O crédito é decrementado a cada pergunta.
+                  </p>
                 </div>
 
                 {/* Linha do Tempo */}

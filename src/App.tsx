@@ -503,7 +503,7 @@ export default function App() {
   }, [profile]);
 
   const isPlus = hasPlusAccess(userProfile);
-  const canChat = hasChamadoFeature(userProfile, "chat");
+  const canChat = hasChamadoFeature(userProfile, "chat") || (userProfile?.chat_free_quota > 0);
   const activeSubscriptionTier: "FREE" | "PLUS" = isPlus ? "PLUS" : "FREE";
 
   const tourSteps: TourStep[] = React.useMemo(
@@ -739,6 +739,13 @@ export default function App() {
                 userName={userName}
                 userProfile={userProfile}
                 onUpgradeSuccess={() => setUserProfile((prev: any) => ({ ...prev, has_access: true, subscription_tier: "PLUS" }))}
+                onOpenChat={() => {
+                  if (canChat) {
+                    setIsChatOpen(true);
+                  } else {
+                    setShowChatPaywall(true);
+                  }
+                }}
               />
             </div>
           )}

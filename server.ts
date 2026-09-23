@@ -1039,7 +1039,7 @@ async function createApp(): Promise<express.Application> {
       // Verifica assinatura PLUS (compatível com has_access + access_expires_at)
       const { data: rawProfileRow, error: profileError } = await supabase
         .from("profiles")
-        .select("subscription_tier, full_name, has_access, access_expires_at")
+        .select("subscription_tier, full_name, has_access, access_expires_at, chat_free_quota")
         .eq("id", userId)
         .single();
 
@@ -1082,26 +1082,42 @@ async function createApp(): Promise<express.Application> {
         return res.status(500).json({ error: "Erro ao recuperar perfil. Tente novamente." });
       }
 
-      if (!(await requireFeatureAccess(req, res, "chat"))) {
-        return;
+      // Verifica acesso: PLUS/chamado OU quota gratuita de chat
+      const hasPlus = hasActiveAccess(profileRow);
+      let hasChamadoChat = false;
+      if (!hasPlus) {
+        const settings = await getSystemSettings(supabase);
+        hasChamadoChat = hasChamadoFeature(settings, "chat");
+      }
+      const freeQuota = (profileRow as any)?.chat_free_quota || 0;
+      const isFreeQuotaUser = !hasPlus && !hasChamadoChat && freeQuota > 0;
+
+      if (!hasPlus && !hasChamadoChat && !isFreeQuotaUser) {
+        return res.status(403).json({ error: "Recurso disponível apenas para assinantes PLUS ou durante um Chamado ativo." });
       }
 
-      // Controle de uso mensal
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-      const { data: usageRow, error: usageError } = await supabase
-        .from("chat_usage")
-        .select("count")
-        .eq("user_id", userId)
-        .eq("month", currentMonth)
-        .single();
+      // Controle de uso mensal (apenas para PLUS/chamado; free quota é absoluto)
+      let currentCount = 0;
+      let monthlyLimit = 50;
+      if (!isFreeQuotaUser) {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const { data: usageRow, error: usageError } = await supabase
+          .from("chat_usage")
+          .select("count")
+          .eq("user_id", userId)
+          .eq("month", currentMonth)
+          .single();
 
-      if (usageError && usageError.code !== "PGRST116") {
-        console.error("[chat_usage] erro ao buscar uso:", usageError);
-      }
+        if (usageError && usageError.code !== "PGRST116") {
+          console.error("[chat_usage] erro ao buscar uso:", usageError);
+        }
 
-      const currentCount = usageRow?.count || 0;
-      if (currentCount >= 50) {
-        return res.status(429).json({ error: "Limite de 50 perguntas mensais atingido." });
+        currentCount = usageRow?.count || 0;
+        if (currentCount >= monthlyLimit) {
+          return res.status(429).json({ error: "Limite de 50 perguntas mensais atingido." });
+        }
+      } else if (freeQuota <= 0) {
+        return res.status(429).json({ error: "Você usou todas as suas perguntas gratuitas." });
       }
 
       // Busca o mapa astral completo
@@ -1127,27 +1143,41 @@ async function createApp(): Promise<express.Application> {
         transitContext || undefined
       );
 
-      // Incrementa o contador
-      const newCount = currentCount + 1;
-      const { error: upsertError } = await supabase
-        .from("chat_usage")
-        .upsert(
-          {
-            user_id: userId,
-            month: currentMonth,
-            count: newCount,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,month" }
-        );
-
-      if (upsertError) {
-        console.error("[chat_usage] erro ao atualizar uso:", upsertError);
+      // Incrementa o contador / decrementa quota gratuita
+      let remaining: number;
+      if (isFreeQuotaUser) {
+        const newQuota = Math.max(0, freeQuota - 1);
+        const { error: quotaError } = await supabase
+          .from("profiles")
+          .update({ chat_free_quota: newQuota, updated_at: new Date().toISOString() })
+          .eq("id", userId);
+        if (quotaError) {
+          console.error("[chat_free_quota] erro ao decrementar:", quotaError);
+        }
+        remaining = newQuota;
+      } else {
+        const newCount = currentCount + 1;
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const { error: upsertError } = await supabase
+          .from("chat_usage")
+          .upsert(
+            {
+              user_id: userId,
+              month: currentMonth,
+              count: newCount,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,month" }
+          );
+        if (upsertError) {
+          console.error("[chat_usage] erro ao atualizar uso:", upsertError);
+        }
+        remaining = monthlyLimit - newCount;
       }
 
       return res.json({
         ...response,
-        remaining: 50 - newCount,
+        remaining,
       });
     } catch (err: any) {
       console.error("Erro em /api/chat:", err);
@@ -3760,6 +3790,38 @@ async function createApp(): Promise<express.Application> {
       return res.json({ success: true });
     } catch (err: any) {
       console.error("[Admin] Erro em reset-chart:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // POST /api/admin/users/grant-chat-quota - libera N perguntas gratuitas de chat (1-5)
+  app.post("/api/admin/users/grant-chat-quota", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { userId, quota } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId é obrigatório." });
+      }
+      const n = Math.max(1, Math.min(5, Math.floor(Number(quota) || 0)));
+      if (n < 1 || n > 5) {
+        return res.status(400).json({ error: "A quantidade deve estar entre 1 e 5." });
+      }
+
+      const { error } = await admin.supabase
+        .from("profiles")
+        .update({ chat_free_quota: n, updated_at: new Date().toISOString() })
+        .eq("id", userId);
+
+      if (error) {
+        console.error("[Admin] Erro ao conceder quota de chat:", error);
+        return res.status(500).json({ error: "Erro ao conceder perguntas de chat." });
+      }
+
+      return res.json({ success: true, chat_free_quota: n });
+    } catch (err: any) {
+      console.error("[Admin] Erro em grant-chat-quota:", err);
       return res.status(500).json({ error: "Erro interno." });
     }
   });
