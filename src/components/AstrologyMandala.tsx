@@ -427,6 +427,10 @@ const DiretrizAmplaDrawer: React.FC<DiretrizAmplaModalProps> = ({
   );
 };
 
+// Transparência das pétalas — preenchimento translúcido que revela o fundo metálico.
+// Bordas e linhas internas permanecem opacas para manter a definição do desenho.
+const PETAL_FILL_ACTIVE = 0.65;
+
 export default function AstrologyMandala({
   highlights,
   visualState,
@@ -1202,13 +1206,13 @@ export default function AstrologyMandala({
           {/* Gradiente para as Pétalas de Qualidade */}
           <linearGradient id="qualityPetalGrad" x1="0%" y1="100%" x2="0%" y2="0%">
             <stop offset="0%" stopColor="#a37c5c" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#cfae84" />
+            <stop offset="100%" stopColor="#cfae84" stopOpacity="0.65" />
           </linearGradient>
 
           {/* Gradiente para as Pétalas de Qualidade Ativas */}
           <linearGradient id="qualityPetalGradActive" x1="0%" y1="100%" x2="0%" y2="0%">
             <stop offset="0%" stopColor="#5c4d66" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#a38eb0" />
+            <stop offset="100%" stopColor="#a38eb0" stopOpacity="0.65" />
           </linearGradient>
         </defs>
 
@@ -1903,6 +1907,7 @@ export default function AstrologyMandala({
             <path
               d="M 0,0 C -18,-20 -38,-95 0,-125 C 38,-95 18,-20 0,0 Z"
               fill={isElementActive("petala-mutavel") ? "var(--color-cosmic)" : "url(#qualityPetalGrad)"}
+              fillOpacity={isElementActive("petala-mutavel") ? PETAL_FILL_ACTIVE : 1}
               stroke={isElementActive("petala-mutavel") ? "#a38eb0" : "#ffffff"}
               strokeWidth={isElementActive("petala-mutavel") ? "2.5" : "1.5"}
               className="transition-all duration-300 ease-in-out"
@@ -1928,6 +1933,7 @@ export default function AstrologyMandala({
             <path
               d="M 0,0 C -18,-20 -38,-95 0,-125 C 38,-95 18,-20 0,0 Z"
               fill={isElementActive("petala-cardeal") ? "var(--color-cosmic)" : "url(#qualityPetalGrad)"}
+              fillOpacity={isElementActive("petala-cardeal") ? PETAL_FILL_ACTIVE : 1}
               stroke={isElementActive("petala-cardeal") ? "#a38eb0" : "#ffffff"}
               strokeWidth={isElementActive("petala-cardeal") ? "2.5" : "1.5"}
               className="transition-all duration-300 ease-in-out"
@@ -1953,6 +1959,7 @@ export default function AstrologyMandala({
             <path
               d="M 0,0 C -18,-20 -38,-95 0,-125 C 38,-95 18,-20 0,0 Z"
               fill={isElementActive("petala-fixo") ? "var(--color-cosmic)" : "url(#qualityPetalGrad)"}
+              fillOpacity={isElementActive("petala-fixo") ? PETAL_FILL_ACTIVE : 1}
               stroke={isElementActive("petala-fixo") ? "#a38eb0" : "#ffffff"}
               strokeWidth={isElementActive("petala-fixo") ? "2.5" : "1.5"}
               className="transition-all duration-300 ease-in-out"
@@ -1989,7 +1996,7 @@ export default function AstrologyMandala({
                 fill={isElementActive("petal-fire") ? "var(--color-terracotta)" : "#5c4d66"}
                 stroke={isElementActive("petal-fire") ? "#cfae84" : "#ffffff"}
                 strokeWidth={isElementActive("petal-fire") ? "2.5" : "1.8"}
-                opacity={isElementActive("petal-fire") ? "1" : "0.95"}
+                opacity={isElementActive("petal-fire") ? 1 : 0.95}
                 className="transition-all duration-300 ease-in-out"
               />
               <line
@@ -2016,7 +2023,7 @@ export default function AstrologyMandala({
                 fill={isElementActive("petal-earth") ? "var(--color-sage)" : "#5c4d66"}
                 stroke={isElementActive("petal-earth") ? "#cfae84" : "#ffffff"}
                 strokeWidth={isElementActive("petal-earth") ? "2.5" : "1.8"}
-                opacity={isElementActive("petal-earth") ? "1" : "0.95"}
+                opacity={isElementActive("petal-earth") ? 1 : 0.95}
                 className="transition-all duration-300 ease-in-out"
               />
               <line
@@ -2043,7 +2050,7 @@ export default function AstrologyMandala({
                 fill={isElementActive("petal-water") ? "var(--color-mineral)" : "#5c4d66"}
                 stroke={isElementActive("petal-water") ? "#cfae84" : "#ffffff"}
                 strokeWidth={isElementActive("petal-water") ? "2.5" : "1.8"}
-                opacity={isElementActive("petal-water") ? "1" : "0.95"}
+                opacity={isElementActive("petal-water") ? 1 : 0.95}
                 className="transition-all duration-300 ease-in-out"
               />
               <line
@@ -2070,7 +2077,7 @@ export default function AstrologyMandala({
                 fill={isElementActive("petal-air") ? "var(--color-sand)" : "#5c4d66"}
                 stroke={isElementActive("petal-air") ? "#cfae84" : "#ffffff"}
                 strokeWidth={isElementActive("petal-air") ? "2.5" : "1.8"}
-                opacity={isElementActive("petal-air") ? "1" : "0.95"}
+                opacity={isElementActive("petal-air") ? 1 : 0.95}
                 className="transition-all duration-300 ease-in-out"
               />
               <line

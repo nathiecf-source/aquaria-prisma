@@ -76,7 +76,7 @@
   fill-opacity: 0.4 !important;
 }
 .house.state-vedic {
-  fill-opacity: 0.1 !important;
+  fill-opacity: 0.3 !important;
 }
 .house.state-intersect {
   fill-opacity: 1.0 !important;
@@ -84,10 +84,9 @@
   filter: drop-shadow(0 0 4px var(--color-lavender)) !important;
 }
 
-/* Casas vazias recebem a cor exata do fundo da página, criando a impressão de ausência de preenchimento */
+/* Casas vazias mantêm um véu de 20% da cor do elemento da cúspide tropical */
 .house.state-inactive {
-  fill: #f4f1eb !important;
-  fill-opacity: 1 !important;
+  fill-opacity: 0.2 !important;
 }
 
 .house.active:not(.state-tropical):not(.state-vedic):not(.state-intersect) {
