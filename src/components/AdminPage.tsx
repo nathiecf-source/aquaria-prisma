@@ -34,6 +34,7 @@ interface SystemSettings {
   chamado_expires_at: string | null;
   chamado_features: string[];
   chamado_banner_text: string;
+  chamado_chat_free_quota: number;
 }
 
 interface FoundUser {
@@ -135,6 +136,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     chamado_expires_at: null,
     chamado_features: [],
     chamado_banner_text: "",
+    chamado_chat_free_quota: 3,
   });
   const [searchEmail, setSearchEmail] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
@@ -142,7 +144,6 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const [selectedUser, setSelectedUser] = useState<FoundUser | null>(null);
   const [grantPlanId, setGrantPlanId] = useState("annual-launch");
   const [grantDate, setGrantDate] = useState("");
-  const [chatQuota, setChatQuota] = useState(3);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -156,10 +157,11 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   });
   const [couponLoading, setCouponLoading] = useState(false);
   const [bannerText, setBannerText] = useState("");
-  const [chamadoFeatures, setChamadoFeatures] = useState<string[]>([]);
-  const [chamadoExpiresAt, setChamadoExpiresAt] = useState("");
   const [chamadoActive, setChamadoActive] = useState(false);
+  const [chamadoExpiresAt, setChamadoExpiresAt] = useState("");
+  const [chamadoFeatures, setChamadoFeatures] = useState<string[]>([]);
   const [chamadoBannerText, setChamadoBannerText] = useState("");
+  const [chamadoChatFreeQuota, setChamadoChatFreeQuota] = useState(3);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [previewStory, setPreviewStory] = useState<{ content: string; id: string } | null>(null);
 
@@ -358,6 +360,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
         setChamadoExpiresAt(data.chamado_expires_at ? data.chamado_expires_at.slice(0, 16) : "");
         setChamadoFeatures(Array.isArray(data.chamado_features) ? data.chamado_features : []);
         setChamadoBannerText(typeof data.chamado_banner_text === "string" ? data.chamado_banner_text : "");
+        setChamadoChatFreeQuota(typeof data.chamado_chat_free_quota === "number" ? data.chamado_chat_free_quota : 3);
       }
     } catch (err) {
       console.error("[Admin] Erro ao carregar settings:", err);
@@ -551,15 +554,6 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     await callAction("/api/admin/users/reset-chart", { userId: selectedUser.id }, "Resetar Mapa/Sessão");
   }
 
-  async function handleGrantChatQuota() {
-    if (!selectedUser) return;
-    await callAction(
-      "/api/admin/users/grant-chat-quota",
-      { userId: selectedUser.id, quota: chatQuota },
-      `Liberar ${chatQuota} Pergunta${chatQuota !== 1 ? "s" : ""} de Chat`
-    );
-  }
-
   async function loadUserEvents(userId: string) {
     setEventsLoading(true);
     try {
@@ -677,10 +671,12 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
       expiresValue = new Date(chamadoExpiresAt).toISOString();
     }
 
+    const freeQuota = Math.max(1, Math.min(5, Math.floor(Number(chamadoChatFreeQuota) || 3)));
     await updateSetting("chamado_active", chamadoActive);
     await updateSetting("chamado_expires_at", expiresValue);
     await updateSetting("chamado_features", features);
     await updateSetting("chamado_banner_text", chamadoBannerText.trim());
+    await updateSetting("chamado_chat_free_quota", freeQuota);
 
     setSettings((prev) => ({
       ...prev,
@@ -688,6 +684,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
       chamado_expires_at: expiresValue,
       chamado_features: features,
       chamado_banner_text: chamadoBannerText.trim(),
+      chamado_chat_free_quota: freeQuota,
     }));
   }
 
@@ -1024,6 +1021,26 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                       <span className="text-sm text-[#3c352d]">{item.label}</span>
                     </label>
                   ))}
+
+                  {chamadoFeatures.includes("chat") && (
+                    <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-lg p-4">
+                      <label className="block text-[10px] uppercase tracking-widest text-[#6e6356] mb-2">
+                        Perguntas gratuitas de chat (por usuário free)
+                      </label>
+                      <select
+                        value={chamadoChatFreeQuota}
+                        onChange={(e) => setChamadoChatFreeQuota(Number(e.target.value))}
+                        className="px-3 py-2 bg-white border border-[#d6d2c8] rounded-lg text-sm text-[#3c352d] focus:outline-none focus:border-[#8c6239]"
+                      >
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <option key={n} value={n}>{n} pergunta{n !== 1 ? "s" : ""}</option>
+                        ))}
+                      </select>
+                      <p className="mt-2 text-xs text-[#6e6356]">
+                        Cada usuário FREE ganha esse número de perguntas enquanto o Chamado estiver ativo.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-white border border-[#e6e2d8] rounded-lg p-3">
@@ -1449,44 +1466,6 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                   >
                     {actionLoading === "Resetar Mapa/Sessão" ? "Resetando..." : "Resetar Mapa/Sessão"}
                   </button>
-                </div>
-
-                {/* Liberação de perguntas gratuitas de chat */}
-                <div className="mb-8 p-4 bg-[#f0ebe1] border border-[#d6cfc1] rounded-xl">
-                  <h3 className="text-[10px] uppercase tracking-widest text-[#6e6356] mb-3">
-                    Perguntas Gratuitas de Chat
-                  </h3>
-                  <div className="flex flex-wrap items-end gap-4">
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-widest text-[#6e6356] mb-1">Quantidade (1-5)</label>
-                      <select
-                        value={chatQuota}
-                        onChange={(e) => setChatQuota(Number(e.target.value))}
-                        className="px-3 py-2 bg-white border border-[#d6d2c8] rounded-lg text-sm text-[#3c352d] focus:outline-none focus:border-[#8c6239]"
-                      >
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <option key={n} value={n}>{n} pergunta{n !== 1 ? "s" : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      onClick={handleGrantChatQuota}
-                      disabled={actionLoading !== null}
-                      className="px-4 py-2.5 bg-[#5c4d66] text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-[#4a3d52] disabled:opacity-60"
-                    >
-                      {actionLoading?.startsWith("Liberar") && actionLoading.includes("Pergunta")
-                        ? "Liberando..."
-                        : `Liberar ${chatQuota} Pergunta${chatQuota !== 1 ? "s" : ""} de Chat`}
-                    </button>
-                    {selectedUser.profile?.chat_free_quota > 0 && (
-                      <span className="text-xs text-[#6e6356]">
-                        Atual: <strong>{selectedUser.profile.chat_free_quota}</strong> restante{selectedUser.profile.chat_free_quota !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-[11px] text-[#8c7f70]">
-                    Permite que usuários FREE façam perguntas no chat astrológico. O crédito é decrementado a cada pergunta.
-                  </p>
                 </div>
 
                 {/* Linha do Tempo */}

@@ -96,16 +96,16 @@ function getSupabaseAdmin(): any {
   }
 }
 
-async function getSystemSettings(supabase: any): Promise<{ chat_active: boolean; checkout_active: boolean; banner_active: boolean; banner_text: string; chamado_active: boolean; chamado_expires_at: string | null; chamado_features: string[]; chamado_banner_text: string }> {
+async function getSystemSettings(supabase: any): Promise<{ chat_active: boolean; checkout_active: boolean; banner_active: boolean; banner_text: string; chamado_active: boolean; chamado_expires_at: string | null; chamado_features: string[]; chamado_banner_text: string; chamado_chat_free_quota: number }> {
   try {
     const { data, error } = await supabase
       .from("system_settings")
       .select("key, value")
-      .in("key", ["chat_active", "checkout_active", "banner_active", "banner_text", "chamado_active", "chamado_expires_at", "chamado_features", "chamado_banner_text"]);
+      .in("key", ["chat_active", "checkout_active", "banner_active", "banner_text", "chamado_active", "chamado_expires_at", "chamado_features", "chamado_banner_text", "chamado_chat_free_quota"]);
 
     if (error || !data) {
       console.warn("[SystemSettings] Erro ao carregar configurações:", error);
-      return { chat_active: true, checkout_active: true, banner_active: false, banner_text: "", chamado_active: false, chamado_expires_at: null, chamado_features: [], chamado_banner_text: "" };
+      return { chat_active: true, checkout_active: true, banner_active: false, banner_text: "", chamado_active: false, chamado_expires_at: null, chamado_features: [], chamado_banner_text: "", chamado_chat_free_quota: 3 };
     }
 
     const map: Record<string, any> = {};
@@ -117,6 +117,7 @@ async function getSystemSettings(supabase: any): Promise<{ chat_active: boolean;
     const chamadoBannerText = map["chamado_banner_text"];
     const features = map["chamado_features"];
     const expiresAt = map["chamado_expires_at"];
+    const freeQuota = map["chamado_chat_free_quota"];
 
     return {
       chat_active: map["chat_active"] !== false,
@@ -127,10 +128,11 @@ async function getSystemSettings(supabase: any): Promise<{ chat_active: boolean;
       chamado_expires_at: expiresAt && expiresAt !== "null" ? String(expiresAt) : null,
       chamado_features: Array.isArray(features) ? features.map(String) : [],
       chamado_banner_text: typeof chamadoBannerText === "string" ? chamadoBannerText : "",
+      chamado_chat_free_quota: typeof freeQuota === "number" && !isNaN(freeQuota) ? Math.max(1, Math.min(5, freeQuota)) : 3,
     };
   } catch (err) {
     console.warn("[SystemSettings] Erro inesperado:", err);
-    return { chat_active: true, checkout_active: true, banner_active: false, banner_text: "", chamado_active: false, chamado_expires_at: null, chamado_features: [], chamado_banner_text: "" };
+    return { chat_active: true, checkout_active: true, banner_active: false, banner_text: "", chamado_active: false, chamado_expires_at: null, chamado_features: [], chamado_banner_text: "", chamado_chat_free_quota: 3 };
   }
 }
 
@@ -1082,23 +1084,31 @@ async function createApp(): Promise<express.Application> {
         return res.status(500).json({ error: "Erro ao recuperar perfil. Tente novamente." });
       }
 
-      // Verifica acesso: PLUS/chamado OU quota gratuita de chat
+      // Verifica acesso: PLUS/chamado com chat OU quota gratuita residual/inicializada pelo chamado
       const hasPlus = hasActiveAccess(profileRow);
-      let hasChamadoChat = false;
-      if (!hasPlus) {
-        const settings = await getSystemSettings(supabase);
-        hasChamadoChat = hasChamadoFeature(settings, "chat");
-      }
-      const freeQuota = (profileRow as any)?.chat_free_quota || 0;
-      const isFreeQuotaUser = !hasPlus && !hasChamadoChat && freeQuota > 0;
+      const hasChamadoChat = hasChamadoFeature(settings, "chat");
+      const chamadoChatQuota = hasChamadoChat ? (settings.chamado_chat_free_quota || 3) : 0;
 
-      if (!hasPlus && !hasChamadoChat && !isFreeQuotaUser) {
+      let freeQuota = (profileRow as any)?.chat_free_quota || 0;
+      if (hasChamadoChat && freeQuota <= 0) {
+        freeQuota = chamadoChatQuota;
+        const { error: initQuotaError } = await supabase
+          .from("profiles")
+          .update({ chat_free_quota: freeQuota, updated_at: new Date().toISOString() })
+          .eq("id", userId);
+        if (initQuotaError) {
+          console.error("[chat_free_quota] erro ao inicializar quota:", initQuotaError);
+        }
+      }
+      const isFreeQuotaUser = !hasPlus && freeQuota > 0;
+
+      if (!hasPlus && !isFreeQuotaUser) {
         return res.status(403).json({ error: "Recurso disponível apenas para assinantes PLUS ou durante um Chamado ativo." });
       }
 
-      // Controle de uso mensal (apenas para PLUS/chamado; free quota é absoluto)
+      // Controle de uso mensal (apenas para PLUS/chamado ilimitado; free quota é absoluto)
       let currentCount = 0;
-      let monthlyLimit = 50;
+      const monthlyLimit = 50;
       if (!isFreeQuotaUser) {
         const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
         const { data: usageRow, error: usageError } = await supabase
@@ -3790,38 +3800,6 @@ async function createApp(): Promise<express.Application> {
       return res.json({ success: true });
     } catch (err: any) {
       console.error("[Admin] Erro em reset-chart:", err);
-      return res.status(500).json({ error: "Erro interno." });
-    }
-  });
-
-  // POST /api/admin/users/grant-chat-quota - libera N perguntas gratuitas de chat (1-5)
-  app.post("/api/admin/users/grant-chat-quota", async (req, res) => {
-    const admin = await requireAdmin(req, res);
-    if (!admin) return;
-
-    try {
-      const { userId, quota } = req.body;
-      if (!userId) {
-        return res.status(400).json({ error: "userId é obrigatório." });
-      }
-      const n = Math.max(1, Math.min(5, Math.floor(Number(quota) || 0)));
-      if (n < 1 || n > 5) {
-        return res.status(400).json({ error: "A quantidade deve estar entre 1 e 5." });
-      }
-
-      const { error } = await admin.supabase
-        .from("profiles")
-        .update({ chat_free_quota: n, updated_at: new Date().toISOString() })
-        .eq("id", userId);
-
-      if (error) {
-        console.error("[Admin] Erro ao conceder quota de chat:", error);
-        return res.status(500).json({ error: "Erro ao conceder perguntas de chat." });
-      }
-
-      return res.json({ success: true, chat_free_quota: n });
-    } catch (err: any) {
-      console.error("[Admin] Erro em grant-chat-quota:", err);
       return res.status(500).json({ error: "Erro interno." });
     }
   });
