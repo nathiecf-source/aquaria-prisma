@@ -2463,6 +2463,7 @@ export default function AstrologyMandala({
 
       {paywallFeature && (
         <PaywallBarrier
+          featureId={paywallFeature}
           subscriptionTier={subscriptionTier}
           userId={userProfile?.id || ""}
           userEmail={userProfile?.email || ""}

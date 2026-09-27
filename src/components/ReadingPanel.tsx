@@ -893,6 +893,7 @@ export default function ReadingPanel({
                     </div>
                   ) : data.id.startsWith("casa-") ? !isHouseUnlocked ? (
                     <PaywallBarrier
+                      featureId={data.id.replace(/-/g, "_")}
                       subscriptionTier={subscriptionTier}
                       userId={userId}
                       userEmail={userEmail}
@@ -1016,6 +1017,7 @@ export default function ReadingPanel({
 
                       {!isTabLoading && activeTab === "vedic" && (
                         <PaywallBarrier
+                          featureId={`${data.id.replace(/-/g, "_")}_vedico`}
                           subscriptionTier={isHouseUnlocked ? "PLUS" : "FREE"}
                           userId={userId}
                           userEmail={userEmail}
@@ -1078,6 +1080,7 @@ export default function ReadingPanel({
 
                       {!isTabLoading && activeTab === "sintese" && (
                         <PaywallBarrier
+                          featureId={`${data.id.replace(/-/g, "_")}_sintese`}
                           subscriptionTier={isHouseUnlocked ? "PLUS" : "FREE"}
                           userId={userId}
                           userEmail={userEmail}
@@ -1170,6 +1173,7 @@ export default function ReadingPanel({
                     </>
                   ) : data.id === "caminho-assimilacao" || data.id === "caminho-manifestacao" || data.id === "caminho-transformacao" || data.id === "eixo-asc" || data.id === "eixo-ic" || data.id === "eixo-dsc" || data.id === "eixo-mc" ? (
                     <PaywallBarrier
+                      featureId={data.id.replace(/-/g, "_")}
                       subscriptionTier={isPathUnlocked ? "PLUS" : "FREE"}
                       userId={userId}
                       userEmail={userEmail}
@@ -1280,6 +1284,7 @@ export default function ReadingPanel({
                   ) : data.id.startsWith("caminho-") ? (
                     /* Locked Caminhos Layout */
                     <PaywallBarrier
+                      featureId={data.id.replace(/-/g, "_")}
                       subscriptionTier={subscriptionTier}
                       userId={userId}
                       userEmail={userEmail}
@@ -1359,6 +1364,7 @@ export default function ReadingPanel({
                       {/* Body Blocks - Editorial style */}
                       {(data.id === "eixo-ic" || data.id === "eixo-mc") ? (
                         <PaywallBarrier
+                          featureId={data.id.replace(/-/g, "_")}
                           subscriptionTier={subscriptionTier}
                           userId={userId}
                           userEmail={userEmail}

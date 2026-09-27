@@ -43,6 +43,69 @@ interface FoundUser {
   profile: any;
 }
 
+interface PaywallRank {
+  feature_id: string;
+  views: number;
+  unique_users: number;
+}
+
+interface OpportunityItem {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  whatsapp_number: string | null;
+  last_attempt?: string;
+  attempts?: number;
+  plan_views?: number;
+  last_view?: string;
+}
+
+interface CrmUser {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  whatsapp_number: string | null;
+  last_sign_in_at: string | null;
+  access_expires_at?: string | null;
+  subscription_started_at?: string | null;
+  current_plan_id?: string | null;
+  created_at?: string | null;
+}
+
+interface PagedList<T> {
+  items: T[];
+  total: number;
+  page: number;
+  hasMore: boolean;
+  loading: boolean;
+}
+
+const EMPTY_PAGE = { items: [], total: 0, page: 0, hasMore: false, loading: false };
+
+const FEATURE_LABELS: Record<string, string> = {
+  chat_astrologico: "Chat Astrológico",
+  transits: "Ciclos Planetários",
+  planets: "Planetas",
+  caminhos: "Caminhos de Potência",
+  dynamics: "Dinâmicas Planetárias",
+  insights: "Minha Evolução",
+  "(legado)": "Barreiras antigas (sem ID)",
+};
+
+function formatFeatureId(id: string): string {
+  if (FEATURE_LABELS[id]) return FEATURE_LABELS[id];
+  const house = id.match(/^casa_(\d+)(?:_(vedico|sintese))?$/);
+  if (house) {
+    return `Casa ${house[1]}${house[2] === "vedico" ? " · Védico" : house[2] === "sintese" ? " · Síntese" : ""}`;
+  }
+  return id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("pt-BR");
+}
+
 interface Coupon {
   id: string;
   code: string;
@@ -57,6 +120,8 @@ interface Coupon {
 
 const TABS = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "oportunidades", label: "Oportunidades" },
+  { id: "crm", label: "CRM" },
   { id: "cupons", label: "Cupons e Parcerias" },
   { id: "chamado", label: "O Chamado" },
   { id: "feedbacks", label: "Feedbacks" },
@@ -181,6 +246,13 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
+  const [paywallRanking, setPaywallRanking] = useState<PaywallRank[]>([]);
+  const [carts, setCarts] = useState<PagedList<OpportunityItem>>({ ...EMPTY_PAGE });
+  const [flerteiros, setFlerteiros] = useState<PagedList<OpportunityItem>>({ ...EMPTY_PAGE });
+  const [plusUsers, setPlusUsers] = useState<PagedList<CrmUser>>({ ...EMPTY_PAGE });
+  const [freeUsers, setFreeUsers] = useState<PagedList<CrmUser>>({ ...EMPTY_PAGE });
+  const [plusOrder, setPlusOrder] = useState<"desc" | "asc">("desc");
+
   const [emailModal, setEmailModal] = useState<{
     open: boolean;
     templateId: string;
@@ -199,9 +271,21 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     loadMetrics();
     loadSettings().then(() => setLoading(false));
     loadFunnel();
+    loadPaywallRanking();
     loadCoupons();
     loadFeedbacks();
   }, [userProfile]);
+
+  useEffect(() => {
+    if (activeTab === "oportunidades") {
+      if (carts.items.length === 0 && !carts.loading) loadOpportunities("carts", 0);
+      if (flerteiros.items.length === 0 && !flerteiros.loading) loadOpportunities("flerteiros", 0);
+    }
+    if (activeTab === "crm") {
+      if (plusUsers.items.length === 0 && !plusUsers.loading) loadPlusUsers(0, plusOrder);
+      if (freeUsers.items.length === 0 && !freeUsers.loading) loadFreeUsers(0);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!searchEmail.trim()) {
@@ -346,6 +430,81 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
       if (res.ok) setFunnel(data);
     } catch (err) {
       console.error("[Admin] Erro ao carregar funil:", err);
+    }
+  }
+
+  async function loadPaywallRanking() {
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/paywall-ranking", {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setPaywallRanking(data.ranking || []);
+    } catch (err) {
+      console.error("[Admin] Erro ao carregar ranking de paywall:", err);
+    }
+  }
+
+  async function adminGet(url: string) {
+    const token = await getToken();
+    const res = await fetch(url, {
+      headers: { Authorization: token ? `Bearer ${token}` : "" },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Erro ao carregar.");
+    return data;
+  }
+
+  async function loadOpportunities(type: "carts" | "flerteiros", page: number) {
+    const setter = type === "carts" ? setCarts : setFlerteiros;
+    setter((prev) => ({ ...prev, loading: true }));
+    try {
+      const data = await adminGet(`/api/admin/opportunities?type=${type}&page=${page}`);
+      setter((prev) => ({
+        items: page === 0 ? data.items : [...prev.items, ...data.items],
+        total: data.total,
+        page,
+        hasMore: data.hasMore,
+        loading: false,
+      }));
+    } catch (err) {
+      console.error(`[Admin] Erro em oportunidades/${type}:`, err);
+      setter((prev) => ({ ...prev, loading: false }));
+    }
+  }
+
+  async function loadPlusUsers(page: number, order: "desc" | "asc") {
+    setPlusUsers((prev) => ({ ...prev, loading: true }));
+    try {
+      const data = await adminGet(`/api/admin/users/plus?page=${page}&order=${order}`);
+      setPlusUsers((prev) => ({
+        items: page === 0 ? data.items : [...prev.items, ...data.items],
+        total: data.total,
+        page,
+        hasMore: data.hasMore,
+        loading: false,
+      }));
+    } catch (err) {
+      console.error("[Admin] Erro no CRM PLUS:", err);
+      setPlusUsers((prev) => ({ ...prev, loading: false }));
+    }
+  }
+
+  async function loadFreeUsers(page: number) {
+    setFreeUsers((prev) => ({ ...prev, loading: true }));
+    try {
+      const data = await adminGet(`/api/admin/users/free?page=${page}`);
+      setFreeUsers((prev) => ({
+        items: page === 0 ? data.items : [...prev.items, ...data.items],
+        total: data.total,
+        page,
+        hasMore: data.hasMore,
+        loading: false,
+      }));
+    } catch (err) {
+      console.error("[Admin] Erro no CRM FREE:", err);
+      setFreeUsers((prev) => ({ ...prev, loading: false }));
     }
   }
 
@@ -739,9 +898,8 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const isPlus = selectedUser?.profile?.has_access === true &&
     (!selectedUser?.profile?.access_expires_at || new Date(selectedUser.profile.access_expires_at) > new Date());
 
-  const funnelMax = Math.max(funnel.viewPaywall, 1);
+  const funnelMax = Math.max(funnel.viewPlans, 1);
   const funnelSteps = [
-    { label: "Visualizou Barreira", value: funnel.viewPaywall, color: "bg-[#8c7f70]" },
     { label: "Viu Planos", value: funnel.viewPlans, color: "bg-[#8c6239]" },
     { label: "Iniciou Checkout", value: funnel.checkoutInitiated, color: "bg-[#6b452b]" },
     { label: "Pagou", value: funnel.checkoutCompleted, color: "bg-emerald-600" },
@@ -834,7 +992,10 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
             </div>
 
             <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-xs uppercase tracking-widest text-[#6e6356] mb-4">Funil de Vendas</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Funil de Conversão</h2>
+                <span className="text-[10px] uppercase tracking-wider text-[#8c7f70]">usuárias únicas</span>
+              </div>
               <div className="space-y-4">
                 {funnelSteps.map((step, index) => {
                   const pct = Math.round((step.value / funnelMax) * 100);
@@ -851,6 +1012,207 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                   );
                 })}
               </div>
+              <p className="text-[11px] text-[#8c7f70] mt-4 pt-3 border-t border-[#e6e2d8]">
+                {funnel.viewPaywall} usuária(s) única(s) já viram uma barreira de paywall no total.
+              </p>
+            </div>
+
+            <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Ranking de Barreiras</h2>
+                <span className="text-[10px] uppercase tracking-wider text-[#8c7f70]">o que mais trava</span>
+              </div>
+              {paywallRanking.length === 0 ? (
+                <p className="text-xs text-[#8c7f70]">Nenhum evento de paywall registrado.</p>
+              ) : (
+                <div className="space-y-2">
+                  {paywallRanking.map((rank, index) => {
+                    const top = paywallRanking[0]?.unique_users || 1;
+                    const pct = Math.round((rank.unique_users / top) * 100);
+                    return (
+                      <div key={rank.feature_id} className="flex items-center gap-3">
+                        <span className="w-5 text-[10px] font-bold text-[#8c7f70] text-right">{index + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-medium text-[#3c352d] truncate">{formatFeatureId(rank.feature_id)}</span>
+                            <span className="text-[#6e6356] shrink-0 ml-2">{rank.unique_users} usuária(s) · {rank.views} views</span>
+                          </div>
+                          <div className="h-2 w-full bg-white border border-[#e6e2d8] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#8c6239] transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeTab === "oportunidades" && (
+          <section className="space-y-6">
+            <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Carrinhos Abandonados</h2>
+                <span className="text-[10px] uppercase tracking-wider text-[#8c7f70]">{carts.total} na semana</span>
+              </div>
+              <p className="text-[11px] text-[#8c7f70] mb-4">Iniciaram checkout nos últimos 7 dias e não pagaram.</p>
+              {carts.items.length === 0 && !carts.loading ? (
+                <p className="text-xs text-[#8c7f70]">Nenhum carrinho abandonado nos últimos 7 dias.</p>
+              ) : (
+                <div className="space-y-2">
+                  {carts.items.map((item) => (
+                    <div key={item.user_id} className="bg-white border border-[#e6e2d8] rounded-xl p-3 flex flex-wrap items-center gap-x-6 gap-y-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#3c352d] truncate">{item.full_name || "—"}</p>
+                        <p className="text-[11px] text-[#6e6356] truncate">{item.email || "—"}</p>
+                      </div>
+                      <div className="text-[11px] text-[#6e6356]">{item.whatsapp_number || "—"}</div>
+                      <div className="text-[11px] text-[#8c7f70] text-right">
+                        <p>{formatDateTime(item.last_attempt)}</p>
+                        <p className="text-[10px]">{item.attempts} tentativa(s)</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {carts.loading && <p className="text-xs text-[#8c7f70] animate-pulse mt-3">Carregando...</p>}
+              {carts.hasMore && !carts.loading && (
+                <button
+                  onClick={() => loadOpportunities("carts", carts.page + 1)}
+                  className="mt-4 w-full py-2.5 bg-white border border-[#d6d2c8] rounded-lg text-xs font-bold uppercase tracking-widest text-[#6e6356] hover:border-[#8c6239]"
+                >
+                  Carregar mais
+                </button>
+              )}
+            </div>
+
+            <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Flerteiros</h2>
+                <span className="text-[10px] uppercase tracking-wider text-[#8c7f70]">{flerteiros.total} na semana</span>
+              </div>
+              <p className="text-[11px] text-[#8c7f70] mb-4">Viram a tela de planos 3+ vezes nos últimos 7 dias sem pagar.</p>
+              {flerteiros.items.length === 0 && !flerteiros.loading ? (
+                <p className="text-xs text-[#8c7f70]">Nenhuma usuária com alto interesse no momento.</p>
+              ) : (
+                <div className="space-y-2">
+                  {flerteiros.items.map((item) => (
+                    <div key={item.user_id} className="bg-white border border-[#e6e2d8] rounded-xl p-3 flex flex-wrap items-center gap-x-6 gap-y-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#3c352d] truncate">{item.full_name || "—"}</p>
+                        <p className="text-[11px] text-[#6e6356] truncate">{item.email || "—"}</p>
+                      </div>
+                      <div className="text-[11px] text-[#6e6356]">{item.whatsapp_number || "—"}</div>
+                      <div className="text-[11px] text-[#8c7f70] text-right">
+                        <p>{item.plan_views}x planos</p>
+                        <p className="text-[10px]">{formatDateTime(item.last_view)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {flerteiros.loading && <p className="text-xs text-[#8c7f70] animate-pulse mt-3">Carregando...</p>}
+              {flerteiros.hasMore && !flerteiros.loading && (
+                <button
+                  onClick={() => loadOpportunities("flerteiros", flerteiros.page + 1)}
+                  className="mt-4 w-full py-2.5 bg-white border border-[#d6d2c8] rounded-lg text-xs font-bold uppercase tracking-widest text-[#6e6356] hover:border-[#8c6239]"
+                >
+                  Carregar mais
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeTab === "crm" && (
+          <section className="space-y-6">
+            <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Assinantes PLUS</h2>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] uppercase tracking-wider text-[#8c7f70]">{plusUsers.total} ativas</span>
+                  <select
+                    value={plusOrder}
+                    onChange={(e) => {
+                      const order = e.target.value as "desc" | "asc";
+                      setPlusOrder(order);
+                      setPlusUsers({ ...EMPTY_PAGE });
+                      loadPlusUsers(0, order);
+                    }}
+                    className="px-3 py-1.5 bg-white border border-[#d6d2c8] rounded-lg text-[11px] text-[#3c352d] focus:outline-none focus:border-[#8c6239]"
+                  >
+                    <option value="desc">Assinaturas mais recentes</option>
+                    <option value="asc">Assinaturas mais antigas</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-[11px] text-[#8c7f70] mb-4">Usuárias com acesso ativo no momento.</p>
+              {plusUsers.items.length === 0 && !plusUsers.loading ? (
+                <p className="text-xs text-[#8c7f70]">Nenhuma assinante ativa.</p>
+              ) : (
+                <div className="space-y-2">
+                  {plusUsers.items.map((item) => (
+                    <div key={item.user_id} className="bg-white border border-[#e6e2d8] rounded-xl p-3 flex flex-wrap items-center gap-x-6 gap-y-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#3c352d] truncate">{item.full_name || "—"}</p>
+                        <p className="text-[11px] text-[#6e6356] truncate">{item.email || "—"}</p>
+                      </div>
+                      <div className="text-[11px] text-[#6e6356]">{item.whatsapp_number || "—"}</div>
+                      <div className="text-[11px] text-[#8c7f70] text-right">
+                        <p>Login: {formatDateTime(item.last_sign_in_at)}</p>
+                        <p className="text-[10px]">Expira: {formatDateTime(item.access_expires_at)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {plusUsers.loading && <p className="text-xs text-[#8c7f70] animate-pulse mt-3">Carregando...</p>}
+              {plusUsers.hasMore && !plusUsers.loading && (
+                <button
+                  onClick={() => loadPlusUsers(plusUsers.page + 1, plusOrder)}
+                  className="mt-4 w-full py-2.5 bg-white border border-[#d6d2c8] rounded-lg text-xs font-bold uppercase tracking-widest text-[#6e6356] hover:border-[#8c6239]"
+                >
+                  Carregar mais
+                </button>
+              )}
+            </div>
+
+            <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-xs uppercase tracking-widest text-[#6e6356]">Leads Gratuitos</h2>
+                <span className="text-[10px] uppercase tracking-wider text-[#8c7f70]">{freeUsers.total} na base</span>
+              </div>
+              <p className="text-[11px] text-[#8c7f70] mb-4">Usuárias sem acesso PLUS ativo (inclui expiradas).</p>
+              {freeUsers.items.length === 0 && !freeUsers.loading ? (
+                <p className="text-xs text-[#8c7f70]">Nenhuma usuária gratuita.</p>
+              ) : (
+                <div className="space-y-2">
+                  {freeUsers.items.map((item) => (
+                    <div key={item.user_id} className="bg-white border border-[#e6e2d8] rounded-xl p-3 flex flex-wrap items-center gap-x-6 gap-y-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#3c352d] truncate">{item.full_name || "—"}</p>
+                        <p className="text-[11px] text-[#6e6356] truncate">{item.email || "—"}</p>
+                      </div>
+                      <div className="text-[11px] text-[#6e6356]">{item.whatsapp_number || "—"}</div>
+                      <div className="text-[11px] text-[#8c7f70] text-right">
+                        <p>Login: {formatDateTime(item.last_sign_in_at)}</p>
+                        <p className="text-[10px]">Cadastro: {formatDateTime(item.created_at)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {freeUsers.loading && <p className="text-xs text-[#8c7f70] animate-pulse mt-3">Carregando...</p>}
+              {freeUsers.hasMore && !freeUsers.loading && (
+                <button
+                  onClick={() => loadFreeUsers(freeUsers.page + 1)}
+                  className="mt-4 w-full py-2.5 bg-white border border-[#d6d2c8] rounded-lg text-xs font-bold uppercase tracking-widest text-[#6e6356] hover:border-[#8c6239]"
+                >
+                  Carregar mais
+                </button>
+              )}
             </div>
           </section>
         )}

@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-export async function trackEvent(eventName: string) {
+export async function trackEvent(eventName: string, metadata?: Record<string, unknown>) {
   try {
     const { data } = await supabase.auth.getSession();
     const token = data?.session?.access_token;
@@ -15,7 +15,7 @@ export async function trackEvent(eventName: string) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ event_name: eventName }),
+      body: JSON.stringify({ event_name: eventName, metadata }),
     });
 
     if (!res.ok) {

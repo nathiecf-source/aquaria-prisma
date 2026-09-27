@@ -3,6 +3,7 @@ import { Lock, Sparkles, CreditCard, X, ArrowRight } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
 
 interface PaywallBarrierProps {
+  featureId: string;
   subscriptionTier: "FREE" | "PLUS";
   userId: string;
   userEmail: string;
@@ -16,6 +17,7 @@ interface PaywallBarrierProps {
 }
 
 export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
+  featureId,
   subscriptionTier,
   children,
   title = "PASSE DE EXPANSÃO",
@@ -25,7 +27,7 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
 }) => {
   useEffect(() => {
     if (subscriptionTier !== "PLUS") {
-      trackEvent("view_paywall");
+      trackEvent("view_paywall", { feature_id: featureId });
     }
   }, []);
 

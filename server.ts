@@ -3811,9 +3811,12 @@ async function createApp(): Promise<express.Application> {
   // POST /api/analytics/track - registra um evento
   app.post("/api/analytics/track", async (req, res) => {
     try {
-      const { event_name } = req.body;
+      const { event_name, metadata } = req.body;
       if (!event_name || typeof event_name !== "string") {
         return res.status(400).json({ error: "event_name é obrigatório." });
+      }
+      if (metadata !== undefined && (typeof metadata !== "object" || metadata === null || Array.isArray(metadata))) {
+        return res.status(400).json({ error: "metadata deve ser um objeto." });
       }
 
       const authHeader = req.headers.authorization;
@@ -3835,6 +3838,7 @@ async function createApp(): Promise<express.Application> {
       const { error } = await supabase.from("analytics_events").insert({
         event_name,
         user_id: user.id,
+        metadata: metadata || null,
         created_at: new Date().toISOString(),
       });
 
@@ -3850,45 +3854,156 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
-  // GET /api/admin/funnel - métricas do funil de vendas
+  // GET /api/admin/funnel - métricas do funil (usuários únicos, agregado no PostgreSQL)
   app.get("/api/admin/funnel", async (req, res) => {
     const admin = await requireAdmin(req, res);
     if (!admin) return;
 
     try {
-      const { count: viewPaywall, error: err1 } = await admin.supabase
-        .from("analytics_events")
-        .select("*", { count: "exact", head: true })
-        .eq("event_name", "view_paywall");
+      const { data, error } = await admin.supabase.rpc("admin_funnel_metrics");
 
-      const { count: viewPlans, error: err2 } = await admin.supabase
-        .from("analytics_events")
-        .select("*", { count: "exact", head: true })
-        .eq("event_name", "view_plans");
-
-      const { count: checkoutInitiated, error: err3 } = await admin.supabase
-        .from("analytics_events")
-        .select("*", { count: "exact", head: true })
-        .eq("event_name", "checkout_initiated");
-
-      const { count: checkoutCompleted, error: err4 } = await admin.supabase
-        .from("transactions")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "paid");
-
-      if (err1 || err2 || err3 || err4) {
-        console.error("[Admin] Erro no funil:", { err1, err2, err3, err4 });
+      if (error) {
+        console.error("[Admin] Erro no funil:", error);
         return res.status(500).json({ error: "Erro ao carregar funil." });
       }
 
       return res.json({
-        viewPaywall: viewPaywall || 0,
-        viewPlans: viewPlans || 0,
-        checkoutInitiated: checkoutInitiated || 0,
-        checkoutCompleted: checkoutCompleted || 0,
+        viewPaywall: data?.viewPaywall || 0,
+        viewPlans: data?.viewPlans || 0,
+        checkoutInitiated: data?.checkoutInitiated || 0,
+        checkoutCompleted: data?.checkoutCompleted || 0,
       });
     } catch (err: any) {
       console.error("[Admin] Erro no funil:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // GET /api/admin/paywall-ranking - ranking de barreiras por feature
+  app.get("/api/admin/paywall-ranking", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { data, error } = await admin.supabase.rpc("admin_paywall_ranking");
+
+      if (error) {
+        console.error("[Admin] Erro no ranking de paywall:", error);
+        return res.status(500).json({ error: "Erro ao carregar ranking." });
+      }
+
+      return res.json({ ranking: data || [] });
+    } catch (err: any) {
+      console.error("[Admin] Erro no ranking de paywall:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // GET /api/admin/opportunities?type=carts|flerteiros&page=0 - listas paginadas de oportunidades
+  app.get("/api/admin/opportunities", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const type = req.query.type === "flerteiros" ? "flerteiros" : "carts";
+      const page = Math.max(0, parseInt(String(req.query.page || "0"), 10) || 0);
+      const limit = 10;
+      const offset = page * limit;
+
+      const rpcName = type === "flerteiros" ? "admin_flerteiros" : "admin_abandoned_carts";
+      const { data, error } = await admin.supabase.rpc(rpcName, {
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (error) {
+        console.error(`[Admin] Erro em opportunities/${type}:`, error);
+        return res.status(500).json({ error: "Erro ao carregar oportunidades." });
+      }
+
+      const items = data || [];
+      const total = items.length > 0 ? Number(items[0].total_count) : 0;
+
+      return res.json({
+        items: items.map(({ total_count, ...rest }: any) => rest),
+        total,
+        page,
+        hasMore: offset + items.length < total,
+      });
+    } catch (err: any) {
+      console.error("[Admin] Erro em opportunities:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // GET /api/admin/users/plus?page=0&order=desc|asc - CRM de assinantes paginado
+  app.get("/api/admin/users/plus", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const page = Math.max(0, parseInt(String(req.query.page || "0"), 10) || 0);
+      const order = req.query.order === "asc" ? "asc" : "desc";
+      const limit = 10;
+      const offset = page * limit;
+
+      const { data, error } = await admin.supabase.rpc("admin_users_plus", {
+        p_limit: limit,
+        p_offset: offset,
+        p_order: order,
+      });
+
+      if (error) {
+        console.error("[Admin] Erro no CRM PLUS:", error);
+        return res.status(500).json({ error: "Erro ao carregar assinantes." });
+      }
+
+      const items = data || [];
+      const total = items.length > 0 ? Number(items[0].total_count) : 0;
+
+      return res.json({
+        items: items.map(({ total_count, ...rest }: any) => rest),
+        total,
+        page,
+        hasMore: offset + items.length < total,
+      });
+    } catch (err: any) {
+      console.error("[Admin] Erro no CRM PLUS:", err);
+      return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // GET /api/admin/users/free?page=0 - CRM de leads paginado
+  app.get("/api/admin/users/free", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const page = Math.max(0, parseInt(String(req.query.page || "0"), 10) || 0);
+      const limit = 10;
+      const offset = page * limit;
+
+      const { data, error } = await admin.supabase.rpc("admin_users_free", {
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (error) {
+        console.error("[Admin] Erro no CRM FREE:", error);
+        return res.status(500).json({ error: "Erro ao carregar leads." });
+      }
+
+      const items = data || [];
+      const total = items.length > 0 ? Number(items[0].total_count) : 0;
+
+      return res.json({
+        items: items.map(({ total_count, ...rest }: any) => rest),
+        total,
+        page,
+        hasMore: offset + items.length < total,
+      });
+    } catch (err: any) {
+      console.error("[Admin] Erro no CRM FREE:", err);
       return res.status(500).json({ error: "Erro interno." });
     }
   });

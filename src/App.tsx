@@ -786,6 +786,7 @@ export default function App() {
       {showChatPaywall && chatActive && userProfile && (
         <PaywallBarrier
           standalone
+          featureId="chat_astrologico"
           subscriptionTier={activeSubscriptionTier}
           userId={userProfile.id}
           userEmail={userProfile.email || ""}
