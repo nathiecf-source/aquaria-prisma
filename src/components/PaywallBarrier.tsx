@@ -68,7 +68,7 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
       {/* Pricing Highlight */}
       <div className="mb-6 inline-flex flex-col items-center px-5 py-3 bg-[#8c6239] text-[#fbf9f5] rounded-2xl shadow-lg shadow-[#8c6239]/15">
         <span className="text-[10px] uppercase tracking-widest font-semibold opacity-90">Acesso a partir de</span>
-        <span className="text-2xl sm:text-3xl font-serif font-bold">6x de R$ 26,66</span>
+        <span className="text-2xl sm:text-3xl font-serif font-bold">12x de R$ 13,34</span>
       </div>
 
       {/* Upgrade Button */}

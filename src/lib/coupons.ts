@@ -14,7 +14,7 @@ export function formatCents(cents: number): string {
 
 export function calculateInstallment(cents: number, months: number): string {
   if (!months || months <= 0) return `R$ ${formatCents(cents)}`;
-  const installment = Math.floor(cents / months);
+  const installment = Math.ceil(cents / months);
   return `${months}x de R$ ${formatCents(installment)}`;
 }
 
