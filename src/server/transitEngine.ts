@@ -16,7 +16,7 @@ function resolveAstronomiaData(raw: any) {
   return raw;
 }
 
-async function initAstronomia(): Promise<{ julian: any; planetposition: any; solar: any; moonposition: any; planetData: any }> {
+export async function initAstronomia(): Promise<{ julian: any; planetposition: any; solar: any; moonposition: any; planetData: any }> {
   if (astromod) return { ...astromod, planetData };
   const [mod, dataRaw] = await Promise.all([
     import("astronomia"),
@@ -37,7 +37,7 @@ function shortestDelta(from: number, to: number): number {
 }
 
 /** Interpola linearmente a data em que a longitude cruza o alvo entre duas amostras. */
-function lerpCrossingDate(
+export function lerpCrossingDate(
   prevDate: Date,
   currDate: Date,
   prevValue: number,
@@ -71,6 +71,13 @@ export interface TransitAspect {
   distancia: number;
   casa_natal?: number;
   ritmo_tempo: string;
+  // Dados temporais e terreno computados pelo backend
+  whole_sign_house?: number;
+  scenery_start_date?: string;
+  scenery_end_date?: string | null;
+  peak_trigger_date?: string | null;
+  geography_text?: { palco: string; gatilho: string | null };
+  nature_text?: { label: string; sentence: string };
 }
 
 function getRitmoTempo(planeta: string): string {

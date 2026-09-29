@@ -31,10 +31,27 @@ interface RestructuringCycle {
 
 export type TransitPanelTab = "dashas" | "portal" | "transits";
 
+interface TransitCycleBlock {
+  planet: string;
+  planetaNatal: string;
+  aspecto: string;
+  wholeSignHouse: number;
+  desafio: string;
+  geografia: { palco: string; gatilho: string | null };
+  natureza: { label: string; sentence: string };
+  integracao: string;
+}
+
+interface TransitCyclesReading {
+  transits: TransitCycleBlock[];
+}
+
+type TransitText = string | TransitCyclesReading | null;
+
 interface TransitPanelProps {
   isOpen: boolean;
   isLoading: boolean;
-  text: string | null;
+  text: TransitText;
   restructuringCycles?: RestructuringCycle[];
   dashaText?: string | null;
   isLoadingDashas?: boolean;
@@ -172,6 +189,154 @@ function getRitmoBadge(ritmo: string): string {
   if (ritmo.startsWith("Longo")) return "bg-[#3c2e4a]/10 text-[#5c4d66] border-[#5c4d66]/20";
   if (ritmo.startsWith("M")) return "bg-[#8c6239]/10 text-[#8c6239] border-[#8c6239]/20";
   return "bg-[#3c6e4a]/10 text-[#3c6e4a] border-[#3c6e4a]/20";
+}
+
+// ─── Visualização estruturada dos Ciclos Planetários ──────────────────────────
+
+interface StructuredTransitViewProps {
+  reading: TransitCyclesReading;
+  userId: string | null;
+  profile: any;
+  onActivate: (t: ActiveTransit | null) => void;
+}
+
+function StructuredTransitView({ reading, userId, profile, onActivate }: StructuredTransitViewProps) {
+  const grouped = React.useMemo(() => {
+    const map = new Map<number, TransitCycleBlock[]>();
+    for (const t of reading.transits) {
+      const list = map.get(t.wholeSignHouse) || [];
+      list.push(t);
+      map.set(t.wholeSignHouse, list);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+  }, [reading]);
+
+  return (
+    <div className="space-y-8">
+      {grouped.length === 0 ? (
+        <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
+          <p className="font-serif text-[#8c7f70] text-sm">
+            Nenhum portal ativo no orbe de 4° no momento.
+          </p>
+        </div>
+      ) : (
+        grouped.map(([house, transits]) => (
+          <div key={house}>
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <span className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
+                Casa {house}
+              </span>
+              <div className="h-px flex-1 bg-[#8c7f70]/10" />
+              <span className="font-serif text-xs text-[#3c352d]">
+                {HOUSE_SPHERES[house] || `Esfera ${house}`}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {transits.map((t, idx) => (
+                <StructuredTransitCard
+                  key={`${house}-${idx}`}
+                  block={t}
+                  userId={userId}
+                  profile={profile}
+                  onActivate={onActivate}
+                />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+interface StructuredTransitCardProps {
+  block: TransitCycleBlock;
+  userId: string | null;
+  profile: any;
+  onActivate: (t: ActiveTransit | null) => void;
+}
+
+function StructuredTransitCard({ block, profile, onActivate }: StructuredTransitCardProps) {
+  const natalPlanets: any[] = profile?.tropical_natal?.planets ?? [];
+  const natalPlanet = natalPlanets.find((p: any) => p.name === block.planetaNatal);
+  const activePayload: ActiveTransit = {
+    planetaTransito: block.planet,
+    planetaNatal: block.planetaNatal,
+    casaNatal: natalPlanet?.house ?? block.wholeSignHouse,
+    aspecto: block.aspecto,
+    ritmoTempo: "",
+  };
+
+  return (
+    <div
+      className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] overflow-hidden transition-all hover:border-[#8c6239]/30"
+      onMouseEnter={() => onActivate(activePayload)}
+      onMouseLeave={() => onActivate(null)}
+    >
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-[#8c7f70]/10 bg-[#f4f1eb]/40">
+        <div className="flex items-center gap-3">
+          <span className="text-lg">{PLANET_ICONS[block.planet] || "✦"}</span>
+          <h3 className="font-serif text-[#3c352d] text-[14px] leading-snug">
+            {block.planet} {block.aspecto}
+          </h3>
+        </div>
+      </div>
+
+      {/* Blocos */}
+      <div className="px-5 py-5 space-y-5">
+        {/* 1. O Desafio */}
+        <section>
+          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">
+            O Desafio
+          </h4>
+          <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+            <Markdown rehypePlugins={[rehypeSanitize]}>{block.desafio}</Markdown>
+          </div>
+        </section>
+
+        {/* 2. A Geografia do Trânsito */}
+        <section className="rounded-lg bg-[#f4f1eb]/60 p-4 border border-[#8c7f70]/10">
+          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#8c6239] mb-2">
+            A Geografia do Trânsito
+          </h4>
+          <ul className="list-disc list-inside space-y-1 font-sans text-[13px] text-[#3c352d] leading-relaxed">
+            <li>
+              <span className="font-medium text-[#3c352d]">O Palco:</span>{" "}
+              {block.geografia.palco}
+            </li>
+            {block.geografia.gatilho && (
+              <li>
+                <span className="font-medium text-[#3c352d]">O Gatilho:</span>{" "}
+                {block.geografia.gatilho}
+              </li>
+            )}
+          </ul>
+        </section>
+
+        {/* 3. A Natureza do Evento */}
+        <section className="rounded-lg bg-[#f4f1eb]/40 p-4 border border-[#8c7f70]/10">
+          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#3c6e4a] mb-2">
+            A Natureza do Evento
+          </h4>
+          <p className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+            <span className="font-medium">{block.natureza.label}:</span>{" "}
+            {block.natureza.sentence}
+          </p>
+        </section>
+
+        {/* 4. A Integração & Prática Contemplativa */}
+        <section>
+          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">
+            A Integração & Prática Contemplativa
+          </h4>
+          <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+            <Markdown rehypePlugins={[rehypeSanitize]}>{block.integracao}</Markdown>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }
 
 // ─── Parser e componente para Dashas ─────────────────────────────────────────
@@ -767,7 +932,7 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
   }, [initialTab, isOpen]);
 
   const allTransits = React.useMemo(() => {
-    if (!text) return [];
+    if (!text || typeof text !== "string") return [];
     try {
       const parsed = parseTransitsFromMarkdown(text);
       // Enrich casaNatal from profile when parser got 0 (new format has no (Casa X))
@@ -947,7 +1112,14 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
 
           {text && (
             <div className="mt-6">
-              {allTransits.length === 0 ? (
+              {typeof text === "object" && Array.isArray(text.transits) ? (
+                <StructuredTransitView
+                  reading={text}
+                  userId={userId}
+                  profile={profile}
+                  onActivate={handleActivate}
+                />
+              ) : allTransits.length === 0 ? (
                 <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
                   <p className="font-serif text-[#8c7f70] text-sm">
                     Nenhum portal ativo no orbe de 4° no momento.

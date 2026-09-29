@@ -50,6 +50,7 @@ import { synthesizeMeditation } from "./src/server/ttsService";
 import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
 import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getAllPlanetPositions, getVedicTransitTerrain } from "./src/server/transitEngine";
+import { buildTransitGeography } from "./src/server/transitGeographyEngine";
 import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
 import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarReturnInstant, getActiveSolarReturnYear, getSolarReturnCycles } from "./src/server/solarReturnEngine";
 import { createDashaSignature, createPortalSignature, createTransitSignature, CycleNoticeTab } from "./src/server/cycleNotice";
@@ -1833,9 +1834,9 @@ async function createApp(): Promise<express.Application> {
       // Cache semanal da leitura: uma leitura por semana civil (YYYY-W##)
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
-      const readingId = `transit-cycles-${weekKey}`;
+      const readingId = `transit-cycles-v2-${weekKey}`;
       const cached = await getCachedReading(userId, readingId);
-      if (cached && typeof cached.reading === "string") {
+      if (cached && typeof cached.reading === "object" && cached.reading !== null) {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
         const restructuringCycles = Array.isArray(cached.restructuringCycles)
           ? cached.restructuringCycles
@@ -1897,7 +1898,7 @@ async function createApp(): Promise<express.Application> {
         const natalPlanetsMap: any[] = profile?.tropical_natal?.planets ?? [];
         const natalHousesMap: any[] = profile?.tropical_natal?.houses ?? [];
 
-        const tropicalTransits = allAspects.map(t => {
+        const tropicalTransits = await Promise.all(allAspects.map(async (t) => {
           const transitSign = SIGNS_PT[Math.floor(t.grau_transito / 30)];
           const transitHouse = houseOfDegree(t.grau_transito) || (t.casa_natal ?? 1);
 
@@ -1915,6 +1916,9 @@ async function createApp(): Promise<express.Application> {
           // Camada sideral/védica para o bloco "Geografia do Trânsito"
           const vedicTerrain = getVedicTransitTerrain(profile, t.planeta_transito, t.grau_transito, transitHouse);
 
+          // Geografia determinística: Whole Sign + Placidus
+          const geography = await buildTransitGeography(t.planeta_transito, today, natalHousesMap);
+
           return {
             planet: t.planeta_transito,
             transitSign,
@@ -1928,16 +1932,22 @@ async function createApp(): Promise<express.Application> {
             casaDoRegenteNatal,
             casaRegidaPeloTransitante,
             vedic_structural_terrain: vedicTerrain,
+            whole_sign_house: geography.wholeSignHouse,
+            scenery_start_date: geography.window.ingressDate.toISOString(),
+            scenery_end_date: geography.window.egressDate?.toISOString() ?? null,
+            peak_trigger_date: geography.peakDate?.toISOString() ?? null,
+            geography_text: geography.geografia,
+            nature_text: geography.natureza,
           };
-        });
+        }));
 
-        console.log("[TRANSIT HOUSE DEBUG]", tropicalTransits.map(t => `${t.planet} sign=${t.transitSign} → Casa ${t.transitHouse}${t.transitCoHouse ? ` + co-Casa ${t.transitCoHouse}` : ""}`));
+        console.log("[TRANSIT HOUSE DEBUG]", tropicalTransits.map(t => `${t.planet} sign=${t.transitSign} → Casa ${t.transitHouse}${t.transitCoHouse ? ` + co-Casa ${t.transitCoHouse}` : ""} | WholeSign=${t.whole_sign_house}`));
         enrichedProfile = { ...profile, tropical_transits: tropicalTransits };
       } catch (engineErr: any) {
         console.warn("[TRANSIT ENGINE] Falha no motor interno, usando dados do profile:", engineErr?.message);
       }
 
-      const readingText = await generateTransitCyclesReading(enrichedProfile);
+      const reading = await generateTransitCyclesReading(enrichedProfile);
 
       let restructuringCycles: any[] = [];
       try {
@@ -1946,10 +1956,10 @@ async function createApp(): Promise<express.Application> {
         console.warn("[RESTRUCTURING CYCLES] Falha ao calcular ciclos reestruturantes:", cyclesErr?.message);
       }
 
-      const payload = { reading: readingText, restructuringCycles, generatedAt: new Date().toISOString() };
+      const payload = { reading, restructuringCycles, generatedAt: new Date().toISOString() };
       await saveReading(userId, readingId, "transit-cycles", payload, getNextSundayMidnight(new Date()));
 
-      return res.json({ reading: readingText, restructuringCycles, cached: false });
+      return res.json({ reading, restructuringCycles, cached: false });
     } catch (err: any) {
       console.error("Erro ao gerar Leitura de Trânsitos e Ciclos:", err);
       return res.status(500).json({

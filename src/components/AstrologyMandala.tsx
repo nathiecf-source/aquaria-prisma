@@ -508,7 +508,7 @@ export default function AstrologyMandala({
   const [transitInitialTab, setTransitInitialTab] = React.useState<TransitPanelTab>("dashas");
   const [cycleChanges, setCycleChanges] = React.useState<Array<{ tab: TransitPanelTab; label: string; cosmic?: boolean }>>([]);
   const cycleChangesCheckedFor = React.useRef<string | null>(null);
-  const [transitsText, setTransitsText] = React.useState<string | null>(null);
+  const [transitsText, setTransitsText] = React.useState<string | { transits: any[] } | null>(null);
   const [restructuringCycles, setRestructuringCycles] = React.useState<any[]>([]);
   const [isFetchingTransits, setIsFetchingTransits] = React.useState(false);
   const [dashaText, setDashaText] = React.useState<string | null>(null);

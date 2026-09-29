@@ -3235,144 +3235,130 @@ export function getDeterministicDiretrizAmplaFallback(
   visualState: any
 ): DiretrizAmplaOutput { throw new Error("Fallback de interpretação removido para diagnóstico da API Gemini."); }
 
+export interface TransitCycleGeography {
+  palco: string;
+  gatilho: string | null;
+}
+
+export interface TransitCycleNature {
+  label: string;
+  sentence: string;
+}
+
+export interface TransitCyclesBlock {
+  planet: string;
+  planetaNatal: string;
+  aspecto: string;
+  wholeSignHouse: number;
+  desafio: string;
+  geografia: TransitCycleGeography;
+  natureza: TransitCycleNature;
+  integracao: string;
+}
+
+export interface TransitCyclesReading {
+  transits: TransitCyclesBlock[];
+}
+
+const transitCyclesReadingSchema = {
+  type: Type.OBJECT,
+  properties: {
+    transits: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          planet: { type: Type.STRING, description: "Nome do planeta em trânsito." },
+          planetaNatal: { type: Type.STRING, description: "Nome do planeta natal tocado." },
+          aspecto: { type: Type.STRING, description: "Aspecto (ex: Conjunção com Saturno Natal)." },
+          wholeSignHouse: { type: Type.INTEGER, description: "Casa astrológica Whole Sign ativada pelo trânsito." },
+          desafio: { type: Type.STRING, description: "Texto do bloco O Desafio (introdução psicológica e somática)." },
+          integracao: { type: Type.STRING, description: "Texto do bloco A Integração & Prática Contemplativa." },
+        },
+        required: ["planet", "planetaNatal", "aspecto", "wholeSignHouse", "desafio", "integracao"],
+      },
+    },
+  },
+  required: ["transits"],
+};
+
+function getGenericTransitFallback(transit: any): TransitCyclesBlock {
+  const planet = transit.planet || "Planeta";
+  const natal = transit.planetaNatal || "seu ponto natal";
+  const aspecto = transit.aspectToNatal || `em aspecto com ${natal}`;
+  const wholeSignHouse = transit.whole_sign_house ?? 0;
+  return {
+    planet,
+    planetaNatal: natal,
+    aspecto,
+    wholeSignHouse,
+    desafio: `O trânsito de ${planet} ${aspecto} ativa uma tensão específica na sua psique. Observe como esse encontro ecoa no corpo e na emoção sem buscar soluções imediatas. O primeiro passo é nomear o que está sendo tocado com honestidade.`,
+    geografia: transit.geography_text ?? { palco: "Janela temporal em cálculo.", gatilho: null },
+    natureza: transit.nature_text ?? { label: "Terreno em cálculo.", sentence: "" },
+    integracao: `Este movimento pede que você sustente a tensão com presença, sem fugir nem forçar respostas. Encontre uma virtude própria deste momento — pode ser paciência, discernimento ou coragem quieta — e deixe que ela organize uma ação mínima e concreta para hoje. Feche os olhos por alguns instantes, respire e sinta onde esse trânsito habita no corpo.`,
+  };
+}
+
 export async function generateTransitCyclesReading(
   profile: CompleteAstrologicalProfile
-): Promise<string> {
+): Promise<TransitCyclesReading> {
   const gender = getEffectiveGender(profile);
 
-  const PLANET_ICONS: Record<string, string> = {
-    "Sol": "☀️", "Lua": "🌙", "Mercúrio": "☿", "Vênus": "♀️", "Marte": "♂️",
-    "Júpiter": "♃", "Saturno": "♄", "Urano": "⛢", "Netuno": "♆", "Plutão": "♇"
-  };
-
   const systemInstruction = `[PAPEL DO SISTEMA]
-Você é um guia terapêutico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que conhece astrologia e psicologia de forma profunda. O texto principal deve focar puramente na psicologia dos arquétipos e no atrito dos regentes. Os NÚMEROS DAS CASAS ASTROLÓGICAS são PROIBIDOS no corpo principal do texto e devem aparecer apenas no bloco independente "A Geografia do Trânsito".
+Você é um guia terapêutico e astrológico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que entende astrologia e psicologia de forma profunda.
 
-[DADOS DE ENTRADA]
-Você receberá dados estruturados de cada trânsito: planeta transitante, signo e casa TROPICAL por onde transita, planeta natal tocado, signo natal e casa natal, os planetas que regem esses signos, a casa que o regente natal ocupa e a casa que o planeta transitante governa natalmente, o tipo de aspecto e o ritmo de tempo. Além disso, para cada trânsito será fornecido: signo e casa SIDERAL (Whole Sign Védica), Nota de Terreno BAV (0–8), Força de Contribuição SAV e indicação de divergência entre casa Tropical e Sideral. Esses dados são a sua matéria-prima — use-os como CONTEXTO para escrever, não como roteiro técnico a ser transcrito.
+TAREFA
+Para CADA trânsito fornecido, escreva APENAS os dois campos abaixo:
+1. desafio: introdução psicológica/somática do encontro entre o planeta transitante e o planeta natal (4 a 6 frases).
+2. integracao: encerramento com insight não-dual, virtude nomeada especificamente para esta combinação, e prática contemplativa somática (5 a 8 frases).
 
-${getGenderFlexionInstruction(gender)}
-
-${CHAKRA_BLOCKLIST_RULE}
-
-[REGRAS INEGOCIÁVEIS DE ESCRITA]
-
-1. SÍNTESE ÚNICA POR COMBINAÇÃO: Cada bloco de trânsito deve nascer do cruzamento específico entre a essência do planeta transitante E a essência do planeta natal. PROIBIDO reciclar frases, virtudes, âncoras somáticas ou metáforas entre trânsitos diferentes — mesmo que o planeta transitante se repita. Netuno tocando a Lua exige integração completamente diferente de Netuno tocando Júpiter.
-
-2. CONCORDÂNCIA DE GÊNERO: Respeite o gênero gramatical do planeta natal. Use "a sua Lua", "a sua Vênus", "o seu Júpiter", "o seu Sol", "o seu Marte", "o seu Saturno", "o seu Mercúrio".
-
-3. PROIBIDO JARGÃO ESOTÉRICO: Nunca use 'chakra', 'vibração', 'energia cósmica', 'alinhamento', 'universo', 'manifestar' ou qualquer termo New Age.
-
-4. PROIBIDO CONECTIVOS ROBÓTICOS: A IA é ESTRITAMENTE PROIBIDA de usar frases de transição repetitivas, congeladas ou genéricas como 'e nesse ser', 'neste encontro', 'aqui a chave é', 'a chave aqui é', 'você não tem nada para provar para ninguém' repetida, ou qualquer variação mecânica. Cada frase deve fluir com coesão gramatical impecável.
-
-5. TÍTULO ÚNICO: O título de cada trânsito deve expressar a tônica psicológica EXCLUSIVA daquela combinação de planeta transitante × aspecto × planeta natal. Dois trânsitos do mesmo planeta NUNCA podem ter o mesmo título.
-
-6. COBERTURA COMPLETA: Gere exatamente um bloco completo para CADA linha recebida em TRÂNSITOS ESTRUTURAIS e TRÂNSITOS DINÂMICOS. Não omita, combine ou substitua trânsitos. Se houver linhas de trânsito nos dados, é proibido dizer que não há trânsitos ativos na orbe.
-
-[MATRIZ EXATA DE GERAÇÃO — SIGA PREENCHENDO AS VARIÁVEIS SEM DESVIAR]
-
-Para cada trânsito (repita este bloco completo para CADA trânsito recebido):
-
-#### [ícone do planeta] **[Planeta Trânsito]** em [Aspecto] com [o seu / a sua] **[Planeta Natal] Natal**
-
-> **Título:** [Frase poética de até 8 palavras — 100% exclusiva para esta combinação específica de planeta × aspecto × planeta natal]
-
-**O Desafio:**
-O trânsito de **[Planeta Trânsito]** ([Breve definição poética do arquétipo do planeta, ex: a névoa que dissolve velhas certezas]) encontra [o seu / a sua] **[Planeta Natal] Natal** ([Breve definição do arquétipo do planeta natal, ex: a sua bússola interna de fé e expansão]). Esse cruzamento pode gerar um período de **[Descrever o choque psicológico/emocional sem citar casas astrológicas]**. Isso rapidamente ativa padrões de retenção no seu corpo. Observe agora: seu sistema está respondendo a esse campo de tensão? Há um aperto ou constrição em **[Sugerir área do corpo/sensação reflexa única para este trânsito]**?
-
-**A Geografia do Trânsito:**
-[Bloco independente — nunca como nota de rodapé. Fale DIRETAMENTE com a pessoa usando "você". Não use o nome próprio nem a terceira pessoa.]
-O eixo desta ativação dispara a partir da sua esfera de **[Tema da casa de transito]** (Casa **[Número da casa de transito] Tropical**) e reverbera na sua esfera de **[Tema da casa natal]** (Casa **[Número da casa natal]**).
-
-No mapa sideral, este mesmo trânsito cai em **[Signo Sideral]** na **Casa Védica [Número da casa védica]**. Se as casas Tropical e Sideral forem diferentes, escreva diretamente a interpretação: "A Casa Tropical mostra que o foco psicológico deste trânsito é buscar [tema da casa tropical], enquanto a Casa Sideral mostra que este movimento nasce da necessidade estrutural por [tema da casa sideral]." Não explique a diferença técnica, apenas dê a interpretação viva e direta.
-
-Ainda dentro deste mesmo bloco, o Terreno de Manifestação (Ashtakavarga) se apresenta assim:
-Se a Força do Terreno (BAV) estiver disponível, escreva em uma única linha: "Força do Terreno: [bavTerrain]." Depois, em uma nova linha, 1 frase curta e direta falando com "você" sobre o que isso exige na prática.
-Se a Força do Terreno estiver Indisponível, omita essa linha completamente e escreva apenas a Força de Contribuição do Ambiente.
-Força de Contribuição do Ambiente: [savStrength]. Em uma nova linha, 1 frase curta e direta falando com "você" sobre o que as circunstâncias externas oferecem ou exigem.
-Não repita os números brutos; traduza apenas o rótulo (Árido/Neutro/Fértil ou escassa/limitada/equilibrada/favorecida/potente) como matéria, atrito ou facilidade concreta.
-
-**A Integração:**
-[Parágrafo de 3 a 5 frases — PROIBIDO usar frases de transição congeladas, genéricas ou repetitivas como 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar', ou qualquer variação dessas fórmulas. Cada frase deve fluir com coesão gramatical impecável. Comece diretamente com um insight não-dual EXCLUSIVO para esta exata combinação de planetas, nascido do cruzamento entre o que o planeta transitante dissolve/pressiona/expande E o que o planeta natal representa na psique. Em seguida, nomeie uma Virtude inventada especificamente para este contexto (ex: Discernimento Suave, Silêncio Fértil, Coragem Quieta) e aplique-a em 1 a 2 frases práticas e diretas no dia a dia. A transição entre o insight e a virtude deve ser orgânica e literária — jamais mecânica.]
-
-**Tempo de Maturação:**
-[Insira EXATAMENTE a string do campo ritmo_tempo recebida no dado]. [Adicione 1 a 2 frases de comentário adequado ao ritmo: se 'Curto prazo' — enfatize que é uma janela potente mas breve, que pede incorporação AGORA, não adiamento; se 'Médio prazo' — fale em observar padrões e calibrar a rota; se 'Longo prazo' — fale que a alma trabalha em ritmo de estações, não de horas. Sempre termine com um toque de leveza ou humor gentil.]
-
-**Prática Contemplativa:**
-[Meditação somática de 3 a 5 frases, elementar e visceral, 100% exclusiva para a combinação específica destes dois planetas. Sem jargões esotéricos.] Faça isso agora, antes de continuar.
-
----
+REGRAS INEGOCIÁVEIS
+- Use o gênero fornecido (${gender}).
+- PROIBIDO jargão esotérico: 'chakra', 'vibração', 'energia cósmica', 'alinhamento', 'universo', 'manifestar'.
+- PROIBIDO conectivos robóticos: 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar' e variações.
+- Cada combinação planeta transitante × aspecto × planeta natal deve ter fraseologia exclusiva. Não recicle metáforas.
+- Não cite casas, signos ou números técnicos no corpo do texto — eles já estão nos blocos determinísticos fornecidos.
+- NÃO altere, recrie ou ignore as frases de "Geografia" e "Natureza do Evento" que acompanham cada trânsito; elas são a âncora factual e serão renderizadas separadamente pelo sistema.
 `;
 
-  // Lê os grupos já calculados e limpos pelo motor interno
-  // Estruturais: Júpiter, Saturno, Urano, Netuno, Plutão
-  // Dinâmicos: Sol e Marte (Lua, Mercúrio, Vênus excluídos pelo motor)
-  const STRUCTURAL_PLANETS = ["Júpiter", "Saturno", "Urano", "Netuno", "Plutão"];
-  const DYNAMIC_PLANETS    = ["Sol", "Marte"];
   const EXCLUSIONS = /Nodo|Node|Lilith|Ascendente|Ascendant|Meio do Céu|MC|Parte|Fortuna|Rahu|Ketu/i;
-
-  const allTransits = profile.tropical_transits.filter((t: any) =>
-    !EXCLUSIONS.test(t.planet) && !EXCLUSIONS.test(t.planetaNatal || "")
+  const activeTransits = (profile.tropical_transits || []).filter(
+    (t: any) => !EXCLUSIONS.test(t.planet) && !EXCLUSIONS.test(t.planetaNatal || "")
   );
 
-  let transitos_estruturais = allTransits.filter((t: any) => STRUCTURAL_PLANETS.includes(t.planet));
-  let transitos_dinamicos   = allTransits.filter((t: any) => DYNAMIC_PLANETS.includes(t.planet));
-
-  if (transitos_estruturais.length === 0 && transitos_dinamicos.length === 0) {
-    transitos_estruturais = [
-      { planet: "Saturno", transitSign: "Áries", transitDegree: 14.2, transitHouse: 4,
-        planetaNatal: "Saturno", aspectToNatal: "Conjunção com Saturno Natal",
-        ritmo_tempo: "Médio prazo (semanas a meses). Um ciclo de maturação e ajuste de rota, pedindo responsabilidade e observação."
-      } as any,
-      { planet: "Netuno", transitSign: "Áries", transitDegree: 2.5, transitHouse: 7,
-        planetaNatal: "Mercúrio", aspectToNatal: "Quadratura com Mercúrio Natal",
-        ritmo_tempo: "Longo prazo (meses a anos). Um portal de reestruturação profunda e orgânica que exige paciência e entrega."
-      } as any
-    ] as any[];
+  if (activeTransits.length === 0) {
+    return { transits: [] };
   }
 
-  const activeTensionTransits = [...transitos_estruturais, ...transitos_dinamicos];
-
-  // Enriquecimento de cada linha de trânsito com signos, regentes e casas
-  const TROPICAL_SIGN_RULERS: Record<string, string> = {
-    "Áries": "Marte", "Touro": "Vênus", "Gêmeos": "Mercúrio", "Câncer": "Lua",
-    "Leão": "Sol", "Virgem": "Mercúrio", "Libra": "Vênus", "Escorpião": "Plutão",
-    "Sagitário": "Júpiter", "Capricórnio": "Saturno", "Aquário": "Urano", "Peixes": "Netuno",
-  };
-  const natalPlanetsForPrompt: any[] = (profile as any)?.tropical_natal?.planets ?? [];
-  const natalHousesForPrompt: any[] = (profile as any)?.tropical_natal?.houses ?? [];
-  const enrichTransitLine = (t: any): string => {
-    const natalObj = natalPlanetsForPrompt.find((p: any) => p.name === t.planetaNatal);
-    const signoNatal = natalObj?.sign || "?";
-    const regenteSignoNatal = TROPICAL_SIGN_RULERS[signoNatal] || "?";
-    const regenteObj = natalPlanetsForPrompt.find((p: any) => p.name === regenteSignoNatal);
-    const casaDoRegenteNatal = regenteObj?.house ?? "?";
-    const regenteSignoTransito = TROPICAL_SIGN_RULERS[t.transitSign] || "?";
-    const casaRegidaPeloTransitante = natalHousesForPrompt.find((h: any) => h.ruler === t.planet)?.house ?? "?";
-    const coHouseStr = t.transitCoHouse ? ` + co-ativa Casa ${t.transitCoHouse}` : "";
-    const v = t.vedic_structural_terrain || {};
-    const vedicStr = v.sideral_sign
-      ? ` | sideralSign: "${v.sideral_sign}" | sideralHouse: ${v.sideral_house} | bavTerrain: "${v.terrain_classification ?? "Indisponível"}" | savStrength: "${v.sav_classification ?? "Indisponível"}" | houseShift: ${v.divergences?.house_shift?.has_shift ? "true" : "false"}`
-      : "";
-    return `- planet: "${t.planet}" | transitSign: "${t.transitSign || "?"}" | transitHouse: ${t.transitHouse}${coHouseStr} | planetaNatal: "${t.planetaNatal || ""}" | signoNatal: "${signoNatal}" | casaNatal: ${t.casaNatal ?? t.transitHouse} | regenteSignoTransito: "${regenteSignoTransito}" | regenteSignoNatal: "${regenteSignoNatal}" | casaDoRegenteNatal: ${casaDoRegenteNatal} | casaRegidaPeloTransitante: ${casaRegidaPeloTransitante} | aspecto: "${t.aspectToNatal}" | ritmo_tempo: "${t.ritmo_tempo || ""}"${vedicStr}`;
-  };
+  const transitContextLines = activeTransits.map((t: any) => {
+    const geoPalco = t.geography_text?.palco ?? "Janela temporal em cálculo.";
+    const geoGatilho = t.geography_text?.gatilho ?? null;
+    const natureLabel = t.nature_text?.label ?? "Terreno em cálculo.";
+    const natureSentence = t.nature_text?.sentence ?? "";
+    return `
+TRÂNSITO: ${t.planet} ${t.aspectToNatal}
+Planeta Natal: ${t.planetaNatal}
+Casa Whole Sign ativada: ${t.whole_sign_house ?? "?"}
+Casa Natal do planeta: ${t.casaNatal ?? "?"}
+GEOGRAFIA DETERMINÍSTICA (não altere):
+- O Palco: ${geoPalco}${geoGatilho ? "\n- O Gatilho: " + geoGatilho : ""}
+NATUREZA DO EVENTO (não altere):
+- ${natureLabel}: ${natureSentence}
+RITMO: ${t.ritmo_tempo || ""}
+`.trim();
+  });
 
   const promptInput = `
-DADOS DE ENTRADA DO USUÁRIO:
+DADOS DO USUÁRIO:
 - Nome: ${profile.birthData.name}
 - Gênero: ${gender}
 
-TRÂNSITOS ESTRUTURAIS (Júpiter, Saturno, Urano, Netuno, Plutão — longa maturação):
-${transitos_estruturais.length > 0
-  ? transitos_estruturais.map(enrichTransitLine).join("\n")
-  : "(nenhum aspecto estrutural ativo no orbe de 3°)"}
+${transitContextLines.join("\n\n---\n\n")}
 
-TRÂNSITOS DINÂMICOS (Sol e Marte — pulso de ação e vitalidade):
-${transitos_dinamicos.length > 0
-  ? transitos_dinamicos.map(enrichTransitLine).join("\n")
-  : "(nenhum aspecto dinâmico ativo no orbe de 3°)"}
-
-Por favor, gere a leitura integrada e terapêutica baseada estritamente nesses dados, seguindo as diretrizes de tom e estrutura do [PAPEL DO SISTEMA].
+Gere um array JSON com ${activeTransits.length} objeto(s), um para cada trânsito, na mesma ordem, contendo apenas:
+- planet, planetaNatal, aspecto (copie exatamente dos dados acima)
+- desafio
+- integracao
 `;
 
   try {
@@ -3382,24 +3368,46 @@ Por favor, gere a leitura integrada e terapêutica baseada estritamente nesses d
       contents: promptInput,
       config: {
         systemInstruction,
-        temperature: 0.1,
+        temperature: 0.2,
         maxOutputTokens: 8192,
-      }
+        responseMimeType: "application/json",
+        responseSchema: transitCyclesReadingSchema,
+      },
     });
 
-    let reading = response.text || "";
-    const generatedTransitCount = (reading.match(/^####\s/gm) || []).length;
-    if (generatedTransitCount < activeTensionTransits.length) {
-      throw new Error(`[Gemini API] Resposta incompleta: recebido ${generatedTransitCount} de ${activeTensionTransits.length} blocos de trânsito.`);
+    const raw = response.text || "{\"transits\":[]}";
+    let parsed: TransitCyclesReading;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error("[Gemini API] Resposta não é JSON válido.");
     }
 
-    return reading;
+    if (!Array.isArray(parsed.transits) || parsed.transits.length < activeTransits.length) {
+      throw new Error(`[Gemini API] Resposta incompleta: recebido ${parsed.transits?.length ?? 0} de ${activeTransits.length} trânsitos.`);
+    }
+
+    const transits = activeTransits.map((t: any, idx: number) => {
+      const generated: any = parsed.transits[idx] || {};
+      const fallback = getGenericTransitFallback(t);
+      return {
+        planet: t.planet,
+        planetaNatal: t.planetaNatal,
+        aspecto: t.aspectToNatal,
+        wholeSignHouse: generated.wholeSignHouse ?? t.whole_sign_house ?? fallback.wholeSignHouse,
+        desafio: generated.desafio?.trim() || fallback.desafio,
+        geografia: t.geography_text ?? fallback.geografia,
+        natureza: t.nature_text ?? fallback.natureza,
+        integracao: generated.integracao?.trim() || fallback.integracao,
+      };
+    });
+
+    return { transits };
   } catch (error) {
-    cleanLogError("[Gemini API] Falha na Leitura de Trânsitos e Ciclos", error);
-    throw error;
+    cleanLogError("[Gemini API] Falha na Leitura de Trânsitos e Ciclos — usando fallback", error);
+    return { transits: activeTransits.map(getGenericTransitFallback) };
   }
 }
-
 export async function generateDashaReading(profile: CompleteAstrologicalProfile): Promise<string> {
   const gender = getEffectiveGender(profile);
 
