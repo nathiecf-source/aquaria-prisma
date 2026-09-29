@@ -37,19 +37,25 @@ export interface TransitSummary {
   sideral_sign: string;
   sideral_house: number;
   sideral_house_type: string;
+  sideral_house_class: string;
   sideral_dispositor: string;
   sideral_dignity: string;
+  sideral_dignity_short: string;
   sideral_ingress: string;
   sideral_egress: string | null;
+  tropical_sign: string;
+  tropical_house: number;
   exact_aspect_date: string | null;
   tropical_sign_at_peak: string | null;
-  seals: { camada1: string; camada2: string | null };
+  seals: { tropicalSeal: string; sideralSeal: string };
   nature: {
     label: string;
     sentence: string;
     houseType: string;
+    houseClass: string;
     dispositor: string;
     dignity: string;
+    dignityShort: string;
   };
 }
 
@@ -204,19 +210,37 @@ function getRitmoBadge(ritmo: string): string {
 
 // ─── Lista de Trânsitos com carregamento sob demanda ─────────────────────────
 
+const TRANSIT_HOUSE_THEMES: Record<number, string> = {
+  1:  "Identidade e Presença Física",
+  2:  "Valores e Recursos Naturais",
+  3:  "Comunicação, Aprendizado e Cotidiano",
+  4:  "Lar, Raízes e Base Emocional",
+  5:  "Criatividade, Prazer e Autenticidade",
+  6:  "Rotina, Corpo e Serviço",
+  7:  "Relacionamentos, Parcerias e o Espelho do Outro",
+  8:  "Transformações, Heranças e as Profundezas da Troca",
+  9:  "Visão de Mundo, Crenças e Sentido da Jornada",
+  10: "Realização, Direção e Legado",
+  11: "Grupos, Causas e Visão de Futuro",
+  12: "Interioridade, Inconsciente e Espiritualidade",
+};
+
+function groupTransitsByHouse(transits: TransitSummary[]): [number, TransitSummary[]][] {
+  const map = new Map<number, TransitSummary[]>();
+  for (const t of transits) {
+    const house = t.sideral_house || 0;
+    const list = map.get(house) || [];
+    list.push(t);
+    map.set(house, list);
+  }
+  return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+}
+
 interface TransitAccordionListProps {
   transits: TransitSummary[];
   userId: string | null;
   profile: any;
   onActivate: (t: ActiveTransit | null) => void;
-}
-
-function formatWindowForDisplay(t: TransitSummary): string {
-  const ingress = new Date(t.sideral_ingress);
-  const egress = t.sideral_egress ? new Date(t.sideral_egress) : null;
-  const startYear = ingress.getUTCFullYear();
-  const endText = egress ? String(egress.getUTCFullYear()) : "os próximos anos";
-  return `De ${startYear} a ${endText}`;
 }
 
 const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
@@ -258,21 +282,38 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
     fetchDetail(transits[0], key);
   }, [transits, fetchDetail]);
 
+  const grouped = React.useMemo(() => groupTransitsByHouse(transits), [transits]);
+
   return (
-    <div className="space-y-3">
-      {transits.map((t) => (
-        <TransitAccordion
-          key={getKey(t)}
-          transit={t}
-          detail={details[getKey(t)]}
-          isExpanded={!!expanded[getKey(t)]}
-          onToggle={() => {
-            const key = getKey(t);
-            setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-            if (!details[key]) fetchDetail(t, key);
-          }}
-          onActivate={onActivate}
-        />
+    <div className="space-y-8">
+      {grouped.map(([house, houseTransits]) => (
+        <div key={house}>
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <span className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest bg-[#8c7f70]/8 border border-[#8c7f70]/15 rounded px-1.5 py-0.5 flex-shrink-0">
+              Casa {house}
+            </span>
+            <div className="h-px flex-1 bg-[#8c7f70]/10" />
+            <span className="font-serif text-xs text-[#3c352d]">
+              {TRANSIT_HOUSE_THEMES[house] || `Esfera ${house}`}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {houseTransits.map((t) => (
+              <TransitAccordion
+                key={getKey(t)}
+                transit={t}
+                detail={details[getKey(t)]}
+                isExpanded={!!expanded[getKey(t)]}
+                onToggle={() => {
+                  const key = getKey(t);
+                  setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+                  if (!details[key]) fetchDetail(t, key);
+                }}
+                onActivate={onActivate}
+              />
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -316,14 +357,9 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
       >
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-base leading-none flex-shrink-0">{icon}</span>
-          <div className="min-w-0">
-            <span className="font-serif text-[#3c352d] text-[13.5px] leading-snug block">
-              {transit.planet} {transit.aspectToNatal}
-            </span>
-            <span className="font-mono text-[10px] text-[#8c7f70] block truncate mt-0.5">
-              {transit.seals.camada1}
-            </span>
-          </div>
+          <span className="font-serif text-[#3c352d] text-[13.5px] leading-snug truncate">
+            {transit.planet} {transit.aspectToNatal}
+          </span>
         </div>
         <div className="flex-shrink-0 text-[#8c7f70]">
           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -332,6 +368,12 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
 
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"}`}>
         <div className="px-5 pb-5 space-y-4 border-t border-[#8c7f70]/10 pt-4">
+          {/* Selos técnicos */}
+          <div className="space-y-1.5 text-[11px] text-[#5c544d] font-mono bg-[#f4f1eb]/60 p-3 rounded-lg border border-[#8c7f70]/10">
+            <p>{transit.seals.tropicalSeal}</p>
+            <p>{transit.seals.sideralSeal}</p>
+          </div>
+
           {detail === "loading" && (
             <div className="flex items-center gap-3 py-2">
               <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin" />
@@ -342,30 +384,12 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
           )}
 
           {!detail || detail === "loading" ? (
-            <div className="space-y-2">
-              <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
-                Dados técnicos
-              </p>
-              <p className="font-sans text-[13px] text-[#3c352d]">
-                <span className="font-medium">🏛 Terreno Sideral:</span> {transit.seals.camada1}
-              </p>
-              {transit.seals.camada2 && (
-                <p className="font-sans text-[13px] text-[#3c352d]">
-                  <span className="font-medium">⚡ Gatilho Tropical:</span> {transit.seals.camada2}
-                </p>
-              )}
-              <p className="font-sans text-[13px] text-[#3c352d]">
-                <span className="font-medium">🌱 Natureza:</span> {transit.nature.label} — {transit.nature.sentence}
-              </p>
-            </div>
+            <p className="font-sans text-[13px] text-[#3c352d]">
+              <span className="font-medium">🌱 Natureza do Terreno:</span>{" "}
+              {transit.nature.label} — {transit.nature.sentence}
+            </p>
           ) : (
             <div className="space-y-5">
-              {/* Selos técnicos */}
-              <div className="space-y-1 text-[11px] text-[#5c544d] font-mono bg-[#f4f1eb]/60 p-3 rounded-lg border border-[#8c7f70]/10">
-                <p>🏛 {transit.seals.camada1}</p>
-                {transit.seals.camada2 && <p>⚡ {transit.seals.camada2}</p>}
-              </div>
-
               {/* Camada 1 — Terreno */}
               <section>
                 <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">

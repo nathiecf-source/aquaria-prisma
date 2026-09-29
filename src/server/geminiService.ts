@@ -3283,6 +3283,7 @@ REGRAS DE OURO — NÃO QUEBRAR
 - Use o gênero fornecido (${gender}).
 - Cada combinação planeta × aspecto × planeta natal deve ter fraseologia exclusiva; não recicle metáforas.
 - Os textos devem soar naturais em português brasileiro, mas sem inventar dados técnicos.
+- Quando usar termos técnicos (Kendra, Trikona, Dusthana, Upachaya, Domicílio, Exaltação, Queda, Exílio, Dispositor), acompanhe-os imediatamente de uma breve explicação didática para o leitor.
 `;
 
   const sideralWindow = facts?.sideral_ingress && facts?.sideral_egress !== undefined
@@ -3304,6 +3305,8 @@ ${JSON.stringify({
     signo: facts?.sideral_sign,
     casa: facts?.sideral_house,
     tipo_casa: facts?.sideral_house_type,
+    classificacao_casa: facts?.sideral_house_class,
+    legenda_classificacao: getHouseClassLegend(facts?.sideral_house_class),
     dispositor: facts?.sideral_dispositor,
     dignidade: facts?.sideral_dignity,
     janela: sideralWindow,
@@ -3354,6 +3357,18 @@ Gere um JSON com os campos: terreno, gatilho, integracao.
     cleanLogError("[Gemini API] Falha na geração do detalhe do trânsito — usando fallback", error);
     return getGenericTransitDetailFallback(facts);
   }
+}
+
+function getHouseClassLegend(classLabel: string | undefined): string {
+  const map: Record<string, string> = {
+    "Sustentação": "ângulos de poder, onde a vida se materializa de forma mais visível",
+    "Fluxo": "casas de propósito, talento e fruição",
+    "Crescimento": "casas de desenvolvimento gradual com o tempo e a ação",
+    "Desafios": "casas de cura, transformação e desapego",
+    "Trocas": "casas de entregas, parcerias e recursos compartilhados",
+    "Neutro": "efeito moderado, depende muito da condução pessoal",
+  };
+  return map[classLabel || ""] || "classificação astrológica da casa";
 }
 
 function formatSideralWindow(planet: string, ingress: Date, egress: Date | null): string {

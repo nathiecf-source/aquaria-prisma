@@ -6,10 +6,20 @@ import { PLANET_FICHAMENTO } from "./planetFichamento";
 import { SIGN_NAMES, getVedicHouse } from "./transitEngine";
 import { signRulers } from "./astrology";
 
-const KENDRA_HOUSES = new Set([1, 4, 7, 10]);
-const TRIKONA_HOUSES = new Set([5, 9]);
-const DUSTHANA_HOUSES = new Set([6, 8, 12]);
-const UPACHAYA_HOUSES = new Set([3, 11]);
+interface HouseClassification {
+  houses: number[];
+  key: string;
+  description: string;
+  label: string;
+}
+
+const HOUSE_CLASSIFICATIONS: HouseClassification[] = [
+  { houses: [1, 4, 7, 10], key: "Kendra", description: "ângulo de manifestação", label: "Sustentação" },
+  { houses: [5, 9], key: "Trikona", description: "casa de propósito e fruição", label: "Fluxo" },
+  { houses: [6, 8, 12], key: "Dusthana", description: "casa de cura e transformação", label: "Desafios" },
+  { houses: [3, 11], key: "Upachaya", description: "casa de crescimento gradual", label: "Crescimento" },
+  { houses: [2, 7], key: "Maraka", description: "casa de entregas e trocas", label: "Trocas" },
+];
 
 const NATURAL_BENEFICS = new Set(["Júpiter", "Vênus"]);
 const NATURAL_MALEFICS = new Set(["Saturno", "Marte", "Plutão"]);
@@ -18,8 +28,10 @@ export interface TransitNature {
   label: string;
   sentence: string;
   houseType: string;
+  houseClass: string;
   dispositor: string;
   dignity: string;
+  dignityShort: string;
 }
 
 function normalizePlanetKey(name: string): string {
@@ -42,21 +54,31 @@ function getDignityInfo(planet: string, sign: string): { score: number; label: s
   return { score: 0, label: "Peregrino/Neutro" };
 }
 
+function getHouseClassification(house: number): HouseClassification {
+  return HOUSE_CLASSIFICATIONS.find(c => c.houses.includes(house)) ?? {
+    houses: [house],
+    key: "Neutra",
+    description: "casa sucedente/cadente",
+    label: "Neutro",
+  };
+}
+
 function getHouseType(house: number): string {
-  if (KENDRA_HOUSES.has(house)) return "Kendra (ângulo de manifestação)";
-  if (TRIKONA_HOUSES.has(house)) return "Trikona (casa de propósito/fruição)";
-  if (DUSTHANA_HOUSES.has(house)) return "Dusthana (casa de cura e transformação)";
-  if (UPACHAYA_HOUSES.has(house)) return "Upachaya (casa de crescimento gradual)";
-  if (house === 2 || house === 7) return "Maraka (casa de entregas e trocas)";
-  return "Casa neutra/sucedente";
+  const c = getHouseClassification(house);
+  return `${c.key} (${c.description})`;
+}
+
+function getHouseClassLabel(house: number): string {
+  return getHouseClassification(house).label;
 }
 
 function getHouseModifier(house: number): number {
-  if (KENDRA_HOUSES.has(house)) return 0.5;
-  if (TRIKONA_HOUSES.has(house)) return 0.4;
-  if (UPACHAYA_HOUSES.has(house)) return 0.2;
-  if (DUSTHANA_HOUSES.has(house)) return -0.4;
-  if (house === 2 || house === 7) return -0.1;
+  const c = getHouseClassification(house).key;
+  if (c === "Kendra") return 0.5;
+  if (c === "Trikona") return 0.4;
+  if (c === "Upachaya") return 0.2;
+  if (c === "Dusthana") return -0.4;
+  if (c === "Maraka") return -0.1;
   return 0;
 }
 
@@ -80,36 +102,40 @@ export function getTransitNature(
   const sign = SIGN_NAMES[Math.floor(((sideralLongitude % 360) + 360) % 360 / 30)];
   const dignity = getDignityInfo(planet, sign);
   const houseType = getHouseType(sideralHouse);
+  const houseClass = getHouseClassLabel(sideralHouse);
   const dispositor = signRulers[sign] ?? "?";
+  const dignityShort = dignity.label.split(" em ")[0];
 
   let score = 0;
   score += dignity.score;
   score += getHouseModifier(sideralHouse);
   score += getNaturalDisposition(planet);
 
+  const base = {
+    houseType,
+    houseClass,
+    dispositor,
+    dignity: dignity.label,
+    dignityShort,
+  };
+
   if (score >= 0.8) {
     return {
+      ...base,
       label: "Terreno Favorável",
       sentence: "As circunstâncias externas oferecem apoio e fluidez para este movimento. Há espaço para expandir, acertar e deixar o processo se desdobrar com menos resistência.",
-      houseType,
-      dispositor,
-      dignity: dignity.label,
     };
   }
   if (score <= -0.8) {
     return {
+      ...base,
       label: "Terreno Restritivo",
       sentence: "As circunstâncias externas exigem que você assuma o comando. Não haverá facilidades automáticas; cada passo deste ciclo pede maturidade, paciência e responsabilidade própria.",
-      houseType,
-      dispositor,
-      dignity: dignity.label,
     };
   }
   return {
+    ...base,
     label: "Terreno Neutro",
     sentence: "O ambiente externo não puxa nem empurra: o resultado deste ciclo depende principalmente da sua escolha consciente e da consistência com que conduzir o processo.",
-    houseType,
-    dispositor,
-    dignity: dignity.label,
   };
 }

@@ -36,9 +36,15 @@ const ASPECT_CENTERS: Record<string, number> = {
   "Oposição": 180,
 };
 
+const ASPECT_GLYPHS: Record<string, string> = {
+  "Conjunção": "☌",
+  "Quadratura": "□",
+  "Oposição": "☍",
+};
+
 export interface TransitGeographySeals {
-  camada1: string;
-  camada2: string | null;
+  tropicalSeal: string;
+  sideralSeal: string;
 }
 
 export interface TransitGeographyData {
@@ -48,10 +54,14 @@ export interface TransitGeographyData {
   sideral_sign: string;
   sideral_house: number;
   sideral_house_type: string;
+  sideral_house_class: string;
   sideral_dispositor: string;
   sideral_dignity: string;
+  sideral_dignity_short: string;
   sideral_ingress: Date;
   sideral_egress: Date | null;
+  tropical_sign: string;
+  tropical_house: number;
   tropical_sign_at_peak: string | null;
   exact_aspect_date: Date | null;
   aspect_target_longitude: number;
@@ -82,33 +92,6 @@ function formatDatePrecise(planet: string, date: Date | null): string | null {
   });
 }
 
-function formatDateRangePrecise(planet: string, start: Date, end: Date | null): string {
-  const group = getPlanetSpeedGroup(planet);
-  if (group === "slow") {
-    const endText = end ? String(end.getUTCFullYear()) : "os próximos anos";
-    return `De ${start.getUTCFullYear()} a ${endText}`;
-  }
-  if (group === "medium") {
-    const startText = capitalize(
-      start.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
-    );
-    const endText = end
-      ? capitalize(end.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }))
-      : "os próximos anos";
-    return `De ${startText} a ${endText}`;
-  }
-  const startText = start.toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  const endText = end
-    ? end.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
-    : "os próximos dias";
-  return `De ${startText} a ${endText}`;
-}
-
 function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
@@ -121,6 +104,7 @@ export async function buildTransitGeography(
   aspecto: string,
   planetNatal: string,
   grauNatal: number,
+  tropicalHouse: number,
   sideralAscendantSign: string | null | undefined,
   referenceDate: Date
 ): Promise<TransitGeographyData> {
@@ -129,6 +113,7 @@ export async function buildTransitGeography(
   const transitLonSideral = tropicalToSideral(transitLonTropical, ayanamsha);
   const sideralSignIndex = Math.floor(normalizeAngle(transitLonSideral) / 30);
   const sideralSign = SIGN_NAMES[sideralSignIndex] ?? "?";
+  const tropicalSign = SIGN_NAMES[Math.floor(normalizeAngle(transitLonTropical) / 30)] ?? "?";
 
   let sideralHouse = 0;
   if (sideralAscendantSign) {
@@ -157,14 +142,9 @@ export async function buildTransitGeography(
 
   const nature = getTransitNature(planet, transitLonSideral, sideralHouse || 1);
 
-  // Selos curtos determinísticos — a prosa interpretativa virá do Gemini
-  const camada1Seal = sideralHouse
-    ? `[${planet} em ${sideralSign} • Casa ${sideralHouse} Sideral (${nature.houseType}) • Dispositor: ${nature.dispositor} • ${nature.dignity}]`
-    : `[${planet} em ${sideralSign} Sideral • Dispositor: ${nature.dispositor} • ${nature.dignity}]`;
-
-  const camada2Seal = exactAspectDate
-    ? `[${aspecto} exata com ${planetNatal} Natal • ${formatDatePrecise(planet, exactAspectDate)} • ${tropicalSignAtPeak ?? "?"}]`
-    : null;
+  // Selos no formato solicitado pelo usuário
+  const tropicalSeal = `⚡ Psicológico (Tropical): ${planet} em ${tropicalSignAtPeak ?? tropicalSign} ${ASPECT_GLYPHS[aspecto] ?? aspecto} ${planetNatal} Natal • Casa ${tropicalHouse}`;
+  const sideralSeal = `🏛 Estrutural (Sideral): ${planet} em ${sideralSign} [${nature.dignityShort}] • Casa ${sideralHouse} • Casa ${nature.houseClass}`;
 
   return {
     planet,
@@ -173,16 +153,20 @@ export async function buildTransitGeography(
     sideral_sign: sideralSign,
     sideral_house: sideralHouse,
     sideral_house_type: nature.houseType,
+    sideral_house_class: nature.houseClass,
     sideral_dispositor: nature.dispositor,
     sideral_dignity: nature.dignity,
+    sideral_dignity_short: nature.dignityShort,
     sideral_ingress: sideralWindow.ingressDate,
     sideral_egress: sideralWindow.egressDate,
+    tropical_sign: tropicalSign,
+    tropical_house: tropicalHouse,
     tropical_sign_at_peak: tropicalSignAtPeak,
     exact_aspect_date: exactAspectDate,
     aspect_target_longitude: aspectTarget,
     seals: {
-      camada1: camada1Seal,
-      camada2: camada2Seal,
+      tropicalSeal,
+      sideralSeal,
     },
     nature,
   };

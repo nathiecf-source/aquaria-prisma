@@ -1923,6 +1923,7 @@ async function createApp(): Promise<express.Application> {
             t.aspecto,
             t.planeta_natal,
             t.grau_natal,
+            transitHouse,
             sideralAscendantSign,
             today
           );
@@ -1943,10 +1944,14 @@ async function createApp(): Promise<express.Application> {
             sideral_sign: geography.sideral_sign,
             sideral_house: geography.sideral_house,
             sideral_house_type: geography.sideral_house_type,
+            sideral_house_class: geography.sideral_house_class,
             sideral_dispositor: geography.sideral_dispositor,
             sideral_dignity: geography.sideral_dignity,
+            sideral_dignity_short: geography.sideral_dignity_short,
             sideral_ingress: geography.sideral_ingress.toISOString(),
             sideral_egress: geography.sideral_egress?.toISOString() ?? null,
+            tropical_sign: geography.tropical_sign,
+            tropical_house: geography.tropical_house,
             exact_aspect_date: geography.exact_aspect_date?.toISOString() ?? null,
             tropical_sign_at_peak: geography.tropical_sign_at_peak,
             seals: geography.seals,
