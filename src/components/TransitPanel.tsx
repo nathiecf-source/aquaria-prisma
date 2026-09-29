@@ -31,27 +31,38 @@ interface RestructuringCycle {
 
 export type TransitPanelTab = "dashas" | "portal" | "transits";
 
-interface TransitCycleBlock {
+export interface TransitSummary {
   planet: string;
-  planetaNatal: string;
-  aspecto: string;
-  wholeSignHouse: number;
-  desafio: string;
-  geografia: { palco: string; gatilho: string | null };
-  natureza: { label: string; sentence: string };
+  aspectToNatal: string;
+  sideral_sign: string;
+  sideral_house: number;
+  sideral_house_type: string;
+  sideral_dispositor: string;
+  sideral_dignity: string;
+  sideral_ingress: string;
+  sideral_egress: string | null;
+  exact_aspect_date: string | null;
+  tropical_sign_at_peak: string | null;
+  seals: { camada1: string; camada2: string | null };
+  nature: {
+    label: string;
+    sentence: string;
+    houseType: string;
+    dispositor: string;
+    dignity: string;
+  };
+}
+
+export interface TransitDetail {
+  terreno: string;
+  gatilho: string;
   integracao: string;
 }
-
-interface TransitCyclesReading {
-  transits: TransitCycleBlock[];
-}
-
-type TransitText = string | TransitCyclesReading | null;
 
 interface TransitPanelProps {
   isOpen: boolean;
   isLoading: boolean;
-  text: TransitText;
+  transits: TransitSummary[] | null;
   restructuringCycles?: RestructuringCycle[];
   dashaText?: string | null;
   isLoadingDashas?: boolean;
@@ -191,153 +202,212 @@ function getRitmoBadge(ritmo: string): string {
   return "bg-[#3c6e4a]/10 text-[#3c6e4a] border-[#3c6e4a]/20";
 }
 
-// ─── Visualização estruturada dos Ciclos Planetários ──────────────────────────
+// ─── Lista de Trânsitos com carregamento sob demanda ─────────────────────────
 
-interface StructuredTransitViewProps {
-  reading: TransitCyclesReading;
+interface TransitAccordionListProps {
+  transits: TransitSummary[];
   userId: string | null;
   profile: any;
   onActivate: (t: ActiveTransit | null) => void;
 }
 
-function StructuredTransitView({ reading, userId, profile, onActivate }: StructuredTransitViewProps) {
-  const grouped = React.useMemo(() => {
-    const map = new Map<number, TransitCycleBlock[]>();
-    for (const t of reading.transits) {
-      const list = map.get(t.wholeSignHouse) || [];
-      list.push(t);
-      map.set(t.wholeSignHouse, list);
+function formatWindowForDisplay(t: TransitSummary): string {
+  const ingress = new Date(t.sideral_ingress);
+  const egress = t.sideral_egress ? new Date(t.sideral_egress) : null;
+  const startYear = ingress.getUTCFullYear();
+  const endText = egress ? String(egress.getUTCFullYear()) : "os próximos anos";
+  return `De ${startYear} a ${endText}`;
+}
+
+const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
+  transits,
+  userId,
+  profile,
+  onActivate,
+}) => {
+  const [details, setDetails] = React.useState<Record<string, TransitDetail | "loading" | null>>({});
+  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+
+  const getKey = (t: TransitSummary) => `${t.planet}|${t.aspectToNatal}`;
+
+  const fetchDetail = React.useCallback(async (t: TransitSummary, key: string) => {
+    if (details[key] && details[key] !== "loading") return;
+    setDetails(prev => ({ ...prev, [key]: "loading" }));
+    try {
+      const res = await fetch("/api/generate-transit-cycle-detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, userId, transit: t }),
+      });
+      const data = await res.json();
+      if (data.terreno && data.gatilho && data.integracao) {
+        setDetails(prev => ({ ...prev, [key]: { terreno: data.terreno, gatilho: data.gatilho, integracao: data.integracao } }));
+      } else {
+        setDetails(prev => ({ ...prev, [key]: null }));
+      }
+    } catch (err) {
+      console.error("[TransitAccordionList] Erro ao buscar detalhe:", err);
+      setDetails(prev => ({ ...prev, [key]: null }));
     }
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [reading]);
+  }, [details, profile, userId]);
+
+  // Pré-carrega o primeiro trânsito em background para melhorar a percepção de velocidade
+  React.useEffect(() => {
+    if (!transits[0]) return;
+    const key = getKey(transits[0]);
+    fetchDetail(transits[0], key);
+  }, [transits, fetchDetail]);
 
   return (
-    <div className="space-y-8">
-      {grouped.length === 0 ? (
-        <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
-          <p className="font-serif text-[#8c7f70] text-sm">
-            Nenhum portal ativo no orbe de 4° no momento.
-          </p>
-        </div>
-      ) : (
-        grouped.map(([house, transits]) => (
-          <div key={house}>
-            <div className="flex items-center gap-2 mb-3 px-1">
-              <span className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
-                Casa {house}
-              </span>
-              <div className="h-px flex-1 bg-[#8c7f70]/10" />
-              <span className="font-serif text-xs text-[#3c352d]">
-                {HOUSE_SPHERES[house] || `Esfera ${house}`}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {transits.map((t, idx) => (
-                <StructuredTransitCard
-                  key={`${house}-${idx}`}
-                  block={t}
-                  userId={userId}
-                  profile={profile}
-                  onActivate={onActivate}
-                />
-              ))}
-            </div>
-          </div>
-        ))
-      )}
+    <div className="space-y-3">
+      {transits.map((t) => (
+        <TransitAccordion
+          key={getKey(t)}
+          transit={t}
+          detail={details[getKey(t)]}
+          isExpanded={!!expanded[getKey(t)]}
+          onToggle={() => {
+            const key = getKey(t);
+            setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+            if (!details[key]) fetchDetail(t, key);
+          }}
+          onActivate={onActivate}
+        />
+      ))}
     </div>
   );
-}
+};
 
-interface StructuredTransitCardProps {
-  block: TransitCycleBlock;
-  userId: string | null;
-  profile: any;
+interface TransitAccordionProps {
+  transit: TransitSummary;
+  detail: TransitDetail | "loading" | null;
+  isExpanded: boolean;
+  onToggle: () => void;
   onActivate: (t: ActiveTransit | null) => void;
 }
 
-function StructuredTransitCard({ block, profile, onActivate }: StructuredTransitCardProps) {
-  const natalPlanets: any[] = profile?.tropical_natal?.planets ?? [];
-  const natalPlanet = natalPlanets.find((p: any) => p.name === block.planetaNatal);
+const TransitAccordion: React.FC<TransitAccordionProps> = ({
+  transit,
+  detail,
+  isExpanded,
+  onToggle,
+  onActivate,
+}) => {
+  const icon = PLANET_ICONS[transit.planet] || "✦";
+
   const activePayload: ActiveTransit = {
-    planetaTransito: block.planet,
-    planetaNatal: block.planetaNatal,
-    casaNatal: natalPlanet?.house ?? block.wholeSignHouse,
-    aspecto: block.aspecto,
+    planetaTransito: transit.planet,
+    planetaNatal: transit.aspectToNatal.replace(/^.*com\s+(.+)\s+Natal$/, "$1") || "",
+    casaNatal: transit.sideral_house,
+    aspecto: transit.aspectToNatal,
     ritmoTempo: "",
   };
 
   return (
     <div
-      className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] overflow-hidden transition-all hover:border-[#8c6239]/30"
+      className={`rounded-xl border transition-all duration-300 overflow-hidden
+        ${isExpanded ? "border-[#8c6239]/30 bg-[#f4f1eb]" : "border-[#8c7f70]/15 bg-[#faf9f6] hover:bg-[#f4f1eb]/60"}`}
       onMouseEnter={() => onActivate(activePayload)}
       onMouseLeave={() => onActivate(null)}
     >
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-[#8c7f70]/10 bg-[#f4f1eb]/40">
-        <div className="flex items-center gap-3">
-          <span className="text-lg">{PLANET_ICONS[block.planet] || "✦"}</span>
-          <h3 className="font-serif text-[#3c352d] text-[14px] leading-snug">
-            {block.planet} {block.aspecto}
-          </h3>
+      <button
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-base leading-none flex-shrink-0">{icon}</span>
+          <div className="min-w-0">
+            <span className="font-serif text-[#3c352d] text-[13.5px] leading-snug block">
+              {transit.planet} {transit.aspectToNatal}
+            </span>
+            <span className="font-mono text-[10px] text-[#8c7f70] block truncate mt-0.5">
+              {transit.seals.camada1}
+            </span>
+          </div>
         </div>
-      </div>
+        <div className="flex-shrink-0 text-[#8c7f70]">
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </button>
 
-      {/* Blocos */}
-      <div className="px-5 py-5 space-y-5">
-        {/* 1. O Desafio */}
-        <section>
-          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">
-            O Desafio
-          </h4>
-          <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
-            <Markdown rehypePlugins={[rehypeSanitize]}>{block.desafio}</Markdown>
-          </div>
-        </section>
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"}`}>
+        <div className="px-5 pb-5 space-y-4 border-t border-[#8c7f70]/10 pt-4">
+          {detail === "loading" && (
+            <div className="flex items-center gap-3 py-2">
+              <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin" />
+              <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
+                Gerando leitura interpretativa...
+              </p>
+            </div>
+          )}
 
-        {/* 2. A Geografia do Trânsito */}
-        <section className="rounded-lg bg-[#f4f1eb]/60 p-4 border border-[#8c7f70]/10">
-          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#8c6239] mb-2">
-            A Geografia do Trânsito
-          </h4>
-          <ul className="list-disc list-inside space-y-1 font-sans text-[13px] text-[#3c352d] leading-relaxed">
-            <li>
-              <span className="font-medium text-[#3c352d]">O Palco:</span>{" "}
-              {block.geografia.palco}
-            </li>
-            {block.geografia.gatilho && (
-              <li>
-                <span className="font-medium text-[#3c352d]">O Gatilho:</span>{" "}
-                {block.geografia.gatilho}
-              </li>
-            )}
-          </ul>
-        </section>
+          {!detail || detail === "loading" ? (
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
+                Dados técnicos
+              </p>
+              <p className="font-sans text-[13px] text-[#3c352d]">
+                <span className="font-medium">🏛 Terreno Sideral:</span> {transit.seals.camada1}
+              </p>
+              {transit.seals.camada2 && (
+                <p className="font-sans text-[13px] text-[#3c352d]">
+                  <span className="font-medium">⚡ Gatilho Tropical:</span> {transit.seals.camada2}
+                </p>
+              )}
+              <p className="font-sans text-[13px] text-[#3c352d]">
+                <span className="font-medium">🌱 Natureza:</span> {transit.nature.label} — {transit.nature.sentence}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Selos técnicos */}
+              <div className="space-y-1 text-[11px] text-[#5c544d] font-mono bg-[#f4f1eb]/60 p-3 rounded-lg border border-[#8c7f70]/10">
+                <p>🏛 {transit.seals.camada1}</p>
+                {transit.seals.camada2 && <p>⚡ {transit.seals.camada2}</p>}
+              </div>
 
-        {/* 3. A Natureza do Evento */}
-        <section className="rounded-lg bg-[#f4f1eb]/40 p-4 border border-[#8c7f70]/10">
-          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#3c6e4a] mb-2">
-            A Natureza do Evento
-          </h4>
-          <p className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
-            <span className="font-medium">{block.natureza.label}:</span>{" "}
-            {block.natureza.sentence}
-          </p>
-        </section>
+              {/* Camada 1 — Terreno */}
+              <section>
+                <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">
+                  🏛 O Terreno Estrutural & O Destino
+                </h4>
+                <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+                  <Markdown rehypePlugins={[rehypeSanitize]}>{detail.terreno}</Markdown>
+                </div>
+              </section>
 
-        {/* 4. A Integração & Prática Contemplativa */}
-        <section>
-          <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">
-            A Integração & Prática Contemplativa
-          </h4>
-          <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
-            <Markdown rehypePlugins={[rehypeSanitize]}>{block.integracao}</Markdown>
-          </div>
-        </section>
+              {/* Camada 2 — Gatilho */}
+              <section>
+                <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#8c6239] mb-2">
+                  ⚡ O Gatilho Psicológico & A Urgência
+                </h4>
+                <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+                  <Markdown rehypePlugins={[rehypeSanitize]}>{detail.gatilho}</Markdown>
+                </div>
+              </section>
+
+              {/* Integração */}
+              <section className="rounded-lg bg-[#3c6e4a]/5 p-4 border border-[#3c6e4a]/15">
+                <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#3c6e4a] mb-2">
+                  🌿 A Integração & Prática Contemplativa
+                </h4>
+                <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+                  <Markdown rehypePlugins={[rehypeSanitize]}>{detail.integracao}</Markdown>
+                </div>
+              </section>
+
+              {/* Insight */}
+              <InsightField
+                transitKey={`${transit.planet}|${transit.aspectToNatal}`}
+                userId={null}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
-}
+};
 
 // ─── Parser e componente para Dashas ─────────────────────────────────────────
 
@@ -548,201 +618,6 @@ const InsightField: React.FC<{ transitKey: string; userId: string | null }> = ({
   );
 };
 
-// ─── Componente de Acordeão de Trânsito ───────────────────────────────────────
-
-const TransitAccordion: React.FC<{
-  transit: ParsedTransit;
-  index: number;
-  isActive: boolean;
-  userId: string | null;
-  onActivate: (t: ActiveTransit | null) => void;
-}> = ({ transit, index, isActive, userId, onActivate }) => {
-  const [expanded, setExpanded] = React.useState(false);
-
-  const icon      = PLANET_ICONS[transit.planetaTransito] || "✦";
-  const natalIcon = PLANET_ICONS[transit.planetaNatal]    || "";
-
-  const payload: ActiveTransit = {
-    planetaTransito: transit.planetaTransito,
-    planetaNatal:    transit.planetaNatal,
-    casaNatal:       transit.casaNatal,
-    aspecto:         transit.aspecto,
-    ritmoTempo:      transit.ritmoTempo,
-  };
-
-  const handleToggle = () => {
-    const next = !expanded;
-    setExpanded(next);
-    try { onActivate(next ? payload : null); } catch (_) {}
-  };
-
-  const handleMouseEnter = () => { try { onActivate(payload); } catch (_) {} };
-  const handleMouseLeave = () => { if (!expanded) try { onActivate(null); } catch (_) {} };
-
-  return (
-    <div
-      className={`rounded-xl border transition-all duration-300 overflow-hidden
-        ${isActive
-          ? "border-[#8c6239]/40 shadow-[0_0_20px_rgba(140,98,57,0.10)]"
-          : "border-[#8c7f70]/15"
-        }
-        ${expanded ? "bg-[#f4f1eb]" : "bg-[#faf9f6] hover:bg-[#f4f1eb]/60"}
-      `}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Closed state — título lúdico */}
-      <button
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left cursor-pointer"
-        onClick={handleToggle}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="font-mono text-[#8c7f70] text-[11px] tabular-nums flex-shrink-0">{index}.</span>
-          <span className="text-base leading-none flex-shrink-0">{icon}</span>
-          <span className="font-serif text-[#3c352d] text-[13.5px] leading-snug">
-            {transit.tituloLudico || `${transit.planetaTransito} em ${transit.aspecto} com ${transit.planetaNatal} Natal`}
-          </span>
-        </div>
-        <div className="flex-shrink-0 text-[#8c7f70]">
-          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </div>
-      </button>
-
-      {/* Open state — detalhes */}
-      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="px-5 pb-5 space-y-4 border-t border-[#8c7f70]/10 pt-4">
-
-          {/* Cabeçalho técnico silencioso */}
-          <div className="flex items-center gap-2 flex-wrap opacity-60">
-            <span className="text-sm">{icon}</span>
-            <span className="font-mono text-[10px] text-[#5c544d] italic">
-              {transit.planetaTransito} em {transit.aspecto} com {natalIcon} {transit.planetaNatal} Natal
-            </span>
-            {transit.ritmoTempo && (
-              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${getRitmoBadge(transit.ritmoTempo)}`}>
-                {transit.ritmoTempo.split(".")[0]}
-              </span>
-            )}
-          </div>
-
-          {/* Blocos terapêuticos com estilos por tipo */}
-          {transit.blocks
-            .filter(block => !block.label.includes("Costura"))
-            .map((block, idx) => {
-            const lbl = block.label;
-            const isPratica    = lbl.includes("Pr") && lbl.includes("tica");
-            const isMaturacao  = lbl.includes("Matura") || lbl.includes("Tempo");
-            const isIntegracao = lbl.includes("Integra");
-            const isGeografia  = lbl.includes("Geografia");
-            const isDesafio    = lbl.includes("Desafio");
-
-            let wrapClass = "";
-            let labelClass = "text-[#8c7f70]";
-
-            if (isPratica) {
-              wrapClass = "rounded-xl bg-[#3c352d]/4 border border-[#3c352d]/10 px-4 py-4";
-              labelClass = "text-[#3c352d]";
-            } else if (isMaturacao) {
-              wrapClass = "rounded-lg bg-[#5c4d66]/6 border border-[#5c4d66]/15 px-4 py-3";
-              labelClass = "text-[#5c4d66]";
-            } else if (isIntegracao) {
-              wrapClass = "rounded-lg bg-[#3c6e4a]/5 border border-[#3c6e4a]/15 px-4 py-3";
-              labelClass = "text-[#3c6e4a]";
-            } else if (isGeografia) {
-              wrapClass = "rounded-xl bg-[#8c6239]/5 border border-[#8c6239]/20 px-4 py-4";
-              labelClass = "text-[#8c6239]";
-            } else if (isDesafio) {
-              wrapClass = "rounded-lg bg-[#8c6239]/5 border border-[#8c6239]/12 px-4 py-3";
-              labelClass = "text-[#8c6239]";
-            }
-
-            return (
-              <div key={idx} className={wrapClass}>
-                <p className={`font-mono text-[9px] uppercase tracking-widest mb-2 ${labelClass}`}>
-                  {lbl.replace(/🫁\s*/, "")}
-                </p>
-                <div className="prose prose-sm max-w-none text-[#5c544d] font-sans leading-relaxed text-[13.5px]">
-                  <Markdown
-                    rehypePlugins={[rehypeSanitize]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                      strong: ({ children }) => <strong className="font-semibold text-[#3c352d]">{children}</strong>,
-                      em: ({ children }) => <em className="italic text-[#8c6239]/80">{children}</em>,
-                    }}
-                  >
-                    {block.content}
-                  </Markdown>
-                </div>
-              </div>
-            );
-          })}
-
-          {transit.blocks.length === 0 && (
-            <p className="text-[#8c7f70] text-xs font-sans italic">Leitura em processamento...</p>
-          )}
-
-          {/* Campo de Insight interativo */}
-          <InsightField
-            transitKey={`${transit.planetaTransito}|${transit.planetaNatal}|${transit.casaNatal}`}
-            userId={userId ?? null}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── Agrupamento por Esfera (Casa) ────────────────────────────────────────────
-
-const SphereGroup: React.FC<{
-  house: number;
-  transits: ParsedTransit[];
-  activeKey: string | null;
-  startIndex: number;
-  userId: string | null;
-  onActivate: (t: ActiveTransit | null) => void;
-}> = ({ house, transits, activeKey, startIndex, userId, onActivate }) => {
-  const sphereName = HOUSE_SPHERES[house] || `Casa ${house}`;
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <div className="mb-6">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 mb-3 group"
-      >
-        <span className="font-mono text-[10px] text-[#8c7f70] bg-[#8c7f70]/8 border border-[#8c7f70]/15 rounded px-1.5 py-0.5 flex-shrink-0">
-          Casa {house}
-        </span>
-        <span className="font-serif text-[#3c352d] text-[13px] tracking-wide text-left flex-1">
-          {sphereName}
-        </span>
-        <span className="text-[#8c7f70] flex-shrink-0">
-          {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </span>
-      </button>
-
-      {open && (
-        <div className="space-y-2 pl-1">
-          {transits.map((t, i) => {
-            const key = `${t.planetaTransito}|${t.planetaNatal}`;
-            return (
-              <TransitAccordion
-                key={key}
-                transit={t}
-                index={startIndex + i}
-                isActive={activeKey === key}
-                userId={userId}
-                onActivate={onActivate}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Fases Reestruturantes ───────────────────────────────────────────────────
 
 const HOUSE_THEMES: Record<number, string> = {
@@ -905,7 +780,7 @@ const RestructuringPhasesAccordion: React.FC<{ cycles: RestructuringCycle[] }> =
 const TransitPanel: React.FC<TransitPanelProps> = ({
   isOpen,
   isLoading,
-  text,
+  transits,
   restructuringCycles,
   dashaText,
   isLoadingDashas,
@@ -924,34 +799,11 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
   initialTab = "dashas",
 }) => {
   const userId: string | null = userIdProp ?? profile?.user_id ?? null;
-  const [activeKey, setActiveKey] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<TransitPanelTab>(initialTab);
 
   React.useEffect(() => {
     if (isOpen) setActiveTab(initialTab);
   }, [initialTab, isOpen]);
-
-  const allTransits = React.useMemo(() => {
-    if (!text || typeof text !== "string") return [];
-    try {
-      const parsed = parseTransitsFromMarkdown(text);
-      // Enrich casaNatal from profile when parser got 0 (new format has no (Casa X))
-      const natalPlanets: any[] = profile?.tropical_natal?.planets ?? [];
-      if (natalPlanets.length > 0) {
-        return parsed.map(t => {
-          if (t.casaNatal === 0) {
-            const found = natalPlanets.find((p: any) => p.name === t.planetaNatal);
-            return { ...t, casaNatal: found?.house ?? 0 };
-          }
-          return t;
-        });
-      }
-      return parsed;
-    } catch (err) {
-      console.error("[TransitPanel] Erro ao parsear:", err);
-      return [];
-    }
-  }, [text, profile]);
 
   // Parseia seções das Dashas para blocos estilizados
   const dashaSections = React.useMemo(() => {
@@ -959,26 +811,7 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
     return parseDashaSections(dashaText);
   }, [dashaText]);
 
-  // Agrupa por casa natal
-  const byHouse = React.useMemo(() => {
-    const map = new Map<number, ParsedTransit[]>();
-    for (const t of allTransits) {
-      const list = map.get(t.casaNatal) || [];
-      list.push(t);
-      map.set(t.casaNatal, list);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [allTransits]);
-
-  const handleActivate = (t: ActiveTransit | null) => {
-    setActiveKey(t ? `${t.planetaTransito}|${t.planetaNatal}` : null);
-    onActiveTransitChange(t);
-  };
-
   if (!isOpen) return null;
-
-  // Contador para numeração global dos acordeões
-  let globalIdx = 1;
 
   return (
     <div className="w-full mt-6 transition-all duration-500 ease-in-out">
@@ -1090,12 +923,12 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
         </div>
       )}
 
-      {/* 3. Trânsitos agrupados por Esfera */}
+      {/* 3. Trânsitos — acordeões com carregamento sob demanda */}
       {activeTab === "transits" && (
         <div>
           <RestructuringPhasesAccordion cycles={restructuringCycles || []} />
 
-          {isLoading && !text && (
+          {isLoading && !transits && (
             <div className="flex items-center gap-3 py-4 px-5 rounded-xl border border-[#8c7f70]/10 bg-[#faf9f6]">
               <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin flex-shrink-0" />
               <p className="font-mono text-[10px] text-[#8c7f70] tracking-widest uppercase">
@@ -1104,22 +937,15 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
             </div>
           )}
 
-          {!isLoading && !text && (
+          {!isLoading && !transits && (
             <div className="text-center py-12 text-[#8c7f70] font-sans text-sm">
               Nenhuma leitura disponível.
             </div>
           )}
 
-          {text && (
+          {transits && (
             <div className="mt-6">
-              {typeof text === "object" && Array.isArray(text.transits) ? (
-                <StructuredTransitView
-                  reading={text}
-                  userId={userId}
-                  profile={profile}
-                  onActivate={handleActivate}
-                />
-              ) : allTransits.length === 0 ? (
+              {transits.length === 0 ? (
                 <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
                   <p className="font-serif text-[#8c7f70] text-sm">
                     Nenhum portal ativo no orbe de 4° no momento.
@@ -1128,23 +954,14 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
               ) : (
                 <div>
                   <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-[0.2em] mb-4 px-1">
-                    Portais ativos nos próximos 30 dias — clique na esfera para expandir
+                    Portais ativos nos próximos 30 dias — clique para expandir
                   </p>
-                  {byHouse.map(([house, transits]) => {
-                    const start = globalIdx;
-                    globalIdx += transits.length;
-                    return (
-                      <SphereGroup
-                        key={house}
-                        house={house}
-                        transits={transits}
-                        activeKey={activeKey}
-                        startIndex={start}
-                        userId={userId}
-                        onActivate={handleActivate}
-                      />
-                    );
-                  })}
+                  <TransitAccordionList
+                    transits={transits}
+                    userId={userId}
+                    profile={profile}
+                    onActivate={onActiveTransitChange}
+                  />
                 </div>
               )}
             </div>

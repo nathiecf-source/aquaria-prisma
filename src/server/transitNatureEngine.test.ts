@@ -27,3 +27,15 @@ test("Netuno em Casa 9 (trikona) = Terreno Neutro ou Favorável", () => {
   const result = getTransitNature("Netuno", 30 * 8 + 20, 9); // 20° Sagitário, Casa 9
   assert.ok(["Terreno Neutro", "Terreno Favorável"].includes(result.label));
 });
+
+test("Casa sideral e dispositor são retornados corretamente", () => {
+  // 15° Leão, Casa 1 (Kendra)
+  const result = getTransitNature("Sol", 30 * 4 + 15, 1);
+  assert.equal(result.houseType, "Kendra (ângulo de manifestação)");
+  assert.equal(result.dispositor, "Sol"); // regente de Leão
+});
+
+test("Saturno em Casa 8 (Dusthana) retorna classificação correta", () => {
+  const result = getTransitNature("Saturno", 200, 8); // ~20° Libra, Casa 8
+  assert.equal(result.houseType, "Dusthana (casa de cura e transformação)");
+});

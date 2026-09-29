@@ -78,6 +78,13 @@ export interface TransitAspect {
   peak_trigger_date?: string | null;
   geography_text?: { palco: string; gatilho: string | null };
   nature_text?: { label: string; sentence: string };
+  // Camada sideral para o motor de trânsitos
+  sideral_sign?: string;
+  sideral_house?: number;
+  sideral_house_type?: string;
+  sideral_dignity?: string;
+  sideral_dispositor?: string;
+  exact_aspect_date?: string | null;
 }
 
 function getRitmoTempo(planeta: string): string {
@@ -647,7 +654,7 @@ export async function getUpcomingCosmicEvents(
 const BAV_PLANET_ORDER = ["Sol", "Lua", "Marte", "Mercúrio", "Júpiter", "Vênus", "Saturno", "Ascendente"];
 
 /** Fórmula de Lahiri para o ayanamsha do ano civil (mesma constante usada em geminiService.ts). */
-function computeLahiriAyanamsha(year: number): number {
+export function computeLahiriAyanamsha(year: number): number {
   return 23.853056 + (year - 2000) * 0.0139697;
 }
 
@@ -655,12 +662,12 @@ function getSignIndex(sign: string): number {
   return SIGN_NAMES.indexOf(sign);
 }
 
-function tropicalToSideral(longitude: number, ayanamsha: number): number {
+export function tropicalToSideral(longitude: number, ayanamsha: number): number {
   return normalizeAngle(longitude - ayanamsha);
 }
 
 /** Calcula a casa védica Whole Sign a partir do signo sideral do trânsito e do Ascendente sideral natal. */
-function getVedicHouse(sideralTransitSign: number, sideralAscendantSign: number): number {
+export function getVedicHouse(sideralTransitSign: number, sideralAscendantSign: number): number {
   return ((sideralTransitSign - sideralAscendantSign + 12) % 12) + 1;
 }
 

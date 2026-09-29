@@ -508,7 +508,7 @@ export default function AstrologyMandala({
   const [transitInitialTab, setTransitInitialTab] = React.useState<TransitPanelTab>("dashas");
   const [cycleChanges, setCycleChanges] = React.useState<Array<{ tab: TransitPanelTab; label: string; cosmic?: boolean }>>([]);
   const cycleChangesCheckedFor = React.useRef<string | null>(null);
-  const [transitsText, setTransitsText] = React.useState<string | { transits: any[] } | null>(null);
+  const [transits, setTransits] = React.useState<any[] | null>(null);
   const [restructuringCycles, setRestructuringCycles] = React.useState<any[]>([]);
   const [isFetchingTransits, setIsFetchingTransits] = React.useState(false);
   const [dashaText, setDashaText] = React.useState<string | null>(null);
@@ -600,7 +600,7 @@ export default function AstrologyMandala({
 
   const fetchTransits = () => {
     if (!profile || isFetchingTransits) return;
-    setTransitsText(null);
+    setTransits(null);
     setIsFetchingTransits(true);
     fetch("/api/generate-transit-cycles", {
       method: "POST",
@@ -609,7 +609,7 @@ export default function AstrologyMandala({
     })
     .then(res => res.json())
     .then(data => {
-      if (data.reading) setTransitsText(data.reading);
+      if (Array.isArray(data.transits)) setTransits(data.transits);
       if (Array.isArray(data.restructuringCycles)) setRestructuringCycles(data.restructuringCycles);
     })
     .catch(err => console.error("Erro trânsitos:", err))
@@ -680,7 +680,7 @@ export default function AstrologyMandala({
     setIsTransitsModalOpen(willOpen);
     if (willOpen && profile) {
       if (dashaText === null) fetchDashas();
-      if (transitsText === null) fetchTransits();
+      if (transits === null) fetchTransits();
       if (profectionData === null) fetchProfection();
       if (rapidActivationsData === null) fetchRapidActivations();
     }
@@ -2341,7 +2341,7 @@ export default function AstrologyMandala({
         <TransitPanel
           isOpen={isTransitsModalOpen}
           isLoading={isFetchingTransits}
-          text={transitsText}
+          transits={transits}
           restructuringCycles={restructuringCycles}
           dashaText={dashaText}
           isLoadingDashas={isFetchingDashas}

@@ -41,7 +41,7 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
 import { ensureDrishtis } from "./src/server/astrologyProviders";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCyclesReading, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, HouseReadingSection } from "./src/server/geminiService";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, HouseReadingSection } from "./src/server/geminiService";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -1834,14 +1834,14 @@ async function createApp(): Promise<express.Application> {
       // Cache semanal da leitura: uma leitura por semana civil (YYYY-W##)
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
-      const readingId = `transit-cycles-v2-${weekKey}`;
+      const readingId = `transit-cycles-v3-${weekKey}`;
       const cached = await getCachedReading(userId, readingId);
-      if (cached && typeof cached.reading === "object" && cached.reading !== null) {
+      if (cached && Array.isArray(cached.transits)) {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
         const restructuringCycles = Array.isArray(cached.restructuringCycles)
           ? cached.restructuringCycles
           : await calculateRestructuringCycles(profile, now);
-        return res.json({ reading: cached.reading, restructuringCycles, cached: true });
+        return res.json({ transits: cached.transits, restructuringCycles, cached: true });
       }
 
       // ── Motor de trânsitos interno (Etapa 4) ──
@@ -1916,8 +1916,16 @@ async function createApp(): Promise<express.Application> {
           // Camada sideral/védica para o bloco "Geografia do Trânsito"
           const vedicTerrain = getVedicTransitTerrain(profile, t.planeta_transito, t.grau_transito, transitHouse);
 
-          // Geografia determinística: Whole Sign + Placidus
-          const geography = await buildTransitGeography(t.planeta_transito, today, natalHousesMap);
+          // Geografia determinística: Camada 1 (Sideral/Rāśi) + Camada 2 (Tropical/Placidus aspecto exato)
+          const sideralAscendantSign = profile?.vedic_specifics?.lagna;
+          const geography = await buildTransitGeography(
+            t.planeta_transito,
+            t.aspecto,
+            t.planeta_natal,
+            t.grau_natal,
+            sideralAscendantSign,
+            today
+          );
 
           return {
             planet: t.planeta_transito,
@@ -1932,22 +1940,25 @@ async function createApp(): Promise<express.Application> {
             casaDoRegenteNatal,
             casaRegidaPeloTransitante,
             vedic_structural_terrain: vedicTerrain,
-            whole_sign_house: geography.wholeSignHouse,
-            scenery_start_date: geography.window.ingressDate.toISOString(),
-            scenery_end_date: geography.window.egressDate?.toISOString() ?? null,
-            peak_trigger_date: geography.peakDate?.toISOString() ?? null,
-            geography_text: geography.geografia,
-            nature_text: geography.natureza,
+            sideral_sign: geography.sideral_sign,
+            sideral_house: geography.sideral_house,
+            sideral_house_type: geography.sideral_house_type,
+            sideral_dispositor: geography.sideral_dispositor,
+            sideral_dignity: geography.sideral_dignity,
+            sideral_ingress: geography.sideral_ingress.toISOString(),
+            sideral_egress: geography.sideral_egress?.toISOString() ?? null,
+            exact_aspect_date: geography.exact_aspect_date?.toISOString() ?? null,
+            tropical_sign_at_peak: geography.tropical_sign_at_peak,
+            seals: geography.seals,
+            nature: geography.nature,
           };
         }));
 
-        console.log("[TRANSIT HOUSE DEBUG]", tropicalTransits.map(t => `${t.planet} sign=${t.transitSign} → Casa ${t.transitHouse}${t.transitCoHouse ? ` + co-Casa ${t.transitCoHouse}` : ""} | WholeSign=${t.whole_sign_house}`));
+        console.log("[TRANSIT HOUSE DEBUG]", tropicalTransits.map(t => `${t.planet} sign=${t.transitSign} → Casa ${t.transitHouse}${t.transitCoHouse ? ` + co-Casa ${t.transitCoHouse}` : ""} | Sideral=${t.sideral_sign} Casa ${t.sideral_house}`));
         enrichedProfile = { ...profile, tropical_transits: tropicalTransits };
       } catch (engineErr: any) {
         console.warn("[TRANSIT ENGINE] Falha no motor interno, usando dados do profile:", engineErr?.message);
       }
-
-      const reading = await generateTransitCyclesReading(enrichedProfile);
 
       let restructuringCycles: any[] = [];
       try {
@@ -1956,14 +1967,57 @@ async function createApp(): Promise<express.Application> {
         console.warn("[RESTRUCTURING CYCLES] Falha ao calcular ciclos reestruturantes:", cyclesErr?.message);
       }
 
-      const payload = { reading, restructuringCycles, generatedAt: new Date().toISOString() };
+      const transits = enrichedProfile.tropical_transits || [];
+      const payload = { transits, restructuringCycles, generatedAt: new Date().toISOString() };
       await saveReading(userId, readingId, "transit-cycles", payload, getNextSundayMidnight(new Date()));
 
-      return res.json({ reading, restructuringCycles, cached: false });
+      return res.json({ transits, restructuringCycles, cached: false });
     } catch (err: any) {
       console.error("Erro ao gerar Leitura de Trânsitos e Ciclos:", err);
       return res.status(500).json({
         error: "Erro ao gerar Leitura de Trânsitos e Ciclos.",
+        details: err?.message || String(err)
+      });
+    }
+  });
+
+  // API Route: Gerar prosa detalhada de UM trânsito (carregamento sob demanda)
+  app.post("/api/generate-transit-cycle-detail", async (req: any, res) => {
+    try {
+      const { profile, userId, transit } = req.body;
+      if (!profile || !profile.birthData) {
+        return res.status(400).json({ error: "Perfil astrológico completo é obrigatório." });
+      }
+      if (!userId) {
+        return res.status(400).json({ error: "userId é obrigatório." });
+      }
+      if (!transit || !transit.planet) {
+        return res.status(400).json({ error: "Dados do trânsito são obrigatórios." });
+      }
+
+      if (!(await requireFeatureAccess(req, res, "ciclos"))) {
+        return;
+      }
+
+      const now = new Date();
+      const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
+      const transitKey = `${transit.planet}-${transit.aspectToNatal || transit.aspecto}`.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "-");
+      const detailId = `transit-detail-v1-${userId}-${transitKey}-${weekKey}`;
+      const cached = await getCachedReading(userId, detailId);
+      if (cached && cached.terreno && cached.gatilho && cached.integracao) {
+        console.log(`[TRANSIT CYCLE DETAIL] Cache hit ${detailId}`);
+        return res.json({ ...cached, cached: true });
+      }
+
+      const detail = await generateTransitCycleDetail(profile, transit);
+      const payload = { ...detail, generatedAt: now.toISOString() };
+      await saveReading(userId, detailId, "transit-cycle-detail", payload, getNextSundayMidnight(now));
+
+      return res.json({ ...detail, cached: false });
+    } catch (err: any) {
+      console.error("Erro ao gerar detalhe do trânsito:", err);
+      return res.status(500).json({
+        error: "Erro ao gerar detalhe do trânsito.",
         details: err?.message || String(err)
       });
     }

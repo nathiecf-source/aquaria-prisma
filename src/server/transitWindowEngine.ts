@@ -115,19 +115,14 @@ export interface SignWindow {
   egressDate: Date | null;
 }
 
-/**
- * Encontra a primeira entrada no signo atual antes de referenceDate
- * e a última saída definitiva dentro de um horizonte.
- * Retrogradações no meio são ignoradas: tudo é tratado como um único ciclo.
- */
-export async function findSignWindow(
-  planet: string,
+async function findSignWindowInternal(
+  getLon: (d: Date) => Promise<number>,
+  group: PlanetSpeedGroup,
   referenceDate: Date,
   maxYears: number = HORIZON_YEARS
 ): Promise<SignWindow> {
-  const group = getPlanetSpeedGroup(planet);
   const step = stepDaysForGroup(group);
-  const lonRef = await getPlanetLongitude(planet, referenceDate);
+  const lonRef = await getLon(referenceDate);
   const signRef = signOfLongitude(lonRef);
 
   const maxDate = addDays(referenceDate, maxYears * 365.25);
@@ -137,10 +132,10 @@ export async function findSignWindow(
   let curr = addDays(referenceDate, -step);
   let ingressDate = referenceDate;
   while (true) {
-    const lon = await getPlanetLongitude(planet, curr);
+    const lon = await getLon(curr);
     const sign = signOfLongitude(lon);
     if (sign !== signRef) {
-      ingressDate = lerpCrossingDate(curr, prev, lon, await getPlanetLongitude(planet, prev), signRef * 30);
+      ingressDate = lerpCrossingDate(curr, prev, lon, await getLon(prev), signRef * 30);
       break;
     }
     prev = curr;
@@ -155,7 +150,7 @@ export async function findSignWindow(
   curr = addDays(referenceDate, step);
 
   while (curr.getTime() <= maxDate.getTime()) {
-    const lon = await getPlanetLongitude(planet, curr);
+    const lon = await getLon(curr);
     const sign = signOfLongitude(lon);
 
     if (sign === signRef) {
@@ -179,7 +174,7 @@ export async function findSignWindow(
   // Refinar a saída entre lastInSignDate e a primeira data fora do signo após ele
   let afterIn = addDays(lastInSignDate, step);
   while (afterIn.getTime() <= maxDate.getTime()) {
-    const lon = await getPlanetLongitude(planet, afterIn);
+    const lon = await getLon(afterIn);
     if (signOfLongitude(lon) !== signRef) break;
     afterIn = addDays(afterIn, step);
   }
@@ -187,8 +182,8 @@ export async function findSignWindow(
   const egressDate = lerpCrossingDate(
     lastInSignDate,
     afterIn,
-    await getPlanetLongitude(planet, lastInSignDate),
-    await getPlanetLongitude(planet, afterIn),
+    await getLon(lastInSignDate),
+    await getLon(afterIn),
     ((signRef + 1) % 12) * 30
   );
 
@@ -196,10 +191,50 @@ export async function findSignWindow(
 }
 
 /**
- * Encontra a data mais próxima de referenceDate em que o planeta cruza targetLongitude.
- * Retorna null se não houver cruzamento dentro da janela do signo atual.
+ * Encontra a primeira entrada no signo atual antes de referenceDate
+ * e a última saída definitiva dentro de um horizonte.
+ * Retrogradações no meio são ignoradas: tudo é tratado como um único ciclo.
  */
-export async function findCuspPeakDate(
+export async function findSignWindow(
+  planet: string,
+  referenceDate: Date,
+  maxYears: number = HORIZON_YEARS
+): Promise<SignWindow> {
+  const group = getPlanetSpeedGroup(planet);
+  return findSignWindowInternal(
+    (d: Date) => getPlanetLongitude(planet, d),
+    group,
+    referenceDate,
+    maxYears
+  );
+}
+
+/**
+ * Encontra a janela de ingresso/saída no signo SIDERAL atual.
+ * Útil para a camada Rāśi (Whole Sign) do motor de trânsitos.
+ */
+export async function findSideralSignWindow(
+  planet: string,
+  ayanamsha: number,
+  referenceDate: Date,
+  maxYears: number = HORIZON_YEARS
+): Promise<SignWindow> {
+  const { tropicalToSideral } = await import("./transitEngine");
+  const group = getPlanetSpeedGroup(planet);
+  return findSignWindowInternal(
+    async (d: Date) => tropicalToSideral(await getPlanetLongitude(planet, d), ayanamsha),
+    group,
+    referenceDate,
+    maxYears
+  );
+}
+
+/**
+ * Encontra a data mais próxima de referenceDate em que a longitude do planeta
+ * atinge o targetLongitude (por exemplo, o grau exato de um aspecto ou de uma cúspide).
+ * Retorna null se não houver cruzamento dentro do horizonte temporal.
+ */
+export async function findExactPeakDate(
   planet: string,
   targetLongitude: number,
   referenceDate: Date,

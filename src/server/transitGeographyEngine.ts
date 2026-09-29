@@ -1,134 +1,189 @@
-// Monta as frases determinísticas do bloco "A Geografia do Trânsito".
-// Palco = janela Whole Sign (primeira entrada a última saída).
-// Gatilho = cruzamento da cúspide Placidus do signo.
+// Monta os selos e dados determinísticos das duas camadas do motor de trânsitos:
+// Camada 1 (Sideral / Rāśi via Whole Sign) e Camada 2 (Tropical / Cúspide via aspecto exato).
 
-import { SIGN_NAMES } from "./transitEngine";
+import {
+  SIGN_NAMES,
+  getVedicHouse,
+  tropicalToSideral,
+  computeLahiriAyanamsha,
+} from "./transitEngine";
 import {
   getPlanetLongitude,
   getPlanetSpeedGroup,
-  findSignWindow,
-  findCuspPeakDate,
-  formatTransitWindow,
-  FormattedWindow,
+  findSideralSignWindow,
+  findExactPeakDate,
 } from "./transitWindowEngine";
 import { getTransitNature, TransitNature } from "./transitNatureEngine";
 
-const HOUSE_THEMES: Record<number, string> = {
-  1: "revisar a sua identidade e o modo como você ocupa o mundo",
-  2: "cuidar dos seus recursos, valores e auto-sustentação",
-  3: "movimentar a comunicação, o aprendizado e o cotidiano",
-  4: "rever as suas raízes, o espaço íntimo e a base emocional",
-  5: "abrir espaço para a criatividade, o prazer e a autenticidade",
-  6: "ajustar a rotina, os hábitos e os cuidados práticos",
-  7: "renegociar relacionamentos, parcerias e o espelho do outro",
-  8: "enfrentar transformações, heranças e as profundezas da troca",
-  9: "ampliar a visão de mundo, as crenças e o sentido da jornada",
-  10: "assumir responsabilidades, direção e o seu lugar no mundo",
-  11: "conectar-se a grupos, causas e projetos de futuro",
-  12: "recolher-se, finalizar ciclos e escutar a vida interior",
+export const HOUSE_THEMES: Record<number, string> = {
+  1:  "Identidade e Presença Física",
+  2:  "Valores e Recursos Naturais",
+  3:  "Comunicação, Aprendizado e Cotidiano",
+  4:  "Lar, Raízes e Base Emocional",
+  5:  "Criatividade, Prazer e Autenticidade",
+  6:  "Rotina, Corpo e Serviço",
+  7:  "Relacionamentos, Parcerias e o Espelho do Outro",
+  8:  "Transformações, Heranças e as Profundezas da Troca",
+  9:  "Visão de Mundo, Crenças e Sentido da Jornada",
+  10: "Realização, Direção e Legado",
+  11: "Grupos, Causas e Visão de Futuro",
+  12: "Interioridade, Inconsciente e Espiritualidade",
 };
 
-function getAscendantSign(natalHouses: any[]): string | null {
-  const h1 = natalHouses.find((h) => h.house === 1);
-  return h1?.sign ?? null;
+const ASPECT_CENTERS: Record<string, number> = {
+  "Conjunção": 0,
+  "Quadratura": 90,
+  "Oposição": 180,
+};
+
+export interface TransitGeographySeals {
+  camada1: string;
+  camada2: string | null;
 }
 
-function wholeSignHouseForSign(transitSignIndex: number, ascendantSignIndex: number): number {
-  return ((transitSignIndex - ascendantSignIndex + 12) % 12) + 1;
+export interface TransitGeographyData {
+  planet: string;
+  aspecto: string;
+  planet_natal: string;
+  sideral_sign: string;
+  sideral_house: number;
+  sideral_house_type: string;
+  sideral_dispositor: string;
+  sideral_dignity: string;
+  sideral_ingress: Date;
+  sideral_egress: Date | null;
+  tropical_sign_at_peak: string | null;
+  exact_aspect_date: Date | null;
+  aspect_target_longitude: number;
+  seals: TransitGeographySeals;
+  nature: TransitNature;
 }
 
-function getCuspLongitude(natalHouses: any[], houseNumber: number): number | null {
-  const h = natalHouses.find((h) => h.house === houseNumber);
-  if (!h) return null;
-  if (typeof h.longitude === "number") return h.longitude;
-  const signIndex = SIGN_NAMES.indexOf(h.sign);
-  if (signIndex < 0) return null;
-  return signIndex * 30 + (h.cuspDegree ?? 0);
+function normalizeAngle(angle: number): number {
+  return ((angle % 360) + 360) % 360;
 }
 
-export interface TransitGeographyWindow {
-  ingressDate: Date;
-  egressDate: Date | null;
-}
-
-export interface TransitGeographyResult {
-  wholeSignHouse: number;
-  window: TransitGeographyWindow;
-  peakDate: Date | null;
-  geografia: FormattedWindow;
-  natureza: TransitNature;
-}
-
-/**
- * Calcula a geografia completa de um trânsito: Whole Sign house, janela de datas,
- * gatilho de cúspide e natureza do evento.
- */
-export async function buildTransitGeography(
-  planet: string,
-  referenceDate: Date,
-  natalHouses: any[]
-): Promise<TransitGeographyResult> {
-  const ascendantSign = getAscendantSign(natalHouses);
-  const transitLon = await getPlanetLongitude(planet, referenceDate);
-  const transitSignIndex = Math.floor(((transitLon % 360) + 360) % 360 / 30);
-  const ascendantSignIndex = ascendantSign ? SIGN_NAMES.indexOf(ascendantSign) : 0;
-  const wholeSignHouse = wholeSignHouseForSign(transitSignIndex, ascendantSignIndex);
-
-  const window = await findSignWindow(planet, referenceDate);
-  const cuspLongitude = getCuspLongitude(natalHouses, wholeSignHouse);
-  const peakDate = cuspLongitude !== null
-    ? await findCuspPeakDate(planet, cuspLongitude, referenceDate)
-    : null;
-
-  const geografia = formatTransitWindow(planet, window.ingressDate, window.egressDate, peakDate);
-  const natureza = getTransitNature(planet, transitLon, wholeSignHouse);
-
-  // Sobrescreve as frases genéricas de palco com o tema específico da casa whole sign
-  const theme = HOUSE_THEMES[wholeSignHouse] ?? "reorganizar esta área da sua vida";
+function formatDatePrecise(planet: string, date: Date | null): string | null {
+  if (!date) return null;
   const group = getPlanetSpeedGroup(planet);
-  let palco = geografia.palco;
   if (group === "slow") {
-    const startYear = window.ingressDate.getFullYear();
-    const endText = window.egressDate ? String(window.egressDate.getFullYear()) : "os próximos anos";
-    palco = `De ${startYear} a ${endText}, ${theme}.`;
-  } else if (group === "medium") {
-    const months = dateRangeMonths(window.ingressDate, window.egressDate);
-    palco = `De ${months}, ${theme}.`;
-  } else {
-    const days = dateRangeDays(window.ingressDate, window.egressDate);
-    palco = `De ${days}, ${theme}.`;
+    return String(date.getUTCFullYear());
   }
-
-  return {
-    wholeSignHouse,
-    window,
-    peakDate,
-    geografia: {
-      palco,
-      gatilho: geografia.gatilho,
-    },
-    natureza,
-  };
+  if (group === "medium") {
+    return capitalize(
+      date.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
+    );
+  }
+  return date.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
-function dateRangeMonths(start: Date, end: Date | null): string {
-  const startText = capitalize(
-    start.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
-  );
-  if (!end) return `${startText} em diante`;
-  const endText = capitalize(
-    end.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
-  );
-  return `${startText} a ${endText}`;
-}
-
-function dateRangeDays(start: Date, end: Date | null): string {
-  const startText = start.toLocaleDateString("pt-BR", { day: "numeric", month: "long", timeZone: "UTC" });
-  if (!end) return `${startText} em diante`;
-  const endText = end.toLocaleDateString("pt-BR", { day: "numeric", month: "long", timeZone: "UTC" });
-  return `${startText} a ${endText}`;
+function formatDateRangePrecise(planet: string, start: Date, end: Date | null): string {
+  const group = getPlanetSpeedGroup(planet);
+  if (group === "slow") {
+    const endText = end ? String(end.getUTCFullYear()) : "os próximos anos";
+    return `De ${start.getUTCFullYear()} a ${endText}`;
+  }
+  if (group === "medium") {
+    const startText = capitalize(
+      start.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
+    );
+    const endText = end
+      ? capitalize(end.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }))
+      : "os próximos anos";
+    return `De ${startText} a ${endText}`;
+  }
+  const startText = start.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const endText = end
+    ? end.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : "os próximos dias";
+  return `De ${startText} a ${endText}`;
 }
 
 function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Calcula selos e dados determinísticos para um trânsito ativo.
+ */
+export async function buildTransitGeography(
+  planet: string,
+  aspecto: string,
+  planetNatal: string,
+  grauNatal: number,
+  sideralAscendantSign: string | null | undefined,
+  referenceDate: Date
+): Promise<TransitGeographyData> {
+  const ayanamsha = computeLahiriAyanamsha(referenceDate.getUTCFullYear());
+  const transitLonTropical = await getPlanetLongitude(planet, referenceDate);
+  const transitLonSideral = tropicalToSideral(transitLonTropical, ayanamsha);
+  const sideralSignIndex = Math.floor(normalizeAngle(transitLonSideral) / 30);
+  const sideralSign = SIGN_NAMES[sideralSignIndex] ?? "?";
+
+  let sideralHouse = 0;
+  if (sideralAscendantSign) {
+    const sideralAscIndex = SIGN_NAMES.indexOf(sideralAscendantSign);
+    if (sideralAscIndex >= 0) {
+      sideralHouse = getVedicHouse(sideralSignIndex, sideralAscIndex);
+    }
+  }
+
+  const sideralWindow = await findSideralSignWindow(planet, ayanamsha, referenceDate);
+
+  const aspectCenter = ASPECT_CENTERS[aspecto] ?? 0;
+  const aspectTarget = normalizeAngle(grauNatal + aspectCenter);
+
+  let exactAspectDate: Date | null = null;
+  let tropicalSignAtPeak: string | null = null;
+  try {
+    exactAspectDate = await findExactPeakDate(planet, aspectTarget, referenceDate);
+    if (exactAspectDate) {
+      const peakLon = await getPlanetLongitude(planet, exactAspectDate);
+      tropicalSignAtPeak = SIGN_NAMES[Math.floor(normalizeAngle(peakLon) / 30)] ?? null;
+    }
+  } catch (err) {
+    console.warn(`[transitGeographyEngine] Erro ao calcular pico de aspecto para ${planet}:`, err);
+  }
+
+  const nature = getTransitNature(planet, transitLonSideral, sideralHouse || 1);
+
+  // Selos curtos determinísticos — a prosa interpretativa virá do Gemini
+  const camada1Seal = sideralHouse
+    ? `[${planet} em ${sideralSign} • Casa ${sideralHouse} Sideral (${nature.houseType}) • Dispositor: ${nature.dispositor} • ${nature.dignity}]`
+    : `[${planet} em ${sideralSign} Sideral • Dispositor: ${nature.dispositor} • ${nature.dignity}]`;
+
+  const camada2Seal = exactAspectDate
+    ? `[${aspecto} exata com ${planetNatal} Natal • ${formatDatePrecise(planet, exactAspectDate)} • ${tropicalSignAtPeak ?? "?"}]`
+    : null;
+
+  return {
+    planet,
+    aspecto: `${aspecto} com ${planetNatal} Natal`,
+    planet_natal: planetNatal,
+    sideral_sign: sideralSign,
+    sideral_house: sideralHouse,
+    sideral_house_type: nature.houseType,
+    sideral_dispositor: nature.dispositor,
+    sideral_dignity: nature.dignity,
+    sideral_ingress: sideralWindow.ingressDate,
+    sideral_egress: sideralWindow.egressDate,
+    tropical_sign_at_peak: tropicalSignAtPeak,
+    exact_aspect_date: exactAspectDate,
+    aspect_target_longitude: aspectTarget,
+    seals: {
+      camada1: camada1Seal,
+      camada2: camada2Seal,
+    },
+    nature,
+  };
 }

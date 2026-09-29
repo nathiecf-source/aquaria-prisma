@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   getPlanetLongitude,
   findSignWindow,
-  findCuspPeakDate,
+  findExactPeakDate,
   getPlanetSpeedGroup,
 } from "./transitWindowEngine";
 
@@ -55,14 +55,23 @@ test("findSignWindow: Plutão em 2026 retorna ingresso recente e saída distante
   assert.ok(window.egressDate!.getUTCFullYear() >= 2030);
 });
 
-test("findCuspPeakDate: Sol cruza um grau alvo dentro de poucos dias", async () => {
+test("findExactPeakDate: Sol cruza um grau alvo dentro de poucos dias", async () => {
   const ref = new Date("2026-03-15T00:00:00Z");
   const target = 0; // 0° Áries, equinócio
-  const peak = await findCuspPeakDate("Sol", target, ref, 1);
+  const peak = await findExactPeakDate("Sol", target, ref, 1);
   assert.ok(peak);
   // Pico deve estar entre 15 e 25 de março
   assert.ok(peak!.getUTCMonth() === 2);
   assert.ok(peak!.getUTCDate() >= 18 && peak!.getUTCDate() <= 22);
+});
+
+test("findExactPeakDate: encontra data futura do aspecto exato a um planeta natal fictício", async () => {
+  const ref = new Date("2026-01-01T00:00:00Z");
+  const saturnNow = await getPlanetLongitude("Saturno", ref);
+  const target = (saturnNow + 2) % 360; // poucos graus à frente do Saturno atual
+  const peak = await findExactPeakDate("Saturno", target, ref, 2);
+  assert.ok(peak);
+  assert.ok(peak! > ref);
 });
 
 test("performance: calcular janelas para 7 planetas leva menos de 3 segundos", async () => {

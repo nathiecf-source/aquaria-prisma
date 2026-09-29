@@ -3235,130 +3235,91 @@ export function getDeterministicDiretrizAmplaFallback(
   visualState: any
 ): DiretrizAmplaOutput { throw new Error("Fallback de interpretação removido para diagnóstico da API Gemini."); }
 
-export interface TransitCycleGeography {
-  palco: string;
-  gatilho: string | null;
-}
-
-export interface TransitCycleNature {
-  label: string;
-  sentence: string;
-}
-
-export interface TransitCyclesBlock {
-  planet: string;
-  planetaNatal: string;
-  aspecto: string;
-  wholeSignHouse: number;
-  desafio: string;
-  geografia: TransitCycleGeography;
-  natureza: TransitCycleNature;
+export interface TransitCycleDetail {
+  terreno: string;
+  gatilho: string;
   integracao: string;
 }
 
-export interface TransitCyclesReading {
-  transits: TransitCyclesBlock[];
-}
-
-const transitCyclesReadingSchema = {
+const transitCycleDetailSchema = {
   type: Type.OBJECT,
   properties: {
-    transits: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          planet: { type: Type.STRING, description: "Nome do planeta em trânsito." },
-          planetaNatal: { type: Type.STRING, description: "Nome do planeta natal tocado." },
-          aspecto: { type: Type.STRING, description: "Aspecto (ex: Conjunção com Saturno Natal)." },
-          wholeSignHouse: { type: Type.INTEGER, description: "Casa astrológica Whole Sign ativada pelo trânsito." },
-          desafio: { type: Type.STRING, description: "Texto do bloco O Desafio (introdução psicológica e somática)." },
-          integracao: { type: Type.STRING, description: "Texto do bloco A Integração & Prática Contemplativa." },
-        },
-        required: ["planet", "planetaNatal", "aspecto", "wholeSignHouse", "desafio", "integracao"],
-      },
-    },
+    terreno: { type: Type.STRING, description: "Prosa da Camada 1: terreno estrutural e destino sideral (Sideral/Rāśi)." },
+    gatilho: { type: Type.STRING, description: "Prosa da Camada 2: gatilho psicológico tropical e urgência (Tropical/Placidus)." },
+    integracao: { type: Type.STRING, description: "Bloco final: desafio, natureza do terreno, virtude nomeada e prática contemplativa." },
   },
-  required: ["transits"],
+  required: ["terreno", "gatilho", "integracao"],
 };
 
-function getGenericTransitFallback(transit: any): TransitCyclesBlock {
-  const planet = transit.planet || "Planeta";
-  const natal = transit.planetaNatal || "seu ponto natal";
-  const aspecto = transit.aspectToNatal || `em aspecto com ${natal}`;
-  const wholeSignHouse = transit.whole_sign_house ?? 0;
+function getGenericTransitDetailFallback(facts: any): TransitCycleDetail {
+  const planet = facts?.planet || "Planeta";
+  const aspecto = facts?.aspecto || "aspecto";
   return {
-    planet,
-    planetaNatal: natal,
-    aspecto,
-    wholeSignHouse,
-    desafio: `O trânsito de ${planet} ${aspecto} ativa uma tensão específica na sua psique. Observe como esse encontro ecoa no corpo e na emoção sem buscar soluções imediatas. O primeiro passo é nomear o que está sendo tocado com honestidade.`,
-    geografia: transit.geography_text ?? { palco: "Janela temporal em cálculo.", gatilho: null },
-    natureza: transit.nature_text ?? { label: "Terreno em cálculo.", sentence: "" },
+    terreno: `O trânsito de ${planet} configura um cenário estrutural de longo alcance. Observe como a vida material e os acordos práticos começam a pedir uma nova ordem, sem que você precise resolver tudo de uma só vez.`,
+    gatilho: `Por volta do pico indicado, ${planet} em ${aspecto} atinge uma intensidade especial. A tensão psicológica pode se tornar mais nítida — este é o momento de olhar para o que foi ativado com honestidade, sem afogar a resposta em justificações.`,
     integracao: `Este movimento pede que você sustente a tensão com presença, sem fugir nem forçar respostas. Encontre uma virtude própria deste momento — pode ser paciência, discernimento ou coragem quieta — e deixe que ela organize uma ação mínima e concreta para hoje. Feche os olhos por alguns instantes, respire e sinta onde esse trânsito habita no corpo.`,
   };
 }
 
-export async function generateTransitCyclesReading(
-  profile: CompleteAstrologicalProfile
-): Promise<TransitCyclesReading> {
+export async function generateTransitCycleDetail(
+  profile: CompleteAstrologicalProfile,
+  facts: any
+): Promise<TransitCycleDetail> {
   const gender = getEffectiveGender(profile);
 
   const systemInstruction = `[PAPEL DO SISTEMA]
 Você é um guia terapêutico e astrológico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que entende astrologia e psicologia de forma profunda.
 
 TAREFA
-Para CADA trânsito fornecido, escreva APENAS os dois campos abaixo:
-1. desafio: introdução psicológica/somática do encontro entre o planeta transitante e o planeta natal (4 a 6 frases).
-2. integracao: encerramento com insight não-dual, virtude nomeada especificamente para esta combinação, e prática contemplativa somática (5 a 8 frases).
+Você receberá um JSON com os dados determinísticos de um único trânsito. Escreva EXATAMENTE três campos:
+1. terreno: prosa da Camada 1 (Sideral / Rāśi via Whole Sign) — tom objetivo, estrutural e focado no destino manifesto, eventos práticos, contratos, responsabilidades e o karma material.
+2. gatilho: prosa da Camada 2 (Tropical / Cúspide via aspecto exato) — tom psicológico, direto, focado no nervo exposto, na urgência subjetiva e na pressão emocional do ego.
+3. integracao: bloco final que une: (a) o desafio psicológico/somático do encontro planetário, (b) a natureza do terreno (favorável/restritivo/neutro) como pano de fundo, (c) uma virtude nomeada especificamente para esta combinação, e (d) uma prática contemplativa somática.
 
-REGRAS INEGOCIÁVEIS
+REGRAS DE OURO — NÃO QUEBRAR
+- Use APENAS os dados fornecidos no JSON. É estritamente proibido inventar signos, casas, regentes, dignidades, datas ou classificações diferentes dos do JSON.
+- Não use jargão esotérico: 'chakra', 'vibração', 'energia cósmica', 'alinhamento', 'universo', 'manifestar'.
+- Evite conectivos robóticos: 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar' e variações.
 - Use o gênero fornecido (${gender}).
-- PROIBIDO jargão esotérico: 'chakra', 'vibração', 'energia cósmica', 'alinhamento', 'universo', 'manifestar'.
-- PROIBIDO conectivos robóticos: 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar' e variações.
-- Cada combinação planeta transitante × aspecto × planeta natal deve ter fraseologia exclusiva. Não recicle metáforas.
-- Não cite casas, signos ou números técnicos no corpo do texto — eles já estão nos blocos determinísticos fornecidos.
-- NÃO altere, recrie ou ignore as frases de "Geografia" e "Natureza do Evento" que acompanham cada trânsito; elas são a âncora factual e serão renderizadas separadamente pelo sistema.
+- Cada combinação planeta × aspecto × planeta natal deve ter fraseologia exclusiva; não recicle metáforas.
+- Os textos devem soar naturais em português brasileiro, mas sem inventar dados técnicos.
 `;
 
-  const EXCLUSIONS = /Nodo|Node|Lilith|Ascendente|Ascendant|Meio do Céu|MC|Parte|Fortuna|Rahu|Ketu/i;
-  const activeTransits = (profile.tropical_transits || []).filter(
-    (t: any) => !EXCLUSIONS.test(t.planet) && !EXCLUSIONS.test(t.planetaNatal || "")
-  );
-
-  if (activeTransits.length === 0) {
-    return { transits: [] };
-  }
-
-  const transitContextLines = activeTransits.map((t: any) => {
-    const geoPalco = t.geography_text?.palco ?? "Janela temporal em cálculo.";
-    const geoGatilho = t.geography_text?.gatilho ?? null;
-    const natureLabel = t.nature_text?.label ?? "Terreno em cálculo.";
-    const natureSentence = t.nature_text?.sentence ?? "";
-    return `
-TRÂNSITO: ${t.planet} ${t.aspectToNatal}
-Planeta Natal: ${t.planetaNatal}
-Casa Whole Sign ativada: ${t.whole_sign_house ?? "?"}
-Casa Natal do planeta: ${t.casaNatal ?? "?"}
-GEOGRAFIA DETERMINÍSTICA (não altere):
-- O Palco: ${geoPalco}${geoGatilho ? "\n- O Gatilho: " + geoGatilho : ""}
-NATUREZA DO EVENTO (não altere):
-- ${natureLabel}: ${natureSentence}
-RITMO: ${t.ritmo_tempo || ""}
-`.trim();
-  });
+  const sideralWindow = facts?.sideral_ingress && facts?.sideral_egress !== undefined
+    ? formatSideralWindow(facts.planet, new Date(facts.sideral_ingress), facts.sideral_egress ? new Date(facts.sideral_egress) : null)
+    : facts?.sideral_ingress
+      ? new Date(facts.sideral_ingress).getUTCFullYear()
+      : "";
 
   const promptInput = `
 DADOS DO USUÁRIO:
 - Nome: ${profile.birthData.name}
 - Gênero: ${gender}
 
-${transitContextLines.join("\n\n---\n\n")}
+JSON DE FATOS DO TRÂNSITO (USE APENAS ESTES DADOS):
+${JSON.stringify({
+  planeta_transitante: facts?.planet,
+  aspecto: facts?.aspecto,
+  camada_sideral: {
+    signo: facts?.sideral_sign,
+    casa: facts?.sideral_house,
+    tipo_casa: facts?.sideral_house_type,
+    dispositor: facts?.sideral_dispositor,
+    dignidade: facts?.sideral_dignity,
+    janela: sideralWindow,
+  },
+  camada_tropical: {
+    signo_no_pico: facts?.tropical_sign_at_peak,
+    data_aspecto_exato: facts?.exact_aspect_date,
+  },
+  natureza: {
+    label: facts?.nature?.label,
+    sentence: facts?.nature?.sentence,
+  },
+  selos: facts?.seals,
+}, null, 2)}
 
-Gere um array JSON com ${activeTransits.length} objeto(s), um para cada trânsito, na mesma ordem, contendo apenas:
-- planet, planetaNatal, aspecto (copie exatamente dos dados acima)
-- desafio
-- integracao
+Gere um JSON com os campos: terreno, gatilho, integracao.
 `;
 
   try {
@@ -3368,45 +3329,51 @@ Gere um array JSON com ${activeTransits.length} objeto(s), um para cada trânsit
       contents: promptInput,
       config: {
         systemInstruction,
-        temperature: 0.2,
-        maxOutputTokens: 8192,
+        temperature: 0.25,
+        maxOutputTokens: 4096,
         responseMimeType: "application/json",
-        responseSchema: transitCyclesReadingSchema,
+        responseSchema: transitCycleDetailSchema,
       },
     });
 
-    const raw = response.text || "{\"transits\":[]}";
-    let parsed: TransitCyclesReading;
+    const raw = response.text || "{}";
+    let parsed: Partial<TransitCycleDetail>;
     try {
       parsed = JSON.parse(raw);
     } catch {
       throw new Error("[Gemini API] Resposta não é JSON válido.");
     }
 
-    if (!Array.isArray(parsed.transits) || parsed.transits.length < activeTransits.length) {
-      throw new Error(`[Gemini API] Resposta incompleta: recebido ${parsed.transits?.length ?? 0} de ${activeTransits.length} trânsitos.`);
-    }
-
-    const transits = activeTransits.map((t: any, idx: number) => {
-      const generated: any = parsed.transits[idx] || {};
-      const fallback = getGenericTransitFallback(t);
-      return {
-        planet: t.planet,
-        planetaNatal: t.planetaNatal,
-        aspecto: t.aspectToNatal,
-        wholeSignHouse: generated.wholeSignHouse ?? t.whole_sign_house ?? fallback.wholeSignHouse,
-        desafio: generated.desafio?.trim() || fallback.desafio,
-        geografia: t.geography_text ?? fallback.geografia,
-        natureza: t.nature_text ?? fallback.natureza,
-        integracao: generated.integracao?.trim() || fallback.integracao,
-      };
-    });
-
-    return { transits };
+    const fallback = getGenericTransitDetailFallback(facts);
+    return {
+      terreno: parsed.terreno?.trim() || fallback.terreno,
+      gatilho: parsed.gatilho?.trim() || fallback.gatilho,
+      integracao: parsed.integracao?.trim() || fallback.integracao,
+    };
   } catch (error) {
-    cleanLogError("[Gemini API] Falha na Leitura de Trânsitos e Ciclos — usando fallback", error);
-    return { transits: activeTransits.map(getGenericTransitFallback) };
+    cleanLogError("[Gemini API] Falha na geração do detalhe do trânsito — usando fallback", error);
+    return getGenericTransitDetailFallback(facts);
   }
+}
+
+function formatSideralWindow(planet: string, ingress: Date, egress: Date | null): string {
+  const group = planet === "Sol" || planet === "Marte" ? "fast" : ["Júpiter", "Saturno"].includes(planet) ? "medium" : "slow";
+  if (group === "slow") {
+    const endText = egress ? String(egress.getUTCFullYear()) : "os próximos anos";
+    return `De ${ingress.getUTCFullYear()} a ${endText}`;
+  }
+  if (group === "medium") {
+    const startText = ingress.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+    const endText = egress
+      ? egress.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
+      : "os próximos anos";
+    return `De ${startText} a ${endText}`;
+  }
+  const startText = ingress.toLocaleDateString("pt-BR", { day: "numeric", month: "long", timeZone: "UTC" });
+  const endText = egress
+    ? egress.toLocaleDateString("pt-BR", { day: "numeric", month: "long", timeZone: "UTC" })
+    : "os próximos dias";
+  return `De ${startText} a ${endText}`;
 }
 export async function generateDashaReading(profile: CompleteAstrologicalProfile): Promise<string> {
   const gender = getEffectiveGender(profile);
