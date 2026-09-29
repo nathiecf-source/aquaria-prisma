@@ -51,6 +51,9 @@ export interface TransitGeographyData {
   planet: string;
   aspecto: string;
   planet_natal: string;
+  terrain_mode: "tropical" | "sideral";
+  structural_sign: string;
+  structural_house: number;
   sideral_sign: string;
   sideral_house: number;
   sideral_house_type: string;
@@ -62,6 +65,7 @@ export interface TransitGeographyData {
   sideral_egress: Date | null;
   tropical_sign: string;
   tropical_house: number;
+  tropical_whole_sign_house: number;
   tropical_sign_at_peak: string | null;
   exact_aspect_date: Date | null;
   aspect_target_longitude: number;
@@ -99,12 +103,17 @@ function capitalize(str: string): string {
 /**
  * Calcula selos e dados determinísticos para um trânsito ativo.
  */
+function isTranspersonalPlanet(planet: string): boolean {
+  return ["Urano", "Netuno", "Plutão"].includes(planet);
+}
+
 export async function buildTransitGeography(
   planet: string,
   aspecto: string,
   planetNatal: string,
   grauNatal: number,
   tropicalHouse: number,
+  tropicalAscendantSign: string | null | undefined,
   sideralAscendantSign: string | null | undefined,
   referenceDate: Date
 ): Promise<TransitGeographyData> {
@@ -113,7 +122,16 @@ export async function buildTransitGeography(
   const transitLonSideral = tropicalToSideral(transitLonTropical, ayanamsha);
   const sideralSignIndex = Math.floor(normalizeAngle(transitLonSideral) / 30);
   const sideralSign = SIGN_NAMES[sideralSignIndex] ?? "?";
-  const tropicalSign = SIGN_NAMES[Math.floor(normalizeAngle(transitLonTropical) / 30)] ?? "?";
+  const tropicalSignIndex = Math.floor(normalizeAngle(transitLonTropical) / 30);
+  const tropicalSign = SIGN_NAMES[tropicalSignIndex] ?? "?";
+
+  let tropicalWholeSignHouse = tropicalHouse;
+  if (tropicalAscendantSign) {
+    const tropicalAscIndex = SIGN_NAMES.indexOf(tropicalAscendantSign);
+    if (tropicalAscIndex >= 0) {
+      tropicalWholeSignHouse = ((tropicalSignIndex - tropicalAscIndex + 12) % 12) + 1;
+    }
+  }
 
   let sideralHouse = 0;
   if (sideralAscendantSign) {
@@ -140,33 +158,43 @@ export async function buildTransitGeography(
     console.warn(`[transitGeographyEngine] Erro ao calcular pico de aspecto para ${planet}:`, err);
   }
 
-  const nature = getTransitNature(planet, transitLonSideral, sideralHouse || 1);
+  // Para transpessoais o terreno estrutural é 100% tropical; para os demais, sideral.
+  const terrainMode: "tropical" | "sideral" = isTranspersonalPlanet(planet) ? "tropical" : "sideral";
+  const structuralSign = terrainMode === "tropical" ? tropicalSign : sideralSign;
+  const structuralHouse = terrainMode === "tropical" ? tropicalWholeSignHouse : sideralHouse;
+  const structuralLon = terrainMode === "tropical" ? transitLonTropical : transitLonSideral;
+
+  const nature = getTransitNature(planet, structuralLon, structuralHouse || 1);
 
   // Selos no formato solicitado pelo usuário
   const tropicalSeal = `⚡ Psicológico (Tropical): ${planet} em ${tropicalSignAtPeak ?? tropicalSign} ${ASPECT_GLYPHS[aspecto] ?? aspecto} ${planetNatal} Natal • Casa ${tropicalHouse}`;
-  const sideralSeal = `🏛 Estrutural (Sideral): ${planet} em ${sideralSign} [${nature.dignityShort}] • Casa ${sideralHouse} • Casa ${nature.houseClass}`;
+  const structuralSeal = `🏛 Estrutural (${terrainMode === "tropical" ? "Tropical" : "Sideral"}): ${planet} em ${structuralSign} [${nature.dignityShort}] • Casa ${structuralHouse} • Casa ${nature.houseClass}`;
 
   return {
     planet,
     aspecto: `${aspecto} com ${planetNatal} Natal`,
     planet_natal: planetNatal,
+    terrain_mode: terrainMode,
+    structural_sign: structuralSign,
+    structural_house: structuralHouse,
     sideral_sign: sideralSign,
     sideral_house: sideralHouse,
-    sideral_house_type: nature.houseType,
-    sideral_house_class: nature.houseClass,
-    sideral_dispositor: nature.dispositor,
-    sideral_dignity: nature.dignity,
-    sideral_dignity_short: nature.dignityShort,
-    sideral_ingress: sideralWindow.ingressDate,
-    sideral_egress: sideralWindow.egressDate,
+    sideral_house_type: terrainMode === "tropical" ? "" : nature.houseType,
+    sideral_house_class: terrainMode === "tropical" ? "" : nature.houseClass,
+    sideral_dispositor: terrainMode === "tropical" ? "" : nature.dispositor,
+    sideral_dignity: terrainMode === "tropical" ? "" : nature.dignity,
+    sideral_dignity_short: terrainMode === "tropical" ? "" : nature.dignityShort,
+    sideral_ingress: terrainMode === "tropical" ? new Date(referenceDate) : sideralWindow.ingressDate,
+    sideral_egress: terrainMode === "tropical" ? null : sideralWindow.egressDate,
     tropical_sign: tropicalSign,
     tropical_house: tropicalHouse,
+    tropical_whole_sign_house: tropicalWholeSignHouse,
     tropical_sign_at_peak: tropicalSignAtPeak,
     exact_aspect_date: exactAspectDate,
     aspect_target_longitude: aspectTarget,
     seals: {
       tropicalSeal,
-      sideralSeal,
+      sideralSeal: structuralSeal,
     },
     nature,
   };

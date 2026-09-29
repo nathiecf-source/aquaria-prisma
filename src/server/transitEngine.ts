@@ -2,6 +2,20 @@
 // necessarios em todos os endpoints (ex: /api/settings). Carregamos sob demanda.
 let astromod: any = null;
 let planetData: any = null;
+let astroCache: {
+  julian: any;
+  planetposition: any;
+  solar: any;
+  moonposition: any;
+  earth: any;
+  mars: any;
+  jupiter: any;
+  saturn: any;
+  uranus: any;
+  neptune: any;
+  mercury: any;
+  venus: any;
+} | null = null;
 
 // Compatibilidade: em build CJS o esbuild envolve o default do astronomia/data;
 // em ESM/dev o default já é o objeto com os dados.
@@ -25,6 +39,26 @@ export async function initAstronomia(): Promise<{ julian: any; planetposition: a
   astromod = mod;
   planetData = resolveAstronomiaData(dataRaw);
   return { ...astromod, planetData };
+}
+
+async function getAstronomyState() {
+  if (astroCache) return astroCache;
+  const { julian, planetposition, solar, moonposition } = await initAstronomia();
+  astroCache = {
+    julian,
+    planetposition,
+    solar,
+    moonposition,
+    earth: new planetposition.Planet(planetData.vsop87Dearth),
+    mars: new planetposition.Planet(planetData.vsop87Dmars),
+    jupiter: new planetposition.Planet(planetData.vsop87Djupiter),
+    saturn: new planetposition.Planet(planetData.vsop87Dsaturn),
+    uranus: new planetposition.Planet(planetData.vsop87Buranus),
+    neptune: new planetposition.Planet(planetData.vsop87Bneptune),
+    mercury: new planetposition.Planet(planetData.vsop87Dmercury),
+    venus: new planetposition.Planet(planetData.vsop87Dvenus),
+  };
+  return astroCache;
 }
 
 function normalizeAngle(angle: number): number {
@@ -87,7 +121,7 @@ export interface TransitAspect {
   exact_aspect_date?: string | null;
 }
 
-function getRitmoTempo(planeta: string): string {
+export function getRitmoTempo(planeta: string): string {
   if (["Plutão", "Netuno", "Urano"].includes(planeta)) {
     return "Longo prazo (meses a anos). Um portal de reestruturação profunda e orgânica que exige paciência e entrega.";
   }
@@ -205,34 +239,24 @@ function getGeoLon(planet: any, earth: any, jde: number): number {
 }
 
 export async function getTropicalTransitDegrees(date: Date, quiet = false): Promise<Record<string, number>> {
-  const { julian, planetposition, solar } = await initAstronomia();
+  const { julian, solar, earth, mars, jupiter, saturn, uranus, neptune } = await getAstronomyState();
   const jde = julian.CalendarGregorianToJD(
     date.getFullYear(),
     date.getMonth() + 1,
     date.getDate() + date.getHours() / 24 + date.getMinutes() / 1440
   );
 
-  // VSOP87D: apenas os planetas em trânsito permitidos (Mercúrio, Vênus e Lua excluídos)
-  const earthD   = new planetposition.Planet(planetData.vsop87Dearth);
-  const marsD    = new planetposition.Planet(planetData.vsop87Dmars);
-  const jupiterD = new planetposition.Planet(planetData.vsop87Djupiter);
-  const saturnD  = new planetposition.Planet(planetData.vsop87Dsaturn);
-
-  // VSOP87B: longitude geocêntrica direta para planetas externos (Urano, Netuno)
-  const uranusB  = new planetposition.Planet(planetData.vsop87Buranus);
-  const neptuneB = new planetposition.Planet(planetData.vsop87Bneptune);
-
   // Sol: solar.apparentVSOP87 com Terra VSOP87D — resultado direto em radianos
-  const sunLon = toDeg(solar.apparentVSOP87(earthD, jde).lon);
+  const sunLon = toDeg(solar.apparentVSOP87(earth, jde).lon);
 
   // Calcula apenas os planetas em trânsito permitidos (Lua, Mercúrio e Vênus excluídos)
   const positions: Record<string, number> = {
     Sol:      sunLon,
-    Marte:    getGeoLon(marsD,    earthD, jde),
-    Júpiter:  getGeoLon(jupiterD, earthD, jde),
-    Saturno:  getGeoLon(saturnD,  earthD, jde),
-    Urano:    toDeg(uranusB.position(jde).lon),
-    Netuno:   toDeg(neptuneB.position(jde).lon),
+    Marte:    getGeoLon(mars,    earth, jde),
+    Júpiter:  getGeoLon(jupiter, earth, jde),
+    Saturno:  getGeoLon(saturn,  earth, jde),
+    Urano:    toDeg(uranus.position(jde).lon),
+    Netuno:   toDeg(neptune.position(jde).lon),
     Plutão:   getPlutoLongitude(jde),
   };
 
@@ -403,27 +427,22 @@ export async function calculateChatTransits(
 
 /** Posições tropicais geocêntricas dos planetas rápidos para uma data. */
 export async function getFastTransitDegrees(date: Date, quiet = false): Promise<Record<string, number>> {
-  const { julian, planetposition, solar, moonposition } = await initAstronomia();
+  const { julian, solar, moonposition, earth, mercury, venus, mars } = await getAstronomyState();
   const jde = julian.CalendarGregorianToJD(
     date.getFullYear(),
     date.getMonth() + 1,
     date.getDate() + date.getHours() / 24 + date.getMinutes() / 1440
   );
 
-  const earthD   = new planetposition.Planet(planetData.vsop87Dearth);
-  const mercuryD = new planetposition.Planet(planetData.vsop87Dmercury);
-  const venusD   = new planetposition.Planet(planetData.vsop87Dvenus);
-  const marsD    = new planetposition.Planet(planetData.vsop87Dmars);
-
-  const sunLon   = toDeg(solar.apparentVSOP87(earthD, jde).lon);
+  const sunLon   = toDeg(solar.apparentVSOP87(earth, jde).lon);
   const moonLon  = toDeg(moonposition.position(jde).lon);
 
   const positions: Record<string, number> = {
     Sol:      sunLon,
     Lua:      moonLon,
-    Mercúrio: getGeoLon(mercuryD, earthD, jde),
-    Vênus:    getGeoLon(venusD,   earthD, jde),
-    Marte:    getGeoLon(marsD,    earthD, jde),
+    Mercúrio: getGeoLon(mercury, earth, jde),
+    Vênus:    getGeoLon(venus,   earth, jde),
+    Marte:    getGeoLon(mars,    earth, jde),
   };
 
   if (!quiet) {

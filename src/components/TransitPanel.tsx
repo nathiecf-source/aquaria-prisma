@@ -34,6 +34,16 @@ export type TransitPanelTab = "dashas" | "portal" | "transits";
 export interface TransitSummary {
   planet: string;
   aspectToNatal: string;
+  status: "active" | "upcoming";
+  activationDate: string;
+  peakDate: string | null;
+  exitDate: string;
+  daysUntilPeak: number | null;
+  minOrb: number;
+  orbCategory: "slow" | "fast";
+  terrain_mode: "tropical" | "sideral";
+  structural_sign: string;
+  structural_house: number;
   sideral_sign: string;
   sideral_house: number;
   sideral_house_type: string;
@@ -45,6 +55,7 @@ export interface TransitSummary {
   sideral_egress: string | null;
   tropical_sign: string;
   tropical_house: number;
+  tropical_whole_sign_house: number;
   exact_aspect_date: string | null;
   tropical_sign_at_peak: string | null;
   seals: { tropicalSeal: string; sideralSeal: string };
@@ -228,7 +239,7 @@ const TRANSIT_HOUSE_THEMES: Record<number, string> = {
 function groupTransitsByHouse(transits: TransitSummary[]): [number, TransitSummary[]][] {
   const map = new Map<number, TransitSummary[]>();
   for (const t of transits) {
-    const house = t.sideral_house || 0;
+    const house = t.terrain_mode === "tropical" ? t.structural_house : t.sideral_house;
     const list = map.get(house) || [];
     list.push(t);
     map.set(house, list);
@@ -339,15 +350,27 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
   const activePayload: ActiveTransit = {
     planetaTransito: transit.planet,
     planetaNatal: transit.aspectToNatal.replace(/^.*com\s+(.+)\s+Natal$/, "$1") || "",
-    casaNatal: transit.sideral_house,
+    casaNatal: transit.terrain_mode === "tropical" ? transit.structural_house : transit.sideral_house,
     aspecto: transit.aspectToNatal,
     ritmoTempo: "",
   };
 
+  const statusLabel = transit.status === "active"
+    ? "ATIVO AGORA"
+    : transit.daysUntilPeak != null
+      ? `ATIVAÇÃO FUTURA EM ${transit.daysUntilPeak} DIAS`
+      : "ATIVAÇÃO FUTURA";
+
+  const isUpcoming = transit.status === "upcoming";
+
   return (
     <div
       className={`rounded-xl border transition-all duration-300 overflow-hidden
-        ${isExpanded ? "border-[#8c6239]/30 bg-[#f4f1eb]" : "border-[#8c7f70]/15 bg-[#faf9f6] hover:bg-[#f4f1eb]/60"}`}
+        ${isExpanded
+          ? "border-[#8c6239]/30 bg-[#f4f1eb]"
+          : isUpcoming
+            ? "border-[#8c7f70]/10 bg-[#faf9f6]/60 opacity-80 hover:bg-[#f4f1eb]/40"
+            : "border-[#8c7f70]/15 bg-[#faf9f6] hover:bg-[#f4f1eb]/60"}`}
       onMouseEnter={() => onActivate(activePayload)}
       onMouseLeave={() => onActivate(null)}
     >
@@ -355,10 +378,15 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
         className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left"
         onClick={onToggle}
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-base leading-none flex-shrink-0">{icon}</span>
-          <span className="font-serif text-[#3c352d] text-[13.5px] leading-snug truncate">
-            {transit.planet} {transit.aspectToNatal}
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-base leading-none flex-shrink-0">{icon}</span>
+            <span className={`font-serif text-[13.5px] leading-snug truncate ${isUpcoming ? "text-[#5c544d]" : "text-[#3c352d]"}`}>
+              {transit.planet} {transit.aspectToNatal}
+            </span>
+          </div>
+          <span className="font-mono text-[9px] uppercase tracking-widest text-[#8c7f70] pl-7">
+            {statusLabel}
           </span>
         </div>
         <div className="flex-shrink-0 text-[#8c7f70]">

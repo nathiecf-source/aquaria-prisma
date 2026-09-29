@@ -3272,18 +3272,20 @@ Você é um guia terapêutico e astrológico com linguagem íntima, direta e som
 
 TAREFA
 Você receberá um JSON com os dados determinísticos de um único trânsito. Escreva EXATAMENTE três campos:
-1. terreno: prosa da Camada 1 (Sideral / Rāśi via Whole Sign) — tom objetivo, estrutural e focado no destino manifesto, eventos práticos, contratos, responsabilidades e o karma material.
+1. terreno: prosa da Camada 1 — o cenário estrutural e o destino manifesto. O modo desta camada é indicado pelo campo 'modo_terreno'. Se for "sideral", use os dados da camada_sideral (Rāśi / Whole Sign). Se for "tropical", use os dados da camada_tropical_estrutural (signo, casa whole sign tropical, dignidade e dispositor). Tom objetivo, estrutural e focado no destino manifesto, eventos práticos, contratos, responsabilidades e o karma material.
 2. gatilho: prosa da Camada 2 (Tropical / Cúspide via aspecto exato) — tom psicológico, direto, focado no nervo exposto, na urgência subjetiva e na pressão emocional do ego.
 3. integracao: bloco final que une: (a) o desafio psicológico/somático do encontro planetário, (b) a natureza do terreno (favorável/restritivo/neutro) como pano de fundo, (c) uma virtude nomeada especificamente para esta combinação, e (d) uma prática contemplativa somática.
 
 REGRAS DE OURO — NÃO QUEBRAR
 - Use APENAS os dados fornecidos no JSON. É estritamente proibido inventar signos, casas, regentes, dignidades, datas ou classificações diferentes dos do JSON.
+- Se 'modo_terreno' for "tropical", NÃO mencione cálculo sideral, ayanamsha, Rāśi ou zodíaco védico para este trânsito. Escreva tudo em termos tropicais.
+- Se 'modo_terreno' for "sideral", use a camada sideral como base e explique termos como Kendra, Trikona, Dusthana, Upachaya, Domicílio, Exaltação, Queda, Exílio e Dispositor didaticamente.
 - Não use jargão esotérico: 'chakra', 'vibração', 'energia cósmica', 'alinhamento', 'universo', 'manifestar'.
 - Evite conectivos robóticos: 'e nesse ser', 'neste encontro', 'aqui a chave é', 'você não tem nada para provar' e variações.
 - Use o gênero fornecido (${gender}).
 - Cada combinação planeta × aspecto × planeta natal deve ter fraseologia exclusiva; não recicle metáforas.
 - Os textos devem soar naturais em português brasileiro, mas sem inventar dados técnicos.
-- Quando usar termos técnicos (Kendra, Trikona, Dusthana, Upachaya, Domicílio, Exaltação, Queda, Exílio, Dispositor), acompanhe-os imediatamente de uma breve explicação didática para o leitor.
+- Quando usar termos técnicos, acompanhe-os imediatamente de uma breve explicação didática para o leitor.
 `;
 
   const sideralWindow = facts?.sideral_ingress && facts?.sideral_egress !== undefined
@@ -3299,18 +3301,35 @@ DADOS DO USUÁRIO:
 
 JSON DE FATOS DO TRÂNSITO (USE APENAS ESTES DADOS):
 ${JSON.stringify({
+  status: facts?.status,
+  dias_ate_o_pico: facts?.daysUntilPeak,
+  data_ativacao: facts?.activationDate,
+  data_pico: facts?.peakDate,
+  modo_terreno: facts?.terrain_mode,
   planeta_transitante: facts?.planet,
   aspecto: facts?.aspecto,
-  camada_sideral: {
-    signo: facts?.sideral_sign,
-    casa: facts?.sideral_house,
-    tipo_casa: facts?.sideral_house_type,
-    classificacao_casa: facts?.sideral_house_class,
-    legenda_classificacao: getHouseClassLegend(facts?.sideral_house_class),
-    dispositor: facts?.sideral_dispositor,
-    dignidade: facts?.sideral_dignity,
-    janela: sideralWindow,
-  },
+  ...(facts?.terrain_mode === "tropical" ? {
+    camada_tropical_estrutural: {
+      signo: facts?.structural_sign,
+      casa: facts?.structural_house,
+      tipo_casa: facts?.nature?.houseType,
+      classificacao_casa: facts?.nature?.houseClass,
+      legenda_classificacao: getHouseClassLegend(facts?.nature?.houseClass),
+      dispositor: facts?.nature?.dispositor,
+      dignidade: facts?.nature?.dignity,
+    },
+  } : {
+    camada_sideral: {
+      signo: facts?.sideral_sign,
+      casa: facts?.sideral_house,
+      tipo_casa: facts?.sideral_house_type,
+      classificacao_casa: facts?.sideral_house_class,
+      legenda_classificacao: getHouseClassLegend(facts?.sideral_house_class),
+      dispositor: facts?.sideral_dispositor,
+      dignidade: facts?.sideral_dignity,
+      janela: sideralWindow,
+    },
+  }),
   camada_tropical: {
     signo_no_pico: facts?.tropical_sign_at_peak,
     data_aspecto_exato: facts?.exact_aspect_date,

@@ -49,7 +49,9 @@ import { getPlanetGlyphConfig, PLANET_GLYPHS } from "./src/lib/planetGlyphs";
 import { synthesizeMeditation } from "./src/server/ttsService";
 import { mixWithBackgroundMusic } from "./src/server/audioMixer";
 import crypto from "crypto";
-import { getTropicalTransitDegrees, getNatalDegrees, calculateAspects, getUpcomingCosmicEvents, getAllPlanetPositions, getVedicTransitTerrain } from "./src/server/transitEngine";
+import { getNatalDegrees, getUpcomingCosmicEvents, getVedicTransitTerrain, getRitmoTempo, getTropicalTransitDegrees, calculateAspects, SIGN_NAMES } from "./src/server/transitEngine";
+import { findUpcomingTransits } from "./src/server/transitHorizonEngine";
+import { getPlanetLongitude } from "./src/server/transitWindowEngine";
 import { buildTransitGeography } from "./src/server/transitGeographyEngine";
 import { calculateRestructuringCycles } from "./src/server/restructuringCyclesEngine";
 import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarReturnInstant, getActiveSolarReturnYear, getSolarReturnCycles } from "./src/server/solarReturnEngine";
@@ -1831,10 +1833,10 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      // Cache semanal da leitura: uma leitura por semana civil (YYYY-W##)
+      // Cache diário da leitura: horizonte futuro muda todo dia
       const now = new Date();
-      const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
-      const readingId = `transit-cycles-v3-${weekKey}`;
+      const dateKey = now.toISOString().slice(0, 10);
+      const readingId = `transit-cycles-v4-${dateKey}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached && Array.isArray(cached.transits)) {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
@@ -1844,27 +1846,16 @@ async function createApp(): Promise<express.Application> {
         return res.json({ transits: cached.transits, restructuringCycles, cached: true });
       }
 
-      // ── Motor de trânsitos interno (Etapa 4) ──
+      // ── Motor de horizonte futuro (Etapa 4) ──
       let enrichedProfile = profile;
       try {
-        const today = new Date();
-        const transitDegrees = await getTropicalTransitDegrees(today);
-        const natalPlanets = getNatalDegrees(profile);
-        const transitPayload = calculateAspects(transitDegrees, natalPlanets);
+        const horizonDays = 30;
+        const upcomingTransits = await findUpcomingTransits(profile, now, horizonDays);
 
-        console.log("[TRANSIT ENGINE] Payload final:", JSON.stringify(transitPayload, null, 2));
+        console.log(`[TRANSIT HORIZON] ${upcomingTransits.length} trânsitos encontrados nos próximos ${horizonDays} dias`);
 
-        // Converter para o formato TropicalTransit que o LLM já entende
-        const allAspects = [
-          ...transitPayload.transitos_estruturais,
-          ...transitPayload.transitos_dinamicos
-        ];
-
-        const SIGNS_PT = ["Áries","Touro","Gêmeos","Câncer","Leão","Virgem","Libra","Escorpião","Sagitário","Capricórnio","Aquário","Peixes"];
-
-        // Casa REAL por onde o planeta transita agora, calculada pelas longitudes absolutas das cúspides
+        // Casa REAL por onde o planeta transita, calculada pelas longitudes absolutas das cúspides
         const natalHousesRaw: any[] = profile?.tropical_natal?.houses ?? [];
-        // Prefere longitude absoluta; reconstrói a partir do signo+cuspDegree se ausente
         const SIGN_INDEX: Record<string, number> = {
           "Áries": 0, "Touro": 1, "Gêmeos": 2, "Câncer": 3, "Leão": 4, "Virgem": 5,
           "Libra": 6, "Escorpião": 7, "Sagitário": 8, "Capricórnio": 9, "Aquário": 10, "Peixes": 11,
@@ -1890,6 +1881,12 @@ async function createApp(): Promise<express.Application> {
           return 0;
         };
 
+        const tropicalAscendantSign =
+          natalHousesRaw.find((h: any) => h.house === 1)?.sign ||
+          SIGN_NAMES[Math.floor(((natalHousesLong.find((h) => h.house === 1)?.longitude ?? 0) % 360) / 30)] ||
+          "";
+        const sideralAscendantSign = profile?.vedic_specifics?.lagna;
+
         const SIGN_RULERS_MAP: Record<string, string> = {
           "Áries": "Marte", "Touro": "Vênus", "Gêmeos": "Mercúrio", "Câncer": "Lua",
           "Leão": "Sol", "Virgem": "Mercúrio", "Libra": "Vênus", "Escorpião": "Plutão",
@@ -1898,49 +1895,61 @@ async function createApp(): Promise<express.Application> {
         const natalPlanetsMap: any[] = profile?.tropical_natal?.planets ?? [];
         const natalHousesMap: any[] = profile?.tropical_natal?.houses ?? [];
 
-        const tropicalTransits = await Promise.all(allAspects.map(async (t) => {
-          const transitSign = SIGNS_PT[Math.floor(t.grau_transito / 30)];
-          const transitHouse = houseOfDegree(t.grau_transito) || (t.casa_natal ?? 1);
+        const tropicalTransits = await Promise.all(upcomingTransits.map(async (t) => {
+          const activationDate = new Date(t.activationDate);
+          const grauTransito = await getPlanetLongitude(t.planet, activationDate);
+          const transitSign = SIGN_NAMES[Math.floor(grauTransito / 30)];
+          const transitHouse = houseOfDegree(grauTransito) || 1;
 
           // Co-casa: casa cuja cúspide abre no mesmo signo do trânsito (distinta da casa de posição)
           const coHouseObj = natalHousesMap.find((h: any) => h.sign === transitSign && h.house !== transitHouse);
           const transitCoHouse: number | undefined = coHouseObj?.house;
 
-          const natalObj = natalPlanetsMap.find((p: any) => p.name === t.planeta_natal);
+          const natalObj = natalPlanetsMap.find((p: any) => p.name === t.planetNatal);
           const signoNatal: string = natalObj?.sign || "";
           const regenteSignoNatal: string = SIGN_RULERS_MAP[signoNatal] || "";
           const regenteObj = regenteSignoNatal ? natalPlanetsMap.find((p: any) => p.name === regenteSignoNatal) : undefined;
           const casaDoRegenteNatal: number | undefined = regenteObj?.house;
-          const casaRegidaPeloTransitante: number | undefined = natalHousesMap.find((h: any) => h.ruler === t.planeta_transito)?.house;
+          const casaRegidaPeloTransitante: number | undefined = natalHousesMap.find((h: any) => h.ruler === t.planet)?.house;
 
           // Camada sideral/védica para o bloco "Geografia do Trânsito"
-          const vedicTerrain = getVedicTransitTerrain(profile, t.planeta_transito, t.grau_transito, transitHouse);
+          const vedicTerrain = getVedicTransitTerrain(profile, t.planet, grauTransito, transitHouse);
 
-          // Geografia determinística: Camada 1 (Sideral/Rāśi) + Camada 2 (Tropical/Placidus aspecto exato)
-          const sideralAscendantSign = profile?.vedic_specifics?.lagna;
+          // Geografia determinística: Camada 1 (Sideral/Rāśi ou Tropical/Whole Sign) + Camada 2 (Tropical/Placidus aspecto exato)
           const geography = await buildTransitGeography(
-            t.planeta_transito,
+            t.planet,
             t.aspecto,
-            t.planeta_natal,
-            t.grau_natal,
+            t.planetNatal,
+            natalObj?.longitude ?? 0,
             transitHouse,
+            tropicalAscendantSign,
             sideralAscendantSign,
-            today
+            activationDate
           );
 
           return {
-            planet: t.planeta_transito,
+            planet: t.planet,
             transitSign,
-            transitDegree: t.grau_transito % 30,
+            transitDegree: grauTransito % 30,
             transitHouse,
             transitCoHouse,
-            casaNatal: t.casa_natal ?? 1,
-            planetaNatal: t.planeta_natal,
-            aspectToNatal: `${t.aspecto} com ${t.planeta_natal} Natal`,
-            ritmo_tempo: t.ritmo_tempo,
+            casaNatal: natalObj?.house ?? 1,
+            planetaNatal: t.planetNatal,
+            aspectToNatal: `${t.aspecto} com ${t.planetNatal} Natal`,
+            ritmo_tempo: getRitmoTempo(t.planet),
             casaDoRegenteNatal,
             casaRegidaPeloTransitante,
+            status: t.status,
+            activationDate: t.activationDate,
+            peakDate: t.peakDate,
+            exitDate: t.exitDate,
+            daysUntilPeak: t.daysUntilPeak,
+            minOrb: t.minOrb,
+            orbCategory: t.orbCategory,
             vedic_structural_terrain: vedicTerrain,
+            terrain_mode: geography.terrain_mode,
+            structural_sign: geography.structural_sign,
+            structural_house: geography.structural_house,
             sideral_sign: geography.sideral_sign,
             sideral_house: geography.sideral_house,
             sideral_house_type: geography.sideral_house_type,
@@ -1952,6 +1961,7 @@ async function createApp(): Promise<express.Application> {
             sideral_egress: geography.sideral_egress?.toISOString() ?? null,
             tropical_sign: geography.tropical_sign,
             tropical_house: geography.tropical_house,
+            tropical_whole_sign_house: geography.tropical_whole_sign_house,
             exact_aspect_date: geography.exact_aspect_date?.toISOString() ?? null,
             tropical_sign_at_peak: geography.tropical_sign_at_peak,
             seals: geography.seals,
