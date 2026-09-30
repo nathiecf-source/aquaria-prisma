@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { findUpcomingTransits, getDynamicOrb } from "./transitHorizonEngine";
+import { findUpcomingTransits, getAngularOrb, getAspectTargetLongitudes, getDynamicOrb } from "./transitHorizonEngine";
 import { getNatalDegrees } from "./transitEngine";
 
 describe("transitHorizonEngine", () => {
@@ -12,6 +12,12 @@ describe("transitHorizonEngine", () => {
     assert.strictEqual(getDynamicOrb("Urano"), 4);
     assert.strictEqual(getDynamicOrb("Netuno"), 4);
     assert.strictEqual(getDynamicOrb("Plutão"), 4);
+  });
+
+  it("calcula os dois alvos da quadratura e normaliza a passagem por 360°", () => {
+    assert.deepStrictEqual(getAspectTargetLongitudes(350, "Quadratura"), [80, 260]);
+    assert.deepStrictEqual(getAspectTargetLongitudes(350, "Conjunção"), [350]);
+    assert.strictEqual(getAngularOrb(359, 1), 2);
   });
 
   it("findUpcomingTransits retorna array com campos esperados", async () => {
@@ -62,10 +68,13 @@ describe("transitHorizonEngine", () => {
       assert.ok(["slow", "fast"].includes(t.orbCategory));
 
       if (t.status === "upcoming") {
-        assert.ok(
-          t.daysUntilPeak === null || typeof t.daysUntilPeak === "number",
-          "daysUntilPeak deve ser número ou null"
-        );
+        assert.ok(t.peakDate, "upcoming deve ter pico exato");
+        assert.strictEqual(typeof t.daysUntilPeak, "number");
+        assert.ok(t.daysUntilPeak! >= 0 && t.daysUntilPeak! <= 5, "pico deve permanecer dentro do horizonte");
+      }
+      if (t.peakDate) {
+        const distance = Math.ceil((new Date(t.peakDate).getTime() - startDate.getTime()) / 86_400_000);
+        assert.ok(distance <= 5, "nenhum pico futuro pode escapar do horizonte");
       }
     }
   });

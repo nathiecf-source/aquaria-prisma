@@ -1,5 +1,23 @@
 import React from "react";
 import { Loader2, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+
+const BreathingLoader: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
+  <div className="flex flex-col items-center justify-center py-16 space-y-6 text-center">
+    <div className="relative w-28 h-28 flex items-center justify-center">
+      <span className="absolute inline-flex h-full w-full rounded-full bg-[#8c6239]/15 animate-ping" style={{ animationDuration: "3s" }} />
+      <span className="absolute inline-flex h-20 w-20 rounded-full bg-[#8c6239]/10 animate-pulse" style={{ animationDuration: "3s" }} />
+      <span className="absolute inline-flex h-10 w-10 rounded-full bg-[#8c6239]/20" />
+    </div>
+    <div className="space-y-2 max-w-xs">
+      <p className="font-mono text-[10px] text-[#8c7f70] tracking-widest uppercase animate-pulse">
+        {title}
+      </p>
+      <p className="font-sans text-[11px] text-[#8c7f70] leading-relaxed">
+        {subtitle}
+      </p>
+    </div>
+  </div>
+);
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
@@ -71,8 +89,7 @@ export interface TransitSummary {
 }
 
 export interface TransitDetail {
-  terreno: string;
-  gatilho: string;
+  desafio: string;
   integracao: string;
 }
 
@@ -104,6 +121,15 @@ const PLANET_ICONS: Record<string, string> = {
 };
 
 const EXCLUSIONS = /Nodo|Node|Lilith|Ascendente|Ascendant|Meio do Céu|MC|Parte|Fortuna|Rahu|Ketu/i;
+
+function formatTransitDate(value: string): string {
+  return new Date(value).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
 
 const HOUSE_SPHERES: Record<number, string> = {
   1:  "Esfera da Identidade e Presença Física",
@@ -260,31 +286,37 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
   profile,
   onActivate,
 }) => {
-  const [details, setDetails] = React.useState<Record<string, TransitDetail | "loading" | null>>({});
+  const [details, setDetails] = React.useState<Record<string, TransitDetail | "loading" | "error" | null>>({});
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+  const inFlight = React.useRef(new Set<string>());
 
   const getKey = (t: TransitSummary) => `${t.planet}|${t.aspectToNatal}`;
 
   const fetchDetail = React.useCallback(async (t: TransitSummary, key: string) => {
-    if (details[key] && details[key] !== "loading") return;
+    if (inFlight.current.has(key)) return;
+    inFlight.current.add(key);
     setDetails(prev => ({ ...prev, [key]: "loading" }));
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
     try {
       const res = await fetch("/api/generate-transit-cycle-detail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile, userId, transit: t }),
+        signal: controller.signal,
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.terreno && data.gatilho && data.integracao) {
-        setDetails(prev => ({ ...prev, [key]: { terreno: data.terreno, gatilho: data.gatilho, integracao: data.integracao } }));
-      } else {
-        setDetails(prev => ({ ...prev, [key]: null }));
-      }
+      if (!data.desafio || !data.integracao) throw new Error("Resposta interpretativa incompleta");
+      setDetails(prev => ({ ...prev, [key]: { desafio: data.desafio, integracao: data.integracao } }));
     } catch (err) {
       console.error("[TransitAccordionList] Erro ao buscar detalhe:", err);
-      setDetails(prev => ({ ...prev, [key]: null }));
+      setDetails(prev => ({ ...prev, [key]: "error" }));
+    } finally {
+      window.clearTimeout(timeout);
+      inFlight.current.delete(key);
     }
-  }, [details, profile, userId]);
+  }, [profile, userId]);
 
   // Pré-carrega o primeiro trânsito em background para melhorar a percepção de velocidade
   React.useEffect(() => {
@@ -320,6 +352,7 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
                   setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
                   if (!details[key]) fetchDetail(t, key);
                 }}
+                onRetry={() => fetchDetail(t, getKey(t))}
                 onActivate={onActivate}
               />
             ))}
@@ -332,9 +365,10 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
 
 interface TransitAccordionProps {
   transit: TransitSummary;
-  detail: TransitDetail | "loading" | null;
+  detail: TransitDetail | "loading" | "error" | null;
   isExpanded: boolean;
   onToggle: () => void;
+  onRetry: () => void;
   onActivate: (t: ActiveTransit | null) => void;
 }
 
@@ -343,6 +377,7 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
   detail,
   isExpanded,
   onToggle,
+  onRetry,
   onActivate,
 }) => {
   const icon = PLANET_ICONS[transit.planet] || "✦";
@@ -402,59 +437,63 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
             <p>{transit.seals.sideralSeal}</p>
           </div>
 
-          {detail === "loading" && (
-            <div className="flex items-center gap-3 py-2">
-              <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin" />
-              <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
-                Gerando leitura interpretativa...
-              </p>
+          <section className="space-y-2">
+            <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66]">
+              🏛 Dados do Ciclo
+            </h4>
+            <div className="grid gap-1 font-sans text-[12px] text-[#3c352d]">
+              <p><span className="font-medium">Entrada no orbe:</span> {formatTransitDate(transit.activationDate)}</p>
+              <p><span className="font-medium">Gatilho exato:</span> {transit.peakDate ? formatTransitDate(transit.peakDate) : "pico recém-passado; trânsito ainda dentro do orbe"}</p>
+              <p><span className="font-medium">Saída do orbe:</span> {formatTransitDate(transit.exitDate)}</p>
+              <p><span className="font-medium">Natureza do evento:</span> {transit.nature.label} — {transit.nature.sentence}</p>
             </div>
-          )}
+          </section>
 
-          {!detail || detail === "loading" ? (
-            <p className="font-sans text-[13px] text-[#3c352d]">
-              <span className="font-medium">🌱 Natureza do Terreno:</span>{" "}
-              {transit.nature.label} — {transit.nature.sentence}
-            </p>
-          ) : (
-            <div className="space-y-5">
-              {/* Camada 1 — Terreno */}
-              <section>
-                <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66] mb-2">
-                  🏛 O Terreno Estrutural & O Destino
-                </h4>
-                <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
-                  <Markdown rehypePlugins={[rehypeSanitize]}>{detail.terreno}</Markdown>
-                </div>
-              </section>
+          <div className="space-y-5">
+            {detail === "loading" && (
+              <div className="flex items-center gap-3 rounded-lg bg-[#8c6239]/5 p-4 border border-[#8c6239]/10">
+                <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin" />
+                <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
+                  Preparando desafio e integração...
+                </p>
+              </div>
+            )}
 
-              {/* Camada 2 — Gatilho */}
-              <section>
-                <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#8c6239] mb-2">
-                  ⚡ O Gatilho Psicológico & A Urgência
-                </h4>
-                <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
-                  <Markdown rehypePlugins={[rehypeSanitize]}>{detail.gatilho}</Markdown>
-                </div>
-              </section>
+            {detail === "error" && (
+              <div className="rounded-lg bg-[#8c6239]/5 p-4 border border-[#8c6239]/10 space-y-3">
+                <p className="font-sans text-[12px] text-[#5c544d]">
+                  A interpretação aprofundada demorou mais que o esperado. Os dados astrológicos acima continuam disponíveis.
+                </p>
+                <button type="button" onClick={onRetry} className="font-mono text-[10px] uppercase tracking-widest text-[#8c6239] hover:underline">
+                  Tentar novamente
+                </button>
+              </div>
+            )}
 
-              {/* Integração */}
-              <section className="rounded-lg bg-[#3c6e4a]/5 p-4 border border-[#3c6e4a]/15">
-                <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#3c6e4a] mb-2">
-                  🌿 A Integração & Prática Contemplativa
-                </h4>
-                <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
-                  <Markdown rehypePlugins={[rehypeSanitize]}>{detail.integracao}</Markdown>
-                </div>
-              </section>
+            {detail && detail !== "loading" && detail !== "error" && (
+              <>
+                <section>
+                  <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#8c6239] mb-2">
+                    ⚡ O Desafio Estrutural & Interno
+                  </h4>
+                  <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+                    <Markdown rehypePlugins={[rehypeSanitize]}>{detail.desafio}</Markdown>
+                  </div>
+                </section>
 
-              {/* Insight */}
-              <InsightField
-                transitKey={`${transit.planet}|${transit.aspectToNatal}`}
-                userId={null}
-              />
-            </div>
-          )}
+                <section className="rounded-lg bg-[#3c6e4a]/5 p-4 border border-[#3c6e4a]/15">
+                  <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#3c6e4a] mb-2">
+                    🌿 A Integração & Prática Contemplativa
+                  </h4>
+                  <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
+                    <Markdown rehypePlugins={[rehypeSanitize]}>{detail.integracao}</Markdown>
+                  </div>
+                </section>
+
+                <InsightField transitKey={`${transit.planet}|${transit.aspectToNatal}`} userId={null} />
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -934,12 +973,10 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
       {/* 1. Dashas — A Tríade do Tempo */}
       {activeTab === "dashas" && (
         isLoadingDashas ? (
-          <div className="flex flex-col items-center justify-center py-16 space-y-4">
-            <Loader2 className="w-7 h-7 text-[#8c6239] animate-spin" />
-            <p className="font-mono text-[10px] text-[#8c7f70] tracking-widest uppercase animate-pulse">
-              Sincronizando tríade do tempo cósmico...
-            </p>
-          </div>
+          <BreathingLoader
+            title="Sincronizando tríade do tempo cósmico..."
+            subtitle="Aproveite para regular sua respiração enquanto sincronizamos seus dados — este processo pode levar entre 1 e 2 minutos. Ou aproveite para fazer outras leituras enquanto sua sincronização é carregada."
+          />
         ) : !dashaText ? (
           <div className="text-center py-12 text-[#8c7f70] font-sans text-sm">
             Nenhuma leitura disponível.
@@ -956,6 +993,12 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
       {/* 2. Portal do Ano — Profecção + Ativações Rápidas */}
       {activeTab === "portal" && (
         <div className="mb-8 pb-6">
+          {(isFetchingProfection || isFetchingRapidActivations) && !profectionData && !rapidActivationsData && (
+            <BreathingLoader
+              title="Sincronizando portal do ano..."
+              subtitle="Aproveite para regular sua respiração enquanto sincronizamos seus dados — este processo pode levar entre 1 e 2 minutos. Ou aproveite para fazer outras leituras enquanto sua sincronização é carregada."
+            />
+          )}
           <SenhorDoAnoCard
             age={profectionData?.profection?.age ?? age}
             primaryLord={profectionData?.profection?.primaryLord}
@@ -981,12 +1024,10 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
           <RestructuringPhasesAccordion cycles={restructuringCycles || []} />
 
           {isLoading && !transits && (
-            <div className="flex items-center gap-3 py-4 px-5 rounded-xl border border-[#8c7f70]/10 bg-[#faf9f6]">
-              <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin flex-shrink-0" />
-              <p className="font-mono text-[10px] text-[#8c7f70] tracking-widest uppercase">
-                Sincronizando leitura dos próximos 30 dias...
-              </p>
-            </div>
+            <BreathingLoader
+              title="Sincronizando leitura dos próximos 30 dias..."
+              subtitle="Aproveite para regular sua respiração enquanto sincronizamos seus dados — este processo pode levar entre 1 e 2 minutos. Ou aproveite para fazer outras leituras enquanto sua sincronização é carregada."
+            />
           )}
 
           {!isLoading && !transits && (

@@ -3236,30 +3236,18 @@ export function getDeterministicDiretrizAmplaFallback(
 ): DiretrizAmplaOutput { throw new Error("Fallback de interpretação removido para diagnóstico da API Gemini."); }
 
 export interface TransitCycleDetail {
-  terreno: string;
-  gatilho: string;
+  desafio: string;
   integracao: string;
 }
 
 const transitCycleDetailSchema = {
   type: Type.OBJECT,
   properties: {
-    terreno: { type: Type.STRING, description: "Prosa da Camada 1: terreno estrutural e destino sideral (Sideral/Rāśi)." },
-    gatilho: { type: Type.STRING, description: "Prosa da Camada 2: gatilho psicológico tropical e urgência (Tropical/Placidus)." },
-    integracao: { type: Type.STRING, description: "Bloco final: desafio, natureza do terreno, virtude nomeada e prática contemplativa." },
+    desafio: { type: Type.STRING, description: "Leitura psicológica e somática do desafio ativado pelo trânsito." },
+    integracao: { type: Type.STRING, description: "Virtude específica e prática contemplativa somática para integrar o trânsito." },
   },
-  required: ["terreno", "gatilho", "integracao"],
+  required: ["desafio", "integracao"],
 };
-
-function getGenericTransitDetailFallback(facts: any): TransitCycleDetail {
-  const planet = facts?.planet || "Planeta";
-  const aspecto = facts?.aspecto || "aspecto";
-  return {
-    terreno: `O trânsito de ${planet} configura um cenário estrutural de longo alcance. Observe como a vida material e os acordos práticos começam a pedir uma nova ordem, sem que você precise resolver tudo de uma só vez.`,
-    gatilho: `Por volta do pico indicado, ${planet} em ${aspecto} atinge uma intensidade especial. A tensão psicológica pode se tornar mais nítida — este é o momento de olhar para o que foi ativado com honestidade, sem afogar a resposta em justificações.`,
-    integracao: `Este movimento pede que você sustente a tensão com presença, sem fugir nem forçar respostas. Encontre uma virtude própria deste momento — pode ser paciência, discernimento ou coragem quieta — e deixe que ela organize uma ação mínima e concreta para hoje. Feche os olhos por alguns instantes, respire e sinta onde esse trânsito habita no corpo.`,
-  };
-}
 
 export async function generateTransitCycleDetail(
   profile: CompleteAstrologicalProfile,
@@ -3271,10 +3259,9 @@ export async function generateTransitCycleDetail(
 Você é um guia terapêutico e astrológico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que entende astrologia e psicologia de forma profunda.
 
 TAREFA
-Você receberá um JSON com os dados determinísticos de um único trânsito. Escreva EXATAMENTE três campos:
-1. terreno: prosa da Camada 1 — o cenário estrutural e o destino manifesto. O modo desta camada é indicado pelo campo 'modo_terreno'. Se for "sideral", use os dados da camada_sideral (Rāśi / Whole Sign). Se for "tropical", use os dados da camada_tropical_estrutural (signo, casa whole sign tropical, dignidade e dispositor). Tom objetivo, estrutural e focado no destino manifesto, eventos práticos, contratos, responsabilidades e o karma material.
-2. gatilho: prosa da Camada 2 (Tropical / Cúspide via aspecto exato) — tom psicológico, direto, focado no nervo exposto, na urgência subjetiva e na pressão emocional do ego.
-3. integracao: bloco final que une: (a) o desafio psicológico/somático do encontro planetário, (b) a natureza do terreno (favorável/restritivo/neutro) como pano de fundo, (c) uma virtude nomeada especificamente para esta combinação, e (d) uma prática contemplativa somática.
+Você receberá um JSON com os dados determinísticos de um único trânsito. Escreva EXATAMENTE dois campos:
+1. desafio: leitura psicológica e somática do encontro planetário, focada no nervo exposto, na urgência subjetiva e na pressão emocional do ego.
+2. integracao: bloco final que une a natureza do terreno (favorável/restritivo/neutro), uma virtude nomeada especificamente para esta combinação e uma prática contemplativa somática.
 
 REGRAS DE OURO — NÃO QUEBRAR
 - Use APENAS os dados fornecidos no JSON. É estritamente proibido inventar signos, casas, regentes, dignidades, datas ou classificações diferentes dos do JSON.
@@ -3286,6 +3273,7 @@ REGRAS DE OURO — NÃO QUEBRAR
 - Cada combinação planeta × aspecto × planeta natal deve ter fraseologia exclusiva; não recicle metáforas.
 - Os textos devem soar naturais em português brasileiro, mas sem inventar dados técnicos.
 - Quando usar termos técnicos, acompanhe-os imediatamente de uma breve explicação didática para o leitor.
+- TOM SUGESTIVO OBRIGATÓRIO: NUNCA afirme o que o usuário sente, pensa, precisa ou está sendo forçado a fazer. Use formulários como "Talvez você sinta...", "Pode ser que haja...", "Caso o ego tente resistir...", "Você pode ser convocado/a a notar...", "É possível que surja...". Transforme toda afirmação sobre o corpo, a emoção ou a compulsão em convite ou hipótese. Substitua "você está sendo forçada" por "você pode se sentir impelida/convocada". Substitua afirmações de sensação corporal por "talvez haja uma pressão em...", "se o corpo falar, pode ser na região do...". Esta regra vale para desafio e integracao em todos os cards.
 `;
 
   const sideralWindow = facts?.sideral_ingress && facts?.sideral_egress !== undefined
@@ -3341,7 +3329,7 @@ ${JSON.stringify({
   selos: facts?.seals,
 }, null, 2)}
 
-Gere um JSON com os campos: terreno, gatilho, integracao.
+Gere um JSON com os campos: desafio, integracao.
 `;
 
   try {
@@ -3352,11 +3340,11 @@ Gere um JSON com os campos: terreno, gatilho, integracao.
       config: {
         systemInstruction,
         temperature: 0.25,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 1600,
         responseMimeType: "application/json",
         responseSchema: transitCycleDetailSchema,
       },
-    });
+    }, 1);
 
     const raw = response.text || "{}";
     let parsed: Partial<TransitCycleDetail>;
@@ -3366,15 +3354,16 @@ Gere um JSON com os campos: terreno, gatilho, integracao.
       throw new Error("[Gemini API] Resposta não é JSON válido.");
     }
 
-    const fallback = getGenericTransitDetailFallback(facts);
+    if (!parsed.desafio?.trim() || !parsed.integracao?.trim()) {
+      throw new Error("[Gemini API] Resposta incompleta para o detalhe do trânsito.");
+    }
     return {
-      terreno: parsed.terreno?.trim() || fallback.terreno,
-      gatilho: parsed.gatilho?.trim() || fallback.gatilho,
-      integracao: parsed.integracao?.trim() || fallback.integracao,
+      desafio: parsed.desafio.trim(),
+      integracao: parsed.integracao.trim(),
     };
   } catch (error) {
-    cleanLogError("[Gemini API] Falha na geração do detalhe do trânsito — usando fallback", error);
-    return getGenericTransitDetailFallback(facts);
+    cleanLogError("[Gemini API] Falha na geração do detalhe do trânsito", error);
+    throw error;
   }
 }
 

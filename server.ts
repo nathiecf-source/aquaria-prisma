@@ -469,6 +469,8 @@ function getMappingLevel(percent: number): string {
   return "Minha evolução geral";
 }
 
+const transitDetailRequests = new Map<string, Promise<any>>();
+
 async function createApp(): Promise<express.Application> {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -1836,7 +1838,7 @@ async function createApp(): Promise<express.Application> {
       // Cache diário da leitura: horizonte futuro muda todo dia
       const now = new Date();
       const dateKey = now.toISOString().slice(0, 10);
-      const readingId = `transit-cycles-v4-${dateKey}`;
+      const readingId = `transit-cycles-v5-${dateKey}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached && Array.isArray(cached.transits)) {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
@@ -1924,7 +1926,8 @@ async function createApp(): Promise<express.Application> {
             transitHouse,
             tropicalAscendantSign,
             sideralAscendantSign,
-            activationDate
+            activationDate,
+            t.peakDate ? new Date(t.peakDate) : null
           );
 
           return {
@@ -2017,17 +2020,26 @@ async function createApp(): Promise<express.Application> {
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
       const transitKey = `${transit.planet}-${transit.aspectToNatal || transit.aspecto}`.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "-");
-      const detailId = `transit-detail-v1-${userId}-${transitKey}-${weekKey}`;
+      const detailId = `transit-detail-v2-${userId}-${transitKey}-${weekKey}`;
       const cached = await getCachedReading(userId, detailId);
-      if (cached && cached.terreno && cached.gatilho && cached.integracao) {
+      if (cached && cached.desafio && cached.integracao) {
         console.log(`[TRANSIT CYCLE DETAIL] Cache hit ${detailId}`);
         return res.json({ ...cached, cached: true });
       }
 
-      const detail = await generateTransitCycleDetail(profile, transit);
-      const payload = { ...detail, generatedAt: now.toISOString() };
-      await saveReading(userId, detailId, "transit-cycle-detail", payload, getNextSundayMidnight(now));
+      let pending = transitDetailRequests.get(detailId);
+      if (!pending) {
+        pending = (async () => {
+          const detail = await generateTransitCycleDetail(profile, transit);
+          const payload = { ...detail, generatedAt: now.toISOString() };
+          await saveReading(userId, detailId, "transit-cycle-detail", payload, getNextSundayMidnight(now));
+          return detail;
+        })();
+        transitDetailRequests.set(detailId, pending);
+        pending.finally(() => transitDetailRequests.delete(detailId)).catch(() => undefined);
+      }
 
+      const detail = await pending;
       return res.json({ ...detail, cached: false });
     } catch (err: any) {
       console.error("Erro ao gerar detalhe do trânsito:", err);

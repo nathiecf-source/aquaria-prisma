@@ -11,7 +11,6 @@ import {
   getPlanetLongitude,
   getPlanetSpeedGroup,
   findSideralSignWindow,
-  findExactPeakDate,
 } from "./transitWindowEngine";
 import { getTransitNature, TransitNature } from "./transitNatureEngine";
 
@@ -115,7 +114,8 @@ export async function buildTransitGeography(
   tropicalHouse: number,
   tropicalAscendantSign: string | null | undefined,
   sideralAscendantSign: string | null | undefined,
-  referenceDate: Date
+  referenceDate: Date,
+  validatedPeakDate: Date | null
 ): Promise<TransitGeographyData> {
   const ayanamsha = computeLahiriAyanamsha(referenceDate.getUTCFullYear());
   const transitLonTropical = await getPlanetLongitude(planet, referenceDate);
@@ -146,16 +146,11 @@ export async function buildTransitGeography(
   const aspectCenter = ASPECT_CENTERS[aspecto] ?? 0;
   const aspectTarget = normalizeAngle(grauNatal + aspectCenter);
 
-  let exactAspectDate: Date | null = null;
+  const exactAspectDate = validatedPeakDate;
   let tropicalSignAtPeak: string | null = null;
-  try {
-    exactAspectDate = await findExactPeakDate(planet, aspectTarget, referenceDate);
-    if (exactAspectDate) {
-      const peakLon = await getPlanetLongitude(planet, exactAspectDate);
-      tropicalSignAtPeak = SIGN_NAMES[Math.floor(normalizeAngle(peakLon) / 30)] ?? null;
-    }
-  } catch (err) {
-    console.warn(`[transitGeographyEngine] Erro ao calcular pico de aspecto para ${planet}:`, err);
+  if (exactAspectDate) {
+    const peakLon = await getPlanetLongitude(planet, exactAspectDate);
+    tropicalSignAtPeak = SIGN_NAMES[Math.floor(normalizeAngle(peakLon) / 30)] ?? null;
   }
 
   // Para transpessoais o terreno estrutural é 100% tropical; para os demais, sideral.
@@ -167,8 +162,9 @@ export async function buildTransitGeography(
   const nature = getTransitNature(planet, structuralLon, structuralHouse || 1);
 
   // Selos no formato solicitado pelo usuário
+  const structuralLabel = terrainMode === "tropical" ? "WS houses" : "Sideral";
   const tropicalSeal = `⚡ Psicológico (Tropical): ${planet} em ${tropicalSignAtPeak ?? tropicalSign} ${ASPECT_GLYPHS[aspecto] ?? aspecto} ${planetNatal} Natal • Casa ${tropicalHouse}`;
-  const structuralSeal = `🏛 Estrutural (${terrainMode === "tropical" ? "Tropical" : "Sideral"}): ${planet} em ${structuralSign} [${nature.dignityShort}] • Casa ${structuralHouse} • Casa ${nature.houseClass}`;
+  const structuralSeal = `🏛 Estrutural (${structuralLabel}): ${planet} em ${structuralSign} [${nature.dignityShort}] • Casa ${structuralHouse}`;
 
   return {
     planet,

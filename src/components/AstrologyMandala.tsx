@@ -566,6 +566,14 @@ export default function AstrologyMandala({
         if (Array.isArray(data.changes)) setCycleChanges((prev) => [...prev, ...data.changes]);
       })
       .catch(error => console.warn("[CycleChanges] Falha ao verificar mudanças:", error));
+
+    const timer = window.setTimeout(() => {
+      if (transits === null && !isFetchingTransits) fetchTransits();
+      if (dashaText === null && !isFetchingDashas) fetchDashas();
+      if (profectionData === null && !isFetchingProfection) fetchProfection();
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
   }, [profile, userProfile]);
 
   // Fase lunar natal, usada para destacar a lua correta no onboarding.

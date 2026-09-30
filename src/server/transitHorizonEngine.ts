@@ -1,33 +1,26 @@
-// Motor de horizonte futuro de trânsitos.
-// Em vez de varrer dia a dia (custo alto com VSOP87), faz uma interpolação linear
-// por segmentos de 15 dias sobre as posições calculadas em três pontos: início,
-// meio e fim do horizonte. Detecta ativações (entrada no orbe) e o aspecto exato,
-// refinando o pico com findExactPeakDate apenas para os candidatos encontrados.
-
 import {
   getTropicalTransitDegrees,
   getNatalDegrees,
   NATAL_PLANETS_ALLOWED,
   TRANSIT_PLANETS_ALLOWED,
 } from "./transitEngine";
-import { getPlanetLongitude, getPlanetSpeedGroup, findExactPeakDate } from "./transitWindowEngine";
+import { getPlanetSpeedGroup } from "./transitWindowEngine";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const SEGMENT_DAYS = 15;
+const LOOKBACK_DAYS = 30;
 
 const ASPECT_TARGETS = [
-  { nome: "Conjunção" as const, centro: 0 },
-  { nome: "Quadratura" as const, centro: 90 },
-  { nome: "Oposição" as const, centro: 180 },
+  { nome: "Conjunção" as const, offsets: [0] },
+  { nome: "Quadratura" as const, offsets: [90, -90] },
+  { nome: "Oposição" as const, offsets: [180] },
 ];
 
 function normalizeAngle(angle: number): number {
   return ((angle % 360) + 360) % 360;
 }
 
-/** Delta angular com sinal, no intervalo (-180, +180]. */
 function signedDelta(from: number, to: number): number {
-  const d = normalizeAngle(to - from);
+  const d = normalizeAngle(from - to);
   return d > 180 ? d - 360 : d;
 }
 
@@ -36,68 +29,26 @@ function addDays(date: Date, days: number): Date {
 }
 
 function daysBetween(from: Date, to: Date): number {
-  return Math.ceil((to.getTime() - from.getTime()) / MS_PER_DAY);
+  return Math.max(0, Math.ceil((to.getTime() - from.getTime()) / MS_PER_DAY));
 }
 
-/** Orbe permitido: lentos 4°, rápidos 2°. */
+function interpolateDate(start: Date, end: Date, startDelta: number, endDelta: number, target = 0): Date {
+  const denominator = endDelta - startDelta;
+  const ratio = Math.abs(denominator) < 1e-9 ? 0 : Math.max(0, Math.min(1, (target - startDelta) / denominator));
+  return new Date(start.getTime() + (end.getTime() - start.getTime()) * ratio);
+}
+
 export function getDynamicOrb(planet: string): number {
   return getPlanetSpeedGroup(planet) === "fast" ? 2 : 4;
 }
 
-interface LinearActivation {
-  tStart: number; // dias desde startDate
-  tEnd: number;
-  tExact: number | null;
+export function getAspectTargetLongitudes(natalLongitude: number, aspect: "Conjunção" | "Quadratura" | "Oposição"): number[] {
+  const definition = ASPECT_TARGETS.find((item) => item.nome === aspect);
+  return (definition?.offsets ?? []).map((offset) => normalizeAngle(natalLongitude + offset));
 }
 
-/**
- * Encontra intervalos onde |d0 + slope*t| <= orb dentro de um segmento linear.
- * Considera também os casos de borda (ativo no início ou no fim do segmento).
- */
-function findLinearActivations(d0: number, dEnd: number, orb: number, segmentDays: number): LinearActivation[] {
-  if (orb <= 0 || segmentDays <= 0) return [];
-  const slope = (dEnd - d0) / segmentDays;
-
-  // Quase estacionário: se ambos os extremos estão dentro do orbe, todo o segmento é ativo.
-  if (Math.abs(slope) < 1e-6) {
-    if (Math.abs(d0) <= orb) return [{ tStart: 0, tEnd: segmentDays, tExact: null }];
-    return [];
-  }
-
-  const candidates: number[] = [0, segmentDays];
-
-  // Aspecto exato (cruza zero)
-  const tExact = -d0 / slope;
-  if (tExact > 0 && tExact < segmentDays) candidates.push(tExact);
-
-  // Cruza os limites do orbe (+orb e -orb)
-  const tPos = (orb - d0) / slope;
-  const tNeg = (-orb - d0) / slope;
-  if (tPos > 0 && tPos < segmentDays) candidates.push(tPos);
-  if (tNeg > 0 && tNeg < segmentDays) candidates.push(tNeg);
-
-  candidates.sort((a, b) => a - b);
-
-  const intervals: LinearActivation[] = [];
-  for (let i = 0; i < candidates.length - 1; i++) {
-    const mid = (candidates[i] + candidates[i + 1]) / 2;
-    if (Math.abs(d0 + slope * mid) <= orb) {
-      const exact = tExact > candidates[i] && tExact < candidates[i + 1] ? tExact : null;
-      intervals.push({ tStart: candidates[i], tEnd: candidates[i + 1], tExact: exact });
-    }
-  }
-
-  return intervals;
-}
-
-export interface TransitInterval {
-  planet: string;
-  aspecto: "Conjunção" | "Quadratura" | "Oposição";
-  planetNatal: string;
-  activationDate: Date;
-  exitDate: Date;
-  peakDate: Date | null;
-  minOrb: number;
+export function getAngularOrb(longitude: number, target: number): number {
+  return Math.abs(signedDelta(longitude, target));
 }
 
 export interface UpcomingTransit {
@@ -105,156 +56,153 @@ export interface UpcomingTransit {
   aspecto: "Conjunção" | "Quadratura" | "Oposição";
   planetNatal: string;
   status: "active" | "upcoming";
-  activationDate: string; // ISO
-  peakDate: string | null; // ISO
-  exitDate: string; // ISO
+  activationDate: string;
+  peakDate: string | null;
+  exitDate: string;
   daysUntilPeak: number | null;
   minOrb: number;
   orbCategory: "slow" | "fast";
 }
 
-/**
- * Varre o horizonte futuro e retorna trânsitos que entrarem na zona de ativação
- * (orbe dinâmico) dentro do período, ou que já estejam ativos no dia de início.
- */
+interface Candidate {
+  target: number;
+  currentOrb: number;
+  peakDate: Date | null;
+  activationDate: Date;
+  exitDate: Date;
+  minOrb: number;
+}
+
+function findCrossings(samples: Array<{ date: Date; longitude: number }>, target: number): Date[] {
+  const crossings: Date[] = [];
+  for (let i = 0; i < samples.length - 1; i++) {
+    const current = samples[i];
+    const next = samples[i + 1];
+    const d0 = signedDelta(current.longitude, target);
+    const d1 = signedDelta(next.longitude, target);
+    if (Math.abs(d0) < 1e-8) crossings.push(current.date);
+    if (d0 * d1 < 0 && Math.abs(d1 - d0) < 180) {
+      crossings.push(interpolateDate(current.date, next.date, d0, d1));
+    }
+  }
+  return crossings;
+}
+
+function findOrbWindow(
+  samples: Array<{ date: Date; longitude: number }>,
+  target: number,
+  orb: number,
+  anchorDate: Date
+): { activationDate: Date; exitDate: Date; minOrb: number } {
+  const anchorIndex = samples.reduce((best, sample, index) =>
+    Math.abs(sample.date.getTime() - anchorDate.getTime()) < Math.abs(samples[best].date.getTime() - anchorDate.getTime()) ? index : best, 0);
+  let startIndex = anchorIndex;
+  let endIndex = anchorIndex;
+  let minOrb = Math.abs(signedDelta(samples[anchorIndex].longitude, target));
+
+  while (startIndex > 0 && Math.abs(signedDelta(samples[startIndex - 1].longitude, target)) <= orb) startIndex--;
+  while (endIndex < samples.length - 1 && Math.abs(signedDelta(samples[endIndex + 1].longitude, target)) <= orb) endIndex++;
+
+  for (let i = startIndex; i <= endIndex; i++) {
+    minOrb = Math.min(minOrb, Math.abs(signedDelta(samples[i].longitude, target)));
+  }
+
+  let activationDate = samples[startIndex].date;
+  if (startIndex > 0) {
+    const outside = samples[startIndex - 1];
+    const inside = samples[startIndex];
+    const d0 = Math.abs(signedDelta(outside.longitude, target));
+    const d1 = Math.abs(signedDelta(inside.longitude, target));
+    activationDate = interpolateDate(outside.date, inside.date, d0, d1, orb);
+  }
+
+  let exitDate = samples[endIndex].date;
+  if (endIndex < samples.length - 1) {
+    const inside = samples[endIndex];
+    const outside = samples[endIndex + 1];
+    const d0 = Math.abs(signedDelta(inside.longitude, target));
+    const d1 = Math.abs(signedDelta(outside.longitude, target));
+    exitDate = interpolateDate(inside.date, outside.date, d0, d1, orb);
+  }
+
+  return { activationDate, exitDate, minOrb };
+}
+
 export async function findUpcomingTransits(
   profile: any,
   startDate: Date = new Date(),
   horizonDays: number = 30
 ): Promise<UpcomingTransit[]> {
-  const natalPlanets = getNatalDegrees(profile);
-  const allowedNatal = natalPlanets.filter((p) =>
-    NATAL_PLANETS_ALLOWED.some((n) => n.toLowerCase() === p.name.toLowerCase())
+  const natalPlanets = getNatalDegrees(profile).filter((planet) =>
+    NATAL_PLANETS_ALLOWED.some((allowed) => allowed.toLowerCase() === planet.name.toLowerCase())
   );
-
-  // Posições nos pontos de ancoragem: início, meio(s) e fim do horizonte.
-  const midDays = Math.ceil(horizonDays / 2);
-  const [startPositions, midPositions, endPositions] = await Promise.all([
-    getTropicalTransitDegrees(startDate, true),
-    getTropicalTransitDegrees(addDays(startDate, midDays), true),
-    getTropicalTransitDegrees(addDays(startDate, horizonDays), true),
-  ]);
-
-  const results: TransitInterval[] = [];
-  const seen = new Set<string>();
+  const offsets = Array.from({ length: LOOKBACK_DAYS + horizonDays + 1 }, (_, index) => index - LOOKBACK_DAYS);
+  const dailyPositions = await Promise.all(offsets.map(async (offset) => ({
+    offset,
+    date: addDays(startDate, offset),
+    positions: await getTropicalTransitDegrees(addDays(startDate, offset), true),
+  })));
+  const results: UpcomingTransit[] = [];
 
   for (const transitPlanet of TRANSIT_PLANETS_ALLOWED) {
     const orb = getDynamicOrb(transitPlanet);
-    const lonStart = startPositions[transitPlanet];
-    const lonMid = midPositions[transitPlanet];
-    const lonEnd = endPositions[transitPlanet];
-    if (lonStart == null || lonMid == null || lonEnd == null) continue;
+    const samples = dailyPositions
+      .map(({ date, positions }) => ({ date, longitude: positions[transitPlanet] }))
+      .filter((sample): sample is { date: Date; longitude: number } => typeof sample.longitude === "number");
+    const current = samples.find((sample) => sample.date.getTime() === startDate.getTime()) ?? samples[LOOKBACK_DAYS];
+    if (!current) continue;
 
-    for (const natal of allowedNatal) {
+    for (const natal of natalPlanets) {
       for (const aspect of ASPECT_TARGETS) {
-        const key = `${transitPlanet}|${natal.name}|${aspect.nome}`;
-        if (seen.has(key)) continue;
-
-        const target = normalizeAngle(natal.longitude + aspect.centro);
-
-        // Segmento 1: início -> meio
-        const d0 = signedDelta(lonStart, target);
-        const d1 = signedDelta(lonMid, target);
-        const seg1 = findLinearActivations(d0, d1, orb, midDays);
-
-        // Segmento 2: meio -> fim
-        const d2 = signedDelta(lonEnd, target);
-        const seg2 = findLinearActivations(d1, d2, orb, horizonDays - midDays).map((i) => ({
-          tStart: i.tStart + midDays,
-          tEnd: i.tEnd + midDays,
-          tExact: i.tExact == null ? null : i.tExact + midDays,
-        }));
-
-        const all = [...seg1, ...seg2];
-        if (all.length === 0) continue;
-
-        // Junta intervalos adjacentes
-        all.sort((a, b) => a.tStart - b.tStart);
-        const merged: LinearActivation[] = [];
-        for (const interval of all) {
-          const last = merged[merged.length - 1];
-          if (last && Math.abs(interval.tStart - last.tEnd) < 0.001) {
-            last.tEnd = interval.tEnd;
-            if (interval.tExact != null) last.tExact = interval.tExact;
-          } else {
-            merged.push({ ...interval });
-          }
+        const candidates: Candidate[] = [];
+        for (const target of getAspectTargetLongitudes(natal.longitude, aspect.nome)) {
+          const crossings = findCrossings(samples, target);
+          const futureCrossings = crossings.filter((date) => date >= startDate && date <= addDays(startDate, horizonDays));
+          const pastCrossings = crossings.filter((date) => date < startDate);
+          const currentOrb = Math.abs(signedDelta(current.longitude, target));
+          const isActive = currentOrb <= orb;
+          const peakDate = isActive
+            ? [...pastCrossings, ...futureCrossings].sort((a, b) => Math.abs(a.getTime() - startDate.getTime()) - Math.abs(b.getTime() - startDate.getTime()))[0] ?? null
+            : futureCrossings[0] ?? null;
+          if (!isActive && !peakDate) continue;
+          const window = findOrbWindow(samples, target, orb, peakDate ?? startDate);
+          candidates.push({ target, currentOrb, peakDate, ...window });
         }
 
-        for (const interval of merged) {
-          const activationDate = addDays(startDate, interval.tStart);
-          const exitDate = addDays(startDate, interval.tEnd);
+        if (candidates.length === 0) continue;
+        candidates.sort((a, b) => {
+          const aActive = a.currentOrb <= orb;
+          const bActive = b.currentOrb <= orb;
+          if (aActive !== bActive) return aActive ? -1 : 1;
+          return (a.peakDate?.getTime() ?? Infinity) - (b.peakDate?.getTime() ?? Infinity);
+        });
+        const selected = candidates[0];
+        const status = selected.currentOrb <= orb ? "active" : "upcoming";
+        const daysUntilPeak = selected.peakDate && selected.peakDate >= startDate
+          ? daysBetween(startDate, selected.peakDate)
+          : null;
+        if (status === "upcoming" && (daysUntilPeak == null || daysUntilPeak > horizonDays)) continue;
 
-          // Refina o pico exato a partir da estimativa linear
-          let peakDate: Date | null = null;
-          const tExact = interval.tExact;
-          if (tExact != null) {
-            const estimate = addDays(startDate, tExact);
-            try {
-              peakDate = await findExactPeakDate(transitPlanet, target, estimate, 1);
-            } catch (err) {
-              console.warn(`[transitHorizonEngine] Erro ao refinar pico para ${transitPlanet} ${aspect.nome} ${natal.name}:`, err);
-            }
-          }
-          // Se a estimativa linear não cruzou zero no segmento, tenta refinar a partir
-          // do ponto médio do intervalo (caso de borda).
-          if (!peakDate) {
-            const midEstimate = addDays(startDate, (interval.tStart + interval.tEnd) / 2);
-            try {
-              peakDate = await findExactPeakDate(transitPlanet, target, midEstimate, 1);
-            } catch (err) {
-              // ignora
-            }
-          }
-
-          results.push({
-            planet: transitPlanet,
-            aspecto: aspect.nome,
-            planetNatal: natal.name,
-            activationDate,
-            exitDate,
-            peakDate,
-            minOrb: 0, // calculado abaixo
-          });
-        }
-
-        seen.add(key);
+        results.push({
+          planet: transitPlanet,
+          aspecto: aspect.nome,
+          planetNatal: natal.name,
+          status,
+          activationDate: selected.activationDate.toISOString(),
+          peakDate: selected.peakDate?.toISOString() ?? null,
+          exitDate: selected.exitDate.toISOString(),
+          daysUntilPeak,
+          minOrb: Math.round(selected.minOrb * 100) / 100,
+          orbCategory: getPlanetSpeedGroup(transitPlanet) === "fast" ? "fast" : "slow",
+        });
       }
     }
   }
 
-  // Converte para o formato final, calcula status e orb mínima estimada
-  const upcoming: UpcomingTransit[] = [];
-  for (const r of results) {
-    const status = r.activationDate.getTime() <= startDate.getTime() ? "active" : "upcoming";
-
-    let daysUntilPeak: number | null = null;
-    if (r.peakDate && r.peakDate.getTime() >= startDate.getTime()) {
-      daysUntilPeak = daysBetween(startDate, r.peakDate);
-    }
-
-    upcoming.push({
-      planet: r.planet,
-      aspecto: r.aspecto,
-      planetNatal: r.planetNatal,
-      status,
-      activationDate: r.activationDate.toISOString(),
-      peakDate: r.peakDate ? r.peakDate.toISOString() : null,
-      exitDate: r.exitDate.toISOString(),
-      daysUntilPeak,
-      minOrb: Math.round(r.minOrb * 100) / 100,
-      orbCategory: getPlanetSpeedGroup(r.planet) === "fast" ? "fast" : "slow",
-    });
-  }
-
-  // Ordena: ativos primeiro, depois por proximidade do pico
-  upcoming.sort((a, b) => {
-    if (a.status === "active" && b.status !== "active") return -1;
-    if (a.status !== "active" && b.status === "active") return 1;
-    const da = a.daysUntilPeak ?? Infinity;
-    const db = b.daysUntilPeak ?? Infinity;
-    return da - db;
+  return results.sort((a, b) => {
+    if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+    const peakDiff = (a.daysUntilPeak ?? Infinity) - (b.daysUntilPeak ?? Infinity);
+    if (peakDiff !== 0) return peakDiff;
+    return `${a.planet}|${a.aspecto}|${a.planetNatal}`.localeCompare(`${b.planet}|${b.aspecto}|${b.planetNatal}`, "pt-BR");
   });
-
-  return upcoming;
 }
