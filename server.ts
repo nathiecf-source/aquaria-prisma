@@ -1838,7 +1838,7 @@ async function createApp(): Promise<express.Application> {
       // Cache diário da leitura: horizonte futuro muda todo dia
       const now = new Date();
       const dateKey = now.toISOString().slice(0, 10);
-      const readingId = `transit-cycles-v5-${dateKey}`;
+      const readingId = `transit-cycles-v6-${dateKey}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached && Array.isArray(cached.transits)) {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
@@ -2020,7 +2020,7 @@ async function createApp(): Promise<express.Application> {
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
       const transitKey = `${transit.planet}-${transit.aspectToNatal || transit.aspecto}`.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "-");
-      const detailId = `transit-detail-v2-${userId}-${transitKey}-${weekKey}`;
+      const detailId = `transit-detail-v3-${userId}-${transitKey}-${weekKey}`;
       const cached = await getCachedReading(userId, detailId);
       if (cached && cached.desafio && cached.integracao) {
         console.log(`[TRANSIT CYCLE DETAIL] Cache hit ${detailId}`);

@@ -3273,7 +3273,17 @@ REGRAS DE OURO — NÃO QUEBRAR
 - Cada combinação planeta × aspecto × planeta natal deve ter fraseologia exclusiva; não recicle metáforas.
 - Os textos devem soar naturais em português brasileiro, mas sem inventar dados técnicos.
 - Quando usar termos técnicos, acompanhe-os imediatamente de uma breve explicação didática para o leitor.
-- TOM SUGESTIVO OBRIGATÓRIO: NUNCA afirme o que o usuário sente, pensa, precisa ou está sendo forçado a fazer. Use formulários como "Talvez você sinta...", "Pode ser que haja...", "Caso o ego tente resistir...", "Você pode ser convocado/a a notar...", "É possível que surja...". Transforme toda afirmação sobre o corpo, a emoção ou a compulsão em convite ou hipótese. Substitua "você está sendo forçada" por "você pode se sentir impelida/convocada". Substitua afirmações de sensação corporal por "talvez haja uma pressão em...", "se o corpo falar, pode ser na região do...". Esta regra vale para desafio e integracao em todos os cards.
+- TOM SUGESTIVO OBRIGATÓRIO — APLIQUE A CADA FRASE: NUNCA afirme o que o usuário sente, pensa, precisa ou está sendo forçado a fazer. Transforme TODA afirmação de estado interno em convite, hipótese ou possibilidade.
+  Exemplos obrigatórios de reescrita:
+  - ERRADO: "Você sente a lâmina fria de Plutão cavando fundo na sua Casa 6 em Aquário." -> CERTO: "Talvez você sinta a presença transformadora de Plutão atuando na sua rotina e trabalho diário — como uma lâmina fria que cavava fundo na Casa 6."
+  - ERRADO: "bem em cima do seu Marte natal na Casa 5." -> CERTO: "ao mesmo tempo em que a conjunção de Plutão com Marte pode transformar intensamente o seu fazer criativo, na Casa 5."
+  - ERRADO: "É uma pressão visceral que aperta o seu peito e endurece a sua mandíbula." -> CERTO: "Pode ser que surja uma pressão visceral — talvez no peito, talvez na mandíbula — como se o corpo avisasse que algo profundo está em jogo."
+  - ERRADO: "exigindo que você encare onde sua força vital foi sequestrada." -> CERTO: "convidando você a notar, caso sinta, onde a força vital parece ter sido sequestrada por velhas manobras de controle ou por uma exigência implacável de perfeição."
+  - ERRADO: "O estômago revira porque o ego quer resistir." -> CERTO: "Se o estômago revirar, pode ser que o ego esteja tentando resistir e manter o domínio sobre cada detalhe da rotina e dos prazeres criativos."
+  - ERRADO: "Você está sendo forçada a olhar para a raiz da sua exaustão." -> CERTO: "Você pode se sentir impelida, convocada ou convidada a olhar para a raiz da exaustão e a perceber o que precisa morrer para que a verdadeira potência criativa e corporal respire."
+  Palavras-chave permitidas: talvez, pode ser, caso, se, convidado/a, convocado/a, impelido/a, parece, como se, sinal de que, sensação de que.
+  Palavras proibidas no corpo do texto: você sente, você pensa, você precisa, você deve, você está sendo forçado/a, é uma pressão (como afirmação), o estômago revira (como afirmação), o ego quer (como fato), não dá mais para negociar (como imposição).
+- Antes de finalizar, faça uma AUTO-AUDITORIA linha a linha: se uma frase puder ser lida como diagnóstico ou afirmação sobre o usuário, reescreva-a imediatamente como sugestão. Esta regra vale para desafio e integracao em todos os cards.
 `;
 
   const sideralWindow = facts?.sideral_ingress && facts?.sideral_egress !== undefined
