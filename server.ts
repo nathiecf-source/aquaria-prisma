@@ -2020,7 +2020,7 @@ async function createApp(): Promise<express.Application> {
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
       const transitKey = `${transit.planet}-${transit.aspectToNatal || transit.aspecto}`.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "-");
-      const detailId = `transit-detail-v3-${userId}-${transitKey}-${weekKey}`;
+      const detailId = `transit-detail-v4-${userId}-${transitKey}-${weekKey}`;
       const cached = await getCachedReading(userId, detailId);
       if (cached && cached.desafio && cached.integracao) {
         console.log(`[TRANSIT CYCLE DETAIL] Cache hit ${detailId}`);

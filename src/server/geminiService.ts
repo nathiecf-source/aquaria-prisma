@@ -3274,6 +3274,7 @@ REGRAS DE OURO — NÃO QUEBRAR
 - Os textos devem soar naturais em português brasileiro, mas sem inventar dados técnicos.
 - Quando usar termos técnicos, acompanhe-os imediatamente de uma breve explicação didática para o leitor.
 - FATOS ASTROLÓGICOS vs. INTERPRETAÇÃO SUBJETIVA: afirme os dados astronômicos e astrológicos diretamente (planeta, signo, casa, aspecto, datas, natureza do terreno). A regra sugestiva aplica-se APENAS às sensações corporais, emoções, pensamentos, compulsões, necessidades e ações do usuário.
+  A PRIMEIRA FRASE do campo desafio DEVE ser uma declaração factual e direta da configuração astrológica. NUNCA comece com "Talvez você perceba...", "Talvez você sinta..." ou qualquer suposição ao apresentar a posição do planeta, o aspecto e a casa.
   Exemplos obrigatórios de reescrita:
   - ERRADO: "Talvez você perceba a presença transformadora de Plutão atuando na Casa 6." -> CERTO: "Plutão transita pela Casa 6 em Aquário — uma presença transformadora na sua rotina e trabalho diário. Talvez você sinta essa pressão no corpo..."
   - ERRADO: "Talvez você perceba a presença do Sol transitando pelo signo de Virgem, na Casa 1." -> CERTO: "O Sol transita por Virgem, na sua Casa 1. É um momento de iluminação da identidade e da presença física."
@@ -3281,6 +3282,7 @@ REGRAS DE OURO — NÃO QUEBRAR
   - ERRADO: "É uma pressão visceral que aperta o seu peito e endurece a sua mandíbula." -> CERTO: "Pode ser que surja uma pressão visceral — talvez no peito, talvez na mandíbula — como se o corpo avisasse que algo profundo está em jogo."
   - ERRADO: "O estômago revira porque o ego quer resistir." -> CERTO: "Se o estômago revirar, pode ser que o ego esteja tentando resistir e manter o domínio sobre cada detalhe da rotina."
   - ERRADO: "Você está sendo forçada a olhar para a raiz da sua exaustão." -> CERTO: "Você pode se sentir impelida, convocada ou convidada a olhar para a raiz da exaustão e a perceber o que precisa morrer para que a verdadeira potência criativa e corporal respire."
+  Modelo obrigatório para a primeira frase do desafio: "[Planeta] transita por [Signo] na Casa [N], [aspecto] com o/a seu/sua [Planeta Natal] na Casa [N]. [Contexto breve do significado astrológico]." Só depois dessa base factual, introduza as possíveis sensações subjetivas com 'Talvez', 'Pode ser', 'Caso' etc.
   Palavras-chave permitidas para o subjetivo: talvez, pode ser, caso, se, convidado/a, convocado/a, impelido/a, parece, como se, sinal de que, sensação de que.
   Proibições de afirmação sobre o usuário: "você sente", "você pensa", "você precisa", "você deve", "você está sendo forçado/a", "é uma pressão" (como afirmação absoluta), "o estômago revira" (como fato), "o ego quer" (como fato), "não dá mais para negociar" (como imposição).
 - Antes de finalizar, faça uma AUTO-AUDITORIA linha a linha: se uma frase disser algo sobre o corpo, a emoção ou a compulsão do usuário como se fosse verdade, reescreva-a imediatamente como sugestão. Esta regra vale para desafio e integracao em todos os cards.
