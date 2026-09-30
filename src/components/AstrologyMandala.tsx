@@ -571,6 +571,7 @@ export default function AstrologyMandala({
       if (transits === null && !isFetchingTransits) fetchTransits();
       if (dashaText === null && !isFetchingDashas) fetchDashas();
       if (profectionData === null && !isFetchingProfection) fetchProfection();
+      fetchDiretrizData();
     }, 1500);
 
     return () => window.clearTimeout(timer);
@@ -582,28 +583,31 @@ export default function AstrologyMandala({
     ? (Object.entries(MOON_PHASES).find(([, v]) => v.phase === natalMoonPhase)?.[0] as keyof typeof MOON_PHASES)
     : "lua-nova";
 
+  const fetchDiretrizData = React.useCallback(() => {
+    if (!profile || !userName || !visualState || diretrizData || isFetchingDiretriz) return;
+    setIsFetchingDiretriz(true);
+    fetch("/api/generate-diretriz-ampla", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, userName, visualState, userId: userProfile?.id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.reading && isValidDiretrizAmplaData(data.reading)) {
+        setDiretrizData(data.reading);
+      } else {
+        console.warn("[Diretriz] Formato inesperado:", data.reading);
+        setDiretrizData(null);
+      }
+    })
+    .catch(err => console.error("Erro diretriz:", err))
+    .finally(() => setIsFetchingDiretriz(false));
+  }, [profile, userName, visualState, userProfile?.id, diretrizData, isFetchingDiretriz]);
+
   const handleOpenDiretriz = () => {
     setIsPanelOpen(false);
     setIsDiretrizModalOpen(true);
-    if (!diretrizData && profile && userName) {
-      setIsFetchingDiretriz(true);
-      fetch("/api/generate-diretriz-ampla", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, userName, visualState, userId: userProfile?.id })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.reading && isValidDiretrizAmplaData(data.reading)) {
-          setDiretrizData(data.reading);
-        } else {
-          console.warn("[Diretriz] Formato inesperado:", data.reading);
-          setDiretrizData(null);
-        }
-      })
-      .catch(err => console.error("Erro diretriz:", err))
-      .finally(() => setIsFetchingDiretriz(false));
-    }
+    fetchDiretrizData();
   };
 
   const fetchTransits = () => {
