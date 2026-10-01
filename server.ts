@@ -41,7 +41,7 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
 import { ensureDrishtis } from "./src/server/astrologyProviders";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, HouseReadingSection } from "./src/server/geminiService";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, generateCarouselFromText, HouseReadingSection } from "./src/server/geminiService";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -3680,6 +3680,29 @@ async function createApp(): Promise<express.Application> {
     } catch (err: any) {
       console.error("[Admin] Erro em settings:", err);
       return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // POST /api/admin/carousel/generate - gera cards e legenda a partir de texto longo
+  app.post("/api/admin/carousel/generate", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { text } = req.body;
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
+        return res.status(400).json({ error: "Texto é obrigatório." });
+      }
+      const MAX_LENGTH = 15000;
+      if (text.length > MAX_LENGTH) {
+        return res.status(400).json({ error: `Texto deve ter no máximo ${MAX_LENGTH} caracteres.` });
+      }
+
+      const result = await generateCarouselFromText(text.trim());
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error("[Admin] Erro ao gerar carrossel:", err);
+      return res.status(500).json({ error: "Erro ao gerar carrossel.", details: err?.message || String(err) });
     }
   });
 

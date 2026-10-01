@@ -8,6 +8,7 @@ import { DailySkyPillarsCard } from "./DailySkyPillarsCard";
 import { Calendar, Mail, Send, Bell, Rocket, Copy, Download, Sparkles } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { downloadImage, generatePngFromElement } from "./share/shareUtils";
+import { CarouselGeneratorPanel } from "./admin/CarouselGeneratorPanel";
 
 interface AdminPageProps {
   userProfile?: any;
@@ -127,6 +128,7 @@ const TABS = [
   { id: "feedbacks", label: "Feedbacks" },
   { id: "push", label: "Push" },
   { id: "ceu-do-dia", label: "Céu do Dia" },
+  { id: "carrossel", label: "Carrossel" },
   { id: "avisos", label: "Avisos Globais" },
   { id: "suporte", label: "Suporte Técnico" },
 ];
@@ -1673,6 +1675,10 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
               </>
             )}
           </section>
+        )}
+
+        {activeTab === "carrossel" && (
+          <CarouselGeneratorPanel getToken={getToken} />
         )}
 
         {activeTab === "avisos" && (

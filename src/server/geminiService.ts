@@ -4887,3 +4887,99 @@ ${(() => {
   return parsed as DailySkyContent;
 }
 
+// ─── Gerador de Carrossel do Instagram ─────────────────────────────────────
+
+export interface CarouselCard {
+  ordem: number;
+  titulo: string;
+  texto: string;
+}
+
+export interface CarouselContent {
+  carrossel: CarouselCard[];
+  legenda: string;
+}
+
+const carouselCardSchema = {
+  type: Type.OBJECT,
+  properties: {
+    ordem: { type: Type.NUMBER, description: "Número do card na sequência, começando em 1." },
+    titulo: { type: Type.STRING, description: "Título curto do card, no máximo 3 palavras, em CAIXA ALTA." },
+    texto: { type: Type.STRING, description: "Corpo do card, direto, com respiro, no máximo 200 caracteres." },
+  },
+  required: ["ordem", "titulo", "texto"],
+};
+
+const carouselContentSchema = {
+  type: Type.OBJECT,
+  properties: {
+    carrossel: {
+      type: Type.ARRAY,
+      items: carouselCardSchema,
+      description: "Sequência de cards. Máximo 10 cards. Card 1 é o gancho; último card é o fechamento/provocação.",
+    },
+    legenda: { type: Type.STRING, description: "Legenda do post, 3 a 4 parágrafos curtos, com CTA sutil no final." },
+  },
+  required: ["carrossel", "legenda"],
+};
+
+const CAROUSEL_SYSTEM_INSTRUCTION = `[PAPEL]
+Você é a IA editorial da "Aquaria / Portal 36_". Recebe um texto longo (aula, reflexão ou artigo) e o transforma em uma sequência de cards para carrossel do Instagram, além de uma legenda envolvente.
+
+[DIRETRIZES DE EDIÇÃO — CARDS]
+1. Fatiamento curto: divida o texto em NO MÁXIMO 10 cards. Pode ser menos, mas nunca mais.
+2. Limite rígido de caracteres: cada card deve ter NO MÁXIMO 200 caracteres no corpo. Se a ideia for longa, divida em dois cards.
+3. Ritmo de leitura: o Card 1 deve ser um "Gancho" que prenda a atenção. O último card deve conter uma provocação ou reflexão final.
+4. Títulos: todo card deve ter um título curto, no máximo 3 palavras, sempre em CAIXA ALTA.
+5. Tom: elegante, profundo, focado em psicologia, presença e ritmo natural. Sem misticismo exagerado, sem gatilhos de urgência.
+
+[DIRETRIZES DE EDIÇÃO — LEGENDA]
+1. Resuma o texto original em uma legenda coesa de 3 a 4 parágrafos curtos.
+2. Mantenha o tom da marca.
+3. Insira um CTA (Call to Action) sutil no final, convidando a comunidade à reflexão nos comentários ou a conhecer o Portal 36_.
+
+[FORMATO DE SAÍDA]
+Retorne APENAS o objeto JSON válido conforme o schema, sem introduções, explicações ou comentários.`;
+
+function cleanJsonOutput(raw: string): string {
+  return (raw || "")
+    .replace(/```json\s*/gi, "")
+    .replace(/```/g, "")
+    .trim();
+}
+
+function validateCarousel(content: CarouselContent): void {
+  if (!Array.isArray(content.carrossel) || content.carrossel.length === 0 || content.carrossel.length > 10) {
+    throw new Error("O carrossel deve conter entre 1 e 10 cards.");
+  }
+  for (const card of content.carrossel) {
+    if (!card.titulo || typeof card.titulo !== "string" || card.titulo.trim().split(/\s+/).length > 3) {
+      throw new Error(`Título do card ${card.ordem} deve ter no máximo 3 palavras.`);
+    }
+    if (!card.texto || typeof card.texto !== "string" || card.texto.length > 200) {
+      throw new Error(`Texto do card ${card.ordem} excede 200 caracteres.`);
+    }
+  }
+  if (!content.legenda || typeof content.legenda !== "string") {
+    throw new Error("Legenda ausente ou inválida.");
+  }
+}
+
+export async function generateCarouselFromText(text: string): Promise<CarouselContent> {
+  const client = getGeminiClient();
+  const response = await callGeminiWithRetry(client, {
+    model: "gemini-3.5-flash-lite",
+    contents: `Fatie o texto a seguir em um carrossel de Instagram e uma legenda:\n\n${text.trim()}`,
+    config: {
+      systemInstruction: CAROUSEL_SYSTEM_INSTRUCTION,
+      temperature: 0.45,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+      responseSchema: carouselContentSchema,
+    },
+  });
+  const parsed = JSON.parse(cleanJsonOutput(response.text || "{}"));
+  validateCarousel(parsed);
+  return parsed as CarouselContent;
+}
+
