@@ -61,8 +61,8 @@ export const FAQModal: React.FC<FAQModalProps> = ({ onClose }) => {
             <ul className="list-disc pl-4 mt-2 space-y-1">
               <li><strong>Leitura Completa do Mapa:</strong> Todas as casas astrológicas, planetas e caminhos evolutivos.</li>
               <li><strong>Práticas Guiadas:</strong> Acesso às 7 meditações guiadas e personalizadas, além do Diário Alquímico para registrar sua evolução.</li>
-              <li><strong>Seus Ciclos Ativos:</strong> A Tríade Cósmica do seu momento presente (calculada pelas estrelas-guias do sistema védico — Nakshatras/Dasas), os ciclos planetários pelo cálculo tropical e o regente do seu ano.</li>
-              <li><strong>Oráculo no Chat:</strong> Acesso ilimitado ao chat para tirar dúvidas sobre seu mapa (tropical ou sideral), com opção de baixar suas conversas em PDF.</li>
+              <li><strong>Seus Ciclos Ativos:</strong> A Tríade Cósmica do seu momento presente (calculada pelas estrelas-guias do sistema védico — Nakshatras/Dasas), os ciclos planetários pelo cálculo tropical, o regente do seu ano e a revolução solar.</li>
+              <li><strong>Oráculo no Chat:</strong> 50 perguntas por mês no chat para tirar dúvidas sobre seu mapa (tropical ou sideral), com opção de baixar suas conversas em PDF.</li>
             </ul>
           </div>
 
