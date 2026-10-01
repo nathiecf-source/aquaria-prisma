@@ -47,7 +47,7 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
   React.useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Tenor+Sans&display=swap";
+    link.href = "/fonts/carousel-fonts.css";
     document.head.appendChild(link);
 
     document.fonts.ready.then(() => setFontsReady(true)).catch(() => setFontsReady(true));

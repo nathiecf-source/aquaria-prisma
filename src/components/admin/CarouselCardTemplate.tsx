@@ -87,7 +87,7 @@ export const CarouselCardTemplate = React.forwardRef<HTMLDivElement, CarouselCar
               padding: `0 ${paddingX}px`,
             }}
           >
-            Aquaria / Portal 36_
+            Aquar.ia Prisma
           </p>
 
           <h2
@@ -125,14 +125,14 @@ export const CarouselCardTemplate = React.forwardRef<HTMLDivElement, CarouselCar
               bottom: format === "feed" ? 40 : 56,
               left: 0,
               right: 0,
+              fontFamily: "'Open Sans', sans-serif",
               fontSize: format === "feed" ? 18 : 20,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
+              letterSpacing: "0.15em",
               color: mutedColor,
               margin: 0,
             }}
           >
-            {data.ordem.toString().padStart(2, "0")} / 10
+            @aquaria.app
           </p>
         </div>
       </div>
