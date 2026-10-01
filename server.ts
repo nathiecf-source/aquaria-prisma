@@ -3702,7 +3702,8 @@ async function createApp(): Promise<express.Application> {
       return res.json({ success: true, ...result });
     } catch (err: any) {
       console.error("[Admin] Erro ao gerar carrossel:", err);
-      return res.status(500).json({ error: "Erro ao gerar carrossel.", details: err?.message || String(err) });
+      const message = err?.message || String(err);
+      return res.status(500).json({ error: `Erro ao gerar carrossel: ${message}`, details: message });
     }
   });
 

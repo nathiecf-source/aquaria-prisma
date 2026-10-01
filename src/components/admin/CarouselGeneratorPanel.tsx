@@ -40,6 +40,8 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
   const [backgroundUrl, setBackgroundUrl] = React.useState("");
   const [generatingIndex, setGeneratingIndex] = React.useState<number | null>(null);
   const [fontsReady, setFontsReady] = React.useState(false);
+  const [backgroundFileName, setBackgroundFileName] = React.useState("");
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const cardRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
 
   React.useEffect(() => {
@@ -53,6 +55,33 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
       document.head.removeChild(link);
     };
   }, []);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("O arquivo deve ser uma imagem.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 5 MB.");
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setBackgroundUrl(result || "");
+      setBackgroundFileName(file.name);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearBackground() {
+    setBackgroundUrl("");
+    setBackgroundFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function handleGenerate() {
     if (!text.trim()) {
@@ -172,28 +201,49 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <label className="block text-xs font-medium text-[#3c352d]">Imagem de fundo (opcional)</label>
+
         <div className="flex items-center gap-2">
           <ImageIcon className="w-4 h-4 text-[#8c7f70]" />
           <input
             type="text"
             value={backgroundUrl}
-            onChange={(e) => setBackgroundUrl(e.target.value)}
+            onChange={(e) => {
+              setBackgroundUrl(e.target.value);
+              if (backgroundFileName) setBackgroundFileName("");
+            }}
             placeholder="https://images.unsplash.com/photo-... (deve permitir CORS)"
             className="flex-1 p-2.5 rounded-lg border border-[#e6e2d8] bg-white text-sm text-[#3c352d] focus:outline-none focus:ring-2 focus:ring-[#8c6239]/30"
           />
-          {backgroundUrl && (
+          {(backgroundUrl || backgroundFileName) && (
             <button
-              onClick={() => setBackgroundUrl("")}
+              onClick={clearBackground}
               className="text-[10px] text-[#8c7f70] hover:text-[#3c352d] underline"
             >
               Limpar
             </button>
           )}
         </div>
+
+        <div className="flex items-center gap-3">
+          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e6e2d8] bg-white text-xs text-[#3c352d] hover:border-[#8c6239] cursor-pointer transition-colors">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            Escolher arquivo do computador
+          </label>
+          {backgroundFileName && (
+            <span className="text-[11px] text-[#6e6356]">{backgroundFileName}</span>
+          )}
+        </div>
+
         <p className="text-[10px] text-[#8c7f70]">
-          Deixe vazio para usar o gradiente padrão da marca. URLs sem permissão CORS podem falhar e usar o fallback.
+          Deixe vazio para usar o gradiente padrão da marca. Envie uma imagem do PC ou cole uma URL com CORS permitido.
         </p>
       </div>
 

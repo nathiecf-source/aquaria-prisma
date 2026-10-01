@@ -4948,21 +4948,41 @@ function cleanJsonOutput(raw: string): string {
     .trim();
 }
 
-function validateCarousel(content: CarouselContent): void {
-  if (!Array.isArray(content.carrossel) || content.carrossel.length === 0 || content.carrossel.length > 10) {
-    throw new Error("O carrossel deve conter entre 1 e 10 cards.");
+function sanitizeTitle(value: string): string {
+  const trimmed = (value || "").trim().toUpperCase();
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return trimmed;
+  return words.slice(0, 3).join(" ") + "…";
+}
+
+function sanitizeBody(value: string): string {
+  const trimmed = (value || "").trim();
+  if (trimmed.length <= 200) return trimmed;
+  const cut = trimmed.slice(0, 197);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + "…";
+}
+
+function sanitizeCarousel(content: CarouselContent): CarouselContent {
+  if (!Array.isArray(content.carrossel) || content.carrossel.length === 0) {
+    throw new Error("O carrossel deve conter pelo menos 1 card.");
   }
-  for (const card of content.carrossel) {
-    if (!card.titulo || typeof card.titulo !== "string" || card.titulo.trim().split(/\s+/).length > 3) {
-      throw new Error(`Título do card ${card.ordem} deve ter no máximo 3 palavras.`);
-    }
-    if (!card.texto || typeof card.texto !== "string" || card.texto.length > 200) {
-      throw new Error(`Texto do card ${card.ordem} excede 200 caracteres.`);
-    }
+  const cards = content.carrossel.slice(0, 10).map((card, index) => ({
+    ordem: typeof card.ordem === "number" ? card.ordem : index + 1,
+    titulo: sanitizeTitle(card.titulo),
+    texto: sanitizeBody(card.texto),
+  }));
+
+  for (const card of cards) {
+    if (!card.titulo) throw new Error(`Título do card ${card.ordem} está vazio.`);
+    if (!card.texto) throw new Error(`Texto do card ${card.ordem} está vazio.`);
   }
+
   if (!content.legenda || typeof content.legenda !== "string") {
     throw new Error("Legenda ausente ou inválida.");
   }
+
+  return { carrossel: cards, legenda: content.legenda.trim() };
 }
 
 export async function generateCarouselFromText(text: string): Promise<CarouselContent> {
@@ -4979,7 +4999,6 @@ export async function generateCarouselFromText(text: string): Promise<CarouselCo
     },
   });
   const parsed = JSON.parse(cleanJsonOutput(response.text || "{}"));
-  validateCarousel(parsed);
-  return parsed as CarouselContent;
+  return sanitizeCarousel(parsed as CarouselContent);
 }
 
