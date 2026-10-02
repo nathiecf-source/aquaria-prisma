@@ -4904,7 +4904,7 @@ const carouselCardSchema = {
   type: Type.OBJECT,
   properties: {
     ordem: { type: Type.NUMBER, description: "Número do card na sequência, começando em 1." },
-    titulo: { type: Type.STRING, description: "Título curto do card, no máximo 3 palavras, em CAIXA ALTA." },
+    titulo: { type: Type.STRING, description: "Título curto do card, no máximo 5 palavras, em CAIXA ALTA." },
     texto: { type: Type.STRING, description: "Corpo do card, direto, com respiro, no máximo 200 caracteres." },
   },
   required: ["ordem", "titulo", "texto"],
@@ -4930,7 +4930,7 @@ Você é a IA editorial da "Aquaria / Portal 36_". Recebe um texto longo (aula, 
 1. Fatiamento curto: divida o texto em NO MÁXIMO 10 cards. Pode ser menos, mas nunca mais.
 2. Limite rígido de caracteres: cada card deve ter NO MÁXIMO 200 caracteres no corpo. Se a ideia for longa, divida em dois cards.
 3. Ritmo de leitura: o Card 1 deve ser um "Gancho" que prenda a atenção. O último card deve conter uma provocação ou reflexão final.
-4. Títulos: todo card deve ter um título curto, no máximo 3 palavras, sempre em CAIXA ALTA.
+4. Títulos: todo card deve ter um título curto, no máximo 5 palavras, sempre em CAIXA ALTA.
 5. Tom: elegante, profundo, focado em psicologia, presença e ritmo natural. Sem misticismo exagerado, sem gatilhos de urgência.
 
 [DIRETRIZES DE EDIÇÃO — LEGENDA]
@@ -4948,11 +4948,13 @@ function cleanJsonOutput(raw: string): string {
     .trim();
 }
 
+const MAX_CAROUSEL_TITLE_WORDS = 5;
+
 function sanitizeTitle(value: string): string {
   const trimmed = (value || "").trim().toUpperCase();
   const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length <= 3) return trimmed;
-  return words.slice(0, 3).join(" ") + "…";
+  if (words.length <= MAX_CAROUSEL_TITLE_WORDS) return trimmed;
+  return words.slice(0, MAX_CAROUSEL_TITLE_WORDS).join(" ") + "…";
 }
 
 function sanitizeBody(value: string): string {

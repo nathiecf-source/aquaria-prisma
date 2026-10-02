@@ -40,7 +40,7 @@ export const CarouselCardTemplate = React.forwardRef<HTMLDivElement, CarouselCar
     const mutedColor = isDark ? "rgba(255,255,255,0.75)" : "rgba(67,58,74,0.75)";
 
     const titleFontSize = format === "feed" ? 56 : 64;
-    const bodyFontSize = format === "feed" ? 34 : 38;
+    const bodyFontSize = format === "feed" ? 42 : 46;
     const paddingX = format === "feed" ? 96 : 80;
     const paddingY = format === "feed" ? 120 : 160;
 

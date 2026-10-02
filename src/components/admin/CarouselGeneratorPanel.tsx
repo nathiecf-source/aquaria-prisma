@@ -15,18 +15,23 @@ interface CarouselCard {
 
 const MAX_TEXT_LENGTH = 15000;
 const MAX_BODY_CHARS = 200;
-const MAX_TITLE_WORDS = 3;
+const MAX_TITLE_WORDS = 5;
+const MAX_CARDS = 10;
 
 function wordCount(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function isTitleValid(value: string): boolean {
-  return value.trim().length > 0 && wordCount(value) <= MAX_TITLE_WORDS;
+  return value.trim().length === 0 || wordCount(value) <= MAX_TITLE_WORDS;
 }
 
 function isBodyValid(value: string): boolean {
-  return value.trim().length > 0 && value.length <= MAX_BODY_CHARS;
+  return value.trim().length === 0 || value.length <= MAX_BODY_CHARS;
+}
+
+function isBlankCard(card: CarouselCard): boolean {
+  return card.titulo.trim().length === 0 && card.texto.trim().length === 0;
 }
 
 export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ getToken }) => {
@@ -111,7 +116,15 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
       if (!Array.isArray(data.carrossel)) {
         throw new Error("Resposta inesperada do servidor.");
       }
-      setCards(data.carrossel);
+      const generated: CarouselCard[] = data.carrossel.slice(0, MAX_CARDS).map((c: any, i: number) => ({
+        ordem: typeof c.ordem === "number" ? c.ordem : i + 1,
+        titulo: String(c.titulo || ""),
+        texto: String(c.texto || ""),
+      }));
+      while (generated.length < MAX_CARDS) {
+        generated.push({ ordem: generated.length + 1, titulo: "", texto: "" });
+      }
+      setCards(generated);
       setCaption(typeof data.legenda === "string" ? data.legenda : "");
     } catch (err: any) {
       setError(err?.message || "Erro ao gerar carrossel.");
@@ -129,6 +142,7 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
 
   async function downloadSingle(index: number) {
     const card = cards[index];
+    if (isBlankCard(card)) return;
     const el = cardRefs.current[card.ordem];
     if (!el) return;
     setGeneratingIndex(index);
@@ -149,7 +163,9 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
     setGeneratingIndex(-1);
     try {
       for (let i = 0; i < cards.length; i++) {
-        await downloadSingle(i);
+        if (!isBlankCard(cards[i])) {
+          await downloadSingle(i);
+        }
       }
     } finally {
       setGeneratingIndex(null);
@@ -303,14 +319,16 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
                   <span className="text-[10px] font-mono uppercase tracking-widest text-[#8c7f70]">
                     Card {card.ordem}
                   </span>
-                  <button
-                    onClick={() => downloadSingle(index)}
-                    disabled={generatingIndex !== null || !isTitleValid(card.titulo) || !isBodyValid(card.texto)}
-                    className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#8c6239] hover:text-[#3c352d] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Download className="w-3 h-3" />
-                    PNG
-                  </button>
+                  {!isBlankCard(card) && (
+                    <button
+                      onClick={() => downloadSingle(index)}
+                      disabled={generatingIndex !== null || !isTitleValid(card.titulo) || !isBodyValid(card.texto)}
+                      className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#8c6239] hover:text-[#3c352d] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="w-3 h-3" />
+                      PNG
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -321,6 +339,7 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
                       className={`w-full p-2 rounded-lg border text-sm font-medium uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-[#8c6239]/30 ${
                         isTitleValid(card.titulo) ? "border-[#e6e2d8] text-[#3c352d]" : "border-red-300 text-red-800"
                       }`}
+                      placeholder="TÍTULO"
                     />
                     <p className="text-[10px] text-[#8c7f70] mt-1">
                       {wordCount(card.titulo)} / {MAX_TITLE_WORDS} palavras
@@ -333,6 +352,7 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
                       className={`w-full h-20 p-2 rounded-lg border text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-[#8c6239]/30 ${
                         isBodyValid(card.texto) ? "border-[#e6e2d8] text-[#3c352d]" : "border-red-300 text-red-800"
                       }`}
+                      placeholder="Texto do card..."
                     />
                     <p className={`text-[10px] mt-1 ${card.texto.length > MAX_BODY_CHARS ? "text-red-700" : "text-[#8c7f70]"}`}>
                       {card.texto.length} / {MAX_BODY_CHARS} caracteres
