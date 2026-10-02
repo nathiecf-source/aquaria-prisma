@@ -3689,7 +3689,7 @@ async function createApp(): Promise<express.Application> {
     if (!admin) return;
 
     try {
-      const { text } = req.body;
+      const { text, maxCards, mode } = req.body;
       if (!text || typeof text !== "string" || text.trim().length === 0) {
         return res.status(400).json({ error: "Texto é obrigatório." });
       }
@@ -3698,7 +3698,9 @@ async function createApp(): Promise<express.Application> {
         return res.status(400).json({ error: `Texto deve ter no máximo ${MAX_LENGTH} caracteres.` });
       }
 
-      const result = await generateCarouselFromText(text.trim());
+      const parsedMaxCards = typeof maxCards === "number" ? maxCards : 10;
+      const parsedMode = mode === "houses" ? "houses" : "default";
+      const result = await generateCarouselFromText(text.trim(), { maxCards: parsedMaxCards, mode: parsedMode });
       return res.json({ success: true, ...result });
     } catch (err: any) {
       console.error("[Admin] Erro ao gerar carrossel:", err);

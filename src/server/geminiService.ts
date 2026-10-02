@@ -4916,7 +4916,7 @@ const carouselContentSchema = {
     carrossel: {
       type: Type.ARRAY,
       items: carouselCardSchema,
-      description: "Sequência de cards. Máximo 12 cards. Card 1 é o gancho; último card é o fechamento/provocação.",
+      description: "Sequência de cards. Máximo 14 cards. Card 1 é o gancho; último card é o fechamento/provocação.",
     },
     legenda: { type: Type.STRING, description: "Legenda do post, 3 a 4 parágrafos curtos, com CTA sutil no final." },
   },
@@ -4927,11 +4927,14 @@ const CAROUSEL_SYSTEM_INSTRUCTION = `[PAPEL]
 Você é a IA editorial da "Aquaria / Portal 36_". Recebe um texto longo (aula, reflexão ou artigo) e o transforma em uma sequência de cards para carrossel do Instagram, além de uma legenda envolvente.
 
 [DIRETRIZES DE EDIÇÃO — CARDS]
-1. Fatiamento curto: divida o texto em NO MÁXIMO 12 cards. Pode ser menos, mas nunca mais.
+1. Fatiamento curto: divida o texto em NO MÁXIMO {MAX_CARDS} cards. Pode ser menos, mas nunca mais.
 2. Limite rígido de caracteres: cada card deve ter NO MÁXIMO 200 caracteres no corpo. Se a ideia for longa, divida em dois cards.
 3. Ritmo de leitura: o Card 1 deve ser um "Gancho" que prenda a atenção. O último card deve conter uma provocação ou reflexão final.
 4. Títulos: todo card deve ter um título curto, no máximo 5 palavras, sempre em CAIXA ALTA.
 5. Tom: elegante, profundo, focado em psicologia, presença e ritmo natural. Sem misticismo exagerado, sem gatilhos de urgência.
+
+[MODOS ESPECIAIS]
+{HOUSES_MODE_INSTRUCTION}
 
 [DIRETRIZES DE EDIÇÃO — LEGENDA]
 1. Resuma o texto original em uma legenda coesa de 3 a 4 parágrafos curtos.
@@ -4949,6 +4952,7 @@ function cleanJsonOutput(raw: string): string {
 }
 
 const MAX_CAROUSEL_TITLE_WORDS = 5;
+const MAX_CAROUSEL_CARDS_HARD_LIMIT = 14;
 
 function sanitizeTitle(value: string): string {
   const trimmed = (value || "").trim().toUpperCase();
@@ -4965,11 +4969,12 @@ function sanitizeBody(value: string): string {
   return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + "…";
 }
 
-function sanitizeCarousel(content: CarouselContent): CarouselContent {
+function sanitizeCarousel(content: CarouselContent, maxCards: number): CarouselContent {
+  const limit = Math.max(1, Math.min(MAX_CAROUSEL_CARDS_HARD_LIMIT, Math.floor(maxCards) || 10));
   if (!Array.isArray(content.carrossel) || content.carrossel.length === 0) {
     throw new Error("O carrossel deve conter pelo menos 1 card.");
   }
-  const cards = content.carrossel.slice(0, 12).map((card, index) => ({
+  const cards = content.carrossel.slice(0, limit).map((card, index) => ({
     ordem: typeof card.ordem === "number" ? card.ordem : index + 1,
     titulo: sanitizeTitle(card.titulo),
     texto: sanitizeBody(card.texto),
@@ -4987,13 +4992,27 @@ function sanitizeCarousel(content: CarouselContent): CarouselContent {
   return { carrossel: cards, legenda: content.legenda.trim() };
 }
 
-export async function generateCarouselFromText(text: string): Promise<CarouselContent> {
+export async function generateCarouselFromText(
+  text: string,
+  options: { maxCards?: number; mode?: "default" | "houses" } = {}
+): Promise<CarouselContent> {
+  const maxCards = Math.max(1, Math.min(MAX_CAROUSEL_CARDS_HARD_LIMIT, Math.floor(options.maxCards ?? 10)));
+  const isHousesMode = options.mode === "houses";
+
+  const housesModeInstruction = isHousesMode
+    ? `MODO 12 CASAS: O texto está organizado por casas astrológicas (Casa 1 a Casa 12). Crie exatamente 12 cards, um para cada casa, na ordem. Não una duas casas no mesmo card. Use os cards excedentes (além dos 12) apenas para introdução curta e/ou conclusão final.`
+    : "Modo padrão: fatie o texto conforme o ritmo natural da ideia, respeitando o máximo de cards.";
+
+  const systemInstruction = CAROUSEL_SYSTEM_INSTRUCTION
+    .replace(/{MAX_CARDS}/g, String(maxCards))
+    .replace(/{HOUSES_MODE_INSTRUCTION}/g, housesModeInstruction);
+
   const client = getGeminiClient();
   const response = await callGeminiWithRetry(client, {
     model: "gemini-3.5-flash-lite",
     contents: `Fatie o texto a seguir em um carrossel de Instagram e uma legenda:\n\n${text.trim()}`,
     config: {
-      systemInstruction: CAROUSEL_SYSTEM_INSTRUCTION,
+      systemInstruction,
       temperature: 0.45,
       maxOutputTokens: 4096,
       responseMimeType: "application/json",
@@ -5001,6 +5020,6 @@ export async function generateCarouselFromText(text: string): Promise<CarouselCo
     },
   });
   const parsed = JSON.parse(cleanJsonOutput(response.text || "{}"));
-  return sanitizeCarousel(parsed as CarouselContent);
+  return sanitizeCarousel(parsed as CarouselContent, maxCards);
 }
 

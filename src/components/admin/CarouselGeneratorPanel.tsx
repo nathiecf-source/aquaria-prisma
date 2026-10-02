@@ -16,7 +16,8 @@ interface CarouselCard {
 const MAX_TEXT_LENGTH = 15000;
 const MAX_BODY_CHARS = 200;
 const MAX_TITLE_WORDS = 5;
-const MAX_CARDS = 12;
+const MAX_CARDS_HARD_LIMIT = 14;
+const DEFAULT_MAX_CARDS = 10;
 
 function wordCount(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;
@@ -46,8 +47,18 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
   const [generatingIndex, setGeneratingIndex] = React.useState<number | null>(null);
   const [fontsReady, setFontsReady] = React.useState(false);
   const [backgroundFileName, setBackgroundFileName] = React.useState("");
+  const [maxCards, setMaxCards] = React.useState<number>(DEFAULT_MAX_CARDS);
+  const [housesMode, setHousesMode] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const cardRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
+
+  React.useEffect(() => {
+    if (housesMode) {
+      setMaxCards(MAX_CARDS_HARD_LIMIT);
+    } else {
+      setMaxCards(DEFAULT_MAX_CARDS);
+    }
+  }, [housesMode]);
 
   React.useEffect(() => {
     const link = document.createElement("link");
@@ -106,7 +117,7 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify({ text: text.trim(), maxCards, mode: housesMode ? "houses" : "default" }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -116,12 +127,13 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
       if (!Array.isArray(data.carrossel)) {
         throw new Error("Resposta inesperada do servidor.");
       }
-      const generated: CarouselCard[] = data.carrossel.slice(0, MAX_CARDS).map((c: any, i: number) => ({
+      const targetCards = housesMode ? MAX_CARDS_HARD_LIMIT : Math.min(MAX_CARDS_HARD_LIMIT, Math.max(1, maxCards));
+      const generated: CarouselCard[] = data.carrossel.slice(0, targetCards).map((c: any, i: number) => ({
         ordem: typeof c.ordem === "number" ? c.ordem : i + 1,
         titulo: String(c.titulo || ""),
         texto: String(c.texto || ""),
       }));
-      while (generated.length < MAX_CARDS) {
+      while (generated.length < targetCards) {
         generated.push({ ordem: generated.length + 1, titulo: "", texto: "" });
       }
       setCards(generated);
@@ -200,6 +212,32 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
               9:16 Stories
             </button>
           </div>
+
+          <label className="flex items-center gap-2 text-[11px] text-[#3c352d]">
+            <span className="text-[#8c7f70]">Máx. slides</span>
+            <select
+              value={maxCards}
+              disabled={housesMode}
+              onChange={(e) => setMaxCards(Number(e.target.value))}
+              className="px-2 py-1 rounded-md border border-[#e6e2d8] bg-white text-[#3c352d] focus:outline-none focus:ring-2 focus:ring-[#8c6239]/30 disabled:opacity-50"
+            >
+              <option value={6}>6</option>
+              <option value={8}>8</option>
+              <option value={10}>10</option>
+              <option value={12}>12</option>
+              <option value={14}>14</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 text-[11px] text-[#3c352d] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={housesMode}
+              onChange={(e) => setHousesMode(e.target.checked)}
+              className="w-3.5 h-3.5 accent-[#3c352d]"
+            />
+            <span>Modo 12 casas (força 14 slots)</span>
+          </label>
         </div>
       </div>
 
