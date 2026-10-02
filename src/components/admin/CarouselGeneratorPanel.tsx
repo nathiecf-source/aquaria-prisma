@@ -16,7 +16,7 @@ interface CarouselCard {
 const MAX_TEXT_LENGTH = 15000;
 const MAX_BODY_CHARS = 200;
 const MAX_TITLE_WORDS = 5;
-const MAX_CARDS = 10;
+const MAX_CARDS = 12;
 
 function wordCount(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;

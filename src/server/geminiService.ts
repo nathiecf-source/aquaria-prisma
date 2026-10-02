@@ -4916,7 +4916,7 @@ const carouselContentSchema = {
     carrossel: {
       type: Type.ARRAY,
       items: carouselCardSchema,
-      description: "Sequência de cards. Máximo 10 cards. Card 1 é o gancho; último card é o fechamento/provocação.",
+      description: "Sequência de cards. Máximo 12 cards. Card 1 é o gancho; último card é o fechamento/provocação.",
     },
     legenda: { type: Type.STRING, description: "Legenda do post, 3 a 4 parágrafos curtos, com CTA sutil no final." },
   },
@@ -4927,7 +4927,7 @@ const CAROUSEL_SYSTEM_INSTRUCTION = `[PAPEL]
 Você é a IA editorial da "Aquaria / Portal 36_". Recebe um texto longo (aula, reflexão ou artigo) e o transforma em uma sequência de cards para carrossel do Instagram, além de uma legenda envolvente.
 
 [DIRETRIZES DE EDIÇÃO — CARDS]
-1. Fatiamento curto: divida o texto em NO MÁXIMO 10 cards. Pode ser menos, mas nunca mais.
+1. Fatiamento curto: divida o texto em NO MÁXIMO 12 cards. Pode ser menos, mas nunca mais.
 2. Limite rígido de caracteres: cada card deve ter NO MÁXIMO 200 caracteres no corpo. Se a ideia for longa, divida em dois cards.
 3. Ritmo de leitura: o Card 1 deve ser um "Gancho" que prenda a atenção. O último card deve conter uma provocação ou reflexão final.
 4. Títulos: todo card deve ter um título curto, no máximo 5 palavras, sempre em CAIXA ALTA.
@@ -4969,7 +4969,7 @@ function sanitizeCarousel(content: CarouselContent): CarouselContent {
   if (!Array.isArray(content.carrossel) || content.carrossel.length === 0) {
     throw new Error("O carrossel deve conter pelo menos 1 card.");
   }
-  const cards = content.carrossel.slice(0, 10).map((card, index) => ({
+  const cards = content.carrossel.slice(0, 12).map((card, index) => ({
     ordem: typeof card.ordem === "number" ? card.ordem : index + 1,
     titulo: sanitizeTitle(card.titulo),
     texto: sanitizeBody(card.texto),
