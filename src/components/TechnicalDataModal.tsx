@@ -13,6 +13,15 @@ const SIGNS_ORDER = [
   "Libra", "Escorpião", "Sagitário", "Capricórnio", "Aquário", "Peixes"
 ];
 
+function sortPlanetsBySignAndDegree(planets: any[]): any[] {
+  return [...planets].sort((a, b) => {
+    const signA = SIGNS_ORDER.indexOf(a.sign);
+    const signB = SIGNS_ORDER.indexOf(b.sign);
+    if (signA !== signB) return signA - signB;
+    return (a.degree ?? 0) - (b.degree ?? 0);
+  });
+}
+
 export default function TechnicalDataModal({
   isOpen,
   onClose,
@@ -43,10 +52,10 @@ export default function TechnicalDataModal({
 
   // 1. Tropical Calculations
   const tropicalHouses = [...(profile.tropical_natal?.houses || [])].sort((a: any, b: any) => a.house - b.house);
-  const tropicalPlanets = profile.tropical_natal?.planets || [];
+  const tropicalPlanets = sortPlanetsBySignAndDegree(profile.tropical_natal?.planets || []);
 
   // 2. Vedic / Sideral Calculations
-  const vedicPlanets = profile.vedic_natal?.planets || [];
+  const vedicPlanets = sortPlanetsBySignAndDegree(profile.vedic_natal?.planets || []);
   const lagnaSign = profile.vedic_specifics?.lagna || "Áries";
   const lagnaIndex = SIGNS_ORDER.indexOf(lagnaSign);
 

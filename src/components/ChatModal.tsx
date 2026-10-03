@@ -142,7 +142,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   const handleEventClick = (event: TransitContext) => {
     setSelectedEvent(event);
     setShowEventsSheet(false);
-    sendMessage(event.event, { transitContext: event, invisible: true });
+    const planet = event.planet || event.event?.split(/\s+/)[0] || "planeta";
+    const sign = event.sign || "signo";
+    const degrees = Math.floor((event.longitude ?? 0) % 30);
+    setInput(`Trânsito de ${planet} - ${degrees} graus de ${sign} - `);
+    inputRef.current?.focus();
   };
 
   const handleSavePdf = async () => {
