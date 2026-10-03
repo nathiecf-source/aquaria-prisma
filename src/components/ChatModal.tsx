@@ -142,11 +142,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   const handleEventClick = (event: TransitContext) => {
     setSelectedEvent(event);
     setShowEventsSheet(false);
-    const planet = event.planet || event.event?.split(/\s+/)[0] || "planeta";
-    const sign = event.sign || "signo";
-    const degrees = Math.floor((event.longitude ?? 0) % 30);
-    setInput(`Trânsito de ${planet} - ${degrees} graus de ${sign} - `);
-    inputRef.current?.focus();
+    sendMessage(event.event, { transitContext: event, invisible: true });
   };
 
   const handleSavePdf = async () => {
@@ -389,6 +385,18 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             onSubmit={handleSend}
             className="px-5 py-4"
           >
+            {activeTab === "ciclos" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setInput("Quero entender outro trânsito: Trânsito de [planeta] - [x] graus de [signo] - ")
+                }
+                disabled={isLoading}
+                className="mb-2 w-full text-left text-xs px-3 py-2 rounded-xl border border-[#d9d4c7] bg-white/60 text-[#4a3f35] hover:bg-white hover:border-[#c5a880] transition-colors disabled:opacity-50"
+              >
+                Quero entender outro trânsito: Trânsito de [planeta] - [x] graus de [signo] -
+              </button>
+            )}
             <div className="flex items-end gap-2">
               <input
                 ref={inputRef}
