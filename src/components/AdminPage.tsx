@@ -5,6 +5,7 @@ import { DailySkyStoryCard } from "./DailySkyStoryCard";
 import { DailySkySummaryCard } from "./DailySkySummaryCard";
 import { DailySkyNakshatraCard } from "./DailySkyNakshatraCard";
 import { DailySkyPillarsCard } from "./DailySkyPillarsCard";
+import { DailySkySymbolCard } from "./DailySkySymbolCard";
 import { Calendar, Mail, Send, Bell, Rocket, Copy, Download, Sparkles } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { downloadImage, generatePngFromElement } from "./share/shareUtils";
@@ -178,6 +179,7 @@ interface DailySkyResult {
     nakshatraCardTitle: string;
     nakshatraCardText: string;
     nakshatraDeepText: string;
+    symbolCardText: string;
     pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
     feedParagraphs: string[];
     closing: string;
@@ -243,6 +245,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   const storyCardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const nakshatraCardRef = useRef<HTMLDivElement | null>(null);
   const pillarsCardRef = useRef<HTMLDivElement | null>(null);
+  const symbolCardRef = useRef<HTMLDivElement | null>(null);
   const summaryCardRef = useRef<HTMLDivElement | null>(null);
 
   const [userEvents, setUserEvents] = useState<any[]>([]);
@@ -405,6 +408,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     if (!dailySkyResult) return;
     await downloadDailySkyCard(storyCardRefs.current[0], `aquaria-ceu-${dailySkyDate}-ceu-de-hoje.png`);
     await downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`);
+    await downloadDailySkyCard(symbolCardRef.current, `aquaria-ceu-${dailySkyDate}-simbolo-nakshatra.png`);
     await downloadDailySkyCard(pillarsCardRef.current, `aquaria-ceu-${dailySkyDate}-pilares-do-dia.png`);
     await downloadDailySkyCard(summaryCardRef.current, `aquaria-ceu-${dailySkyDate}-resumo.png`);
   }
@@ -1639,6 +1643,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                       {index === 0 && <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyNakshatraCard ref={nakshatraCardRef} date={dailySkyResult.date} title={dailySkyResult.content.nakshatraCardTitle} pada={dailySkyResult.payload.vedic.nakshatra.pada} padaElement={dailySkyResult.payload.vedic.nakshatra.padaElement} activeUntil={dailySkyResult.payload.vedic.nakshatra.activeUntil} next={dailySkyResult.payload.vedic.nakshatra.next} text={dailySkyResult.content.nakshatraCardText} /><button onClick={() => downloadDailySkyCard(nakshatraCardRef.current, `aquaria-ceu-${dailySkyDate}-nakshatra.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>}
                     </React.Fragment>
                   ))}
+                  <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkySymbolCard ref={symbolCardRef} date={dailySkyResult.date} nakshatraName={dailySkyResult.payload.vedic.nakshatra.name} symbolTitle={dailySkyResult.payload.vedic.nakshatra.symbol} text={dailySkyResult.content.symbolCardText} /><button onClick={() => downloadDailySkyCard(symbolCardRef.current, `aquaria-ceu-${dailySkyDate}-simbolo-nakshatra.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>
                   <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm"><DailySkyPillarsCard ref={pillarsCardRef} date={dailySkyResult.date} vedic={dailySkyResult.payload.vedic} guidance={dailySkyResult.content.pillarGuidance} /><button onClick={() => downloadDailySkyCard(pillarsCardRef.current, `aquaria-ceu-${dailySkyDate}-pilares-do-dia.png`)} className="mt-3 flex items-center gap-1 rounded-lg bg-[#3c352d] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white"><Download className="h-3.5 w-3.5" /> PNG</button></div>
                   <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-4 shadow-sm">
                     <DailySkySummaryCard ref={summaryCardRef} theme={dailySkyResult.content.theme} summary={dailySkyResult.content.cardSummary} date={dailySkyResult.date} />
@@ -1657,7 +1662,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <button onClick={() => copyDailySkyText(`TEMA DO DIA\n${dailySkyResult.content.theme}\n\n${dailySkyResult.content.stories.map((story) => `TELA ${story.screen}: ${story.title}\n${story.text}`).join("\n\n")}\n\nNAKSHATRA DO DIA\n${dailySkyResult.content.nakshatraDeepText}\n\nLEGENDA\n${[...dailySkyResult.content.feedParagraphs, dailySkyResult.content.closing].join("\n\n")}`)} className="flex items-center gap-2 rounded-lg border border-[#3c352d] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#3c352d]"><Copy className="h-4 w-4" /> Copiar roteiro completo</button>
+                  <button onClick={() => copyDailySkyText(`TEMA DO DIA\n${dailySkyResult.content.theme}\n\n${dailySkyResult.content.stories.map((story) => `TELA ${story.screen}: ${story.title}\n${story.text}`).join("\n\n")}\n\nNAKSHATRA DO DIA\n${dailySkyResult.content.nakshatraDeepText}\n\nSÍMBOLO SAGRADO\n${dailySkyResult.content.symbolCardText}\n\nLEGENDA\n${[...dailySkyResult.content.feedParagraphs, dailySkyResult.content.closing].join("\n\n")}`)} className="flex items-center gap-2 rounded-lg border border-[#3c352d] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#3c352d]"><Copy className="h-4 w-4" /> Copiar roteiro completo</button>
                   <button onClick={downloadAllDailySkyCards} className="flex items-center gap-2 rounded-lg bg-[#8c6239] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white"><Download className="h-4 w-4" /> Baixar todos os PNGs</button>
                 </div>
 

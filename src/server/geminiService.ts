@@ -8,6 +8,7 @@ import { getPlanetFichamento, PlanetFichamentoEntry } from "./planetFichamento";
 import type { SolarReturnAnalysis } from "./solarReturnEngine";
 import type { DailySkyPayload } from "./dailySkyEngine";
 import { getNakshatraKnowledge } from "../knowledge/nakshatras";
+import { getNakshatraSymbolMeaning } from "../knowledge/nakshatraSymbols";
 
 // Verbos arquetípicos determinísticos para cada signo — aplicados ao domínio do planeta/ponto.
 // O domínio é fornecido pelo planeta (Sol=identidade, Lua=emocional, Ascendente=estilo de presença,
@@ -4783,6 +4784,7 @@ export interface DailySkyContent {
   nakshatraCardTitle: string;
   nakshatraCardText: string;
   nakshatraDeepText: string;
+  symbolCardText: string;
   pillarGuidance: { vara: string; tithi: string; yoga: string; karana: string };
   feedParagraphs: string[];
   closing: string;
@@ -4798,12 +4800,13 @@ const dailySkyContentSchema = {
     nakshatraCardTitle: { type: Type.STRING },
     nakshatraCardText: { type: Type.STRING },
     nakshatraDeepText: { type: Type.STRING },
+    symbolCardText: { type: Type.STRING },
     pillarGuidance: { type: Type.OBJECT, properties: { vara: { type: Type.STRING }, tithi: { type: Type.STRING }, yoga: { type: Type.STRING }, karana: { type: Type.STRING } }, required: ["vara", "tithi", "yoga", "karana"] },
     feedParagraphs: { type: Type.ARRAY, items: { type: Type.STRING } },
     closing: { type: Type.STRING },
     cardSummary: { type: Type.STRING },
   },
-  required: ["theme", "stories", "aspectCoverage", "nakshatraCardTitle", "nakshatraCardText", "nakshatraDeepText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
+  required: ["theme", "stories", "aspectCoverage", "nakshatraCardTitle", "nakshatraCardText", "nakshatraDeepText", "symbolCardText", "pillarGuidance", "feedParagraphs", "closing", "cardSummary"],
 };
 
 export async function generateDailySkyContent(payload: DailySkyPayload): Promise<DailySkyContent> {
@@ -4842,6 +4845,7 @@ INSTRUÇÕES ESPECÍFICAS:
 - nakshatraCardTitle: o subtítulo da Nakshatra no formato "[NOME DA NAKSHATRA] · [PALAVRA 1] & [PALAVRA 2]" em CAIXA ALTA, onde as duas palavras-chave resumem a essência e o propósito prático da Nakshatra (ex: "UTTARA ASHADHA · CONSTRUÇÃO & ÉTICA"). Não use a tradução literal do símbolo.
 - nakshatraCardText: texto em três camadas obrigatórias, em 3 a 5 frases curtas. Camada 1 — introduza o símbolo oficial de forma fluida e explique o que ele representa na prática (ex: "Representada pela presa de elefante, esta constelação simboliza a força inabalável para concluir grandes projetos."). Camada 2 — as qualidades do dia e o comportamento recomendado, sem nenhuma divindade. Camada 3 — o contexto da Pada ativa, correlacionando número e elemento (Fogo, Terra, Ar, Água) com uma postura prática. Tom direto e acolhedor, focado em como agir hoje, sem jargões esotéricos e sem citar signos tropicais.
 - pillarGuidance: cada orientação (Vāra, Tithi, Yoga, Karana) em UMA frase concreta e prática. REGRAS RÍGIDAS: (a) é proibido usar verbos no imperativo — nada de "conclua", "reduza", "dedique", "entregue-se"; use apenas construções sugestivas como "O dia favorece...", "O dia pede...", "Dia auspicioso para...", "A atmosfera é propícia para...", "O momento facilita...". (b) A sugestão deve ser CONCRETA e acionável no cotidiano — cite gestos específicos: encerrar assuntos antigos, ouvir mais e falar menos, se expressar com coragem, iniciar projetos, assinar contratos, revisar documentos, quitar pendências, organizar finanças, ter conversas difíceis, negociar acordos, limpar espaços, cuidar do corpo, descansar, evitar decisões precipitadas. É PROIBIDO cair em abstrações vagas como "acolher a energia", "honrar o processo", "ir com o fluxo", "conectar-se consigo" ou variações. (c) Traduza o purpose/focus/ruler recebido no payload diretamente para a ação: cada pilar deve sugerir um gesto de natureza diferente (iniciar, concluir, negociar, ouvir, limpar, consolidar, observar, cuidar), sem repetir estrutura, verbo ou tema entre os quatro textos — dois pilares NUNCA podem soar como a mesma recomendação reescrita. (d) O texto NUNCA deve repetir o rótulo do pilar, o termo em sânscrito nem os qualificadores do subtítulo (ex: não repita LUA, DASHAMI, ATIGANDA, GARA). (e) Inicie diretamente com a construção sugestiva, sem prefixos, numerações ou rótulos antes de dois-pontos.
+- symbolCardText: texto para o card "Símbolo Sagrado" da Nakshatra, em 2 a 3 parágrafos curtos. Use obrigatoriamente a SIMBOLOGIA PROFUNDA fornecida no conhecimento de referência como base. Estruture em duas camadas: (1) o que o símbolo é fisicamente e o que ele representa como metáfora do funcionamento da mente e da alma; (2) o significado profundo/esotérico — como essa imagem orienta a psique e a jornada espiritual hoje. Sem nomes de divindades, sem jargão sânscrito além do nome da Nakshatra, tom literário e acolhedor. Não repita o conteúdo do nakshatraCardText.
 - feedParagraphs: exatamente três parágrafos curtos: (1) cenário tropical com aspectos do dia; (2) profundidade da Nakshatra como frequência de fundo; (3) ação e desapego a partir de Tithi, Yoga e Karana.
 - closing: uma pergunta reflexiva que ajude a pessoa a alinhar sua vontade com a qualidade do tempo, convidando ao comentário.
 
@@ -4872,15 +4876,26 @@ ${(() => {
     `Temas kármicos: ${nk.karmicThemes.join(" | ")}`,
     `Qualidades práticas: ${nk.practicalQualities}`,
   ].join("\n");
+})()}
+
+SIMBOLOGIA PROFUNDA DA NAKSHATRA ATIVA (base obrigatória para symbolCardText):
+${(() => {
+  const sm = getNakshatraSymbolMeaning(payload.vedic.nakshatra.name);
+  if (!sm) return `(simbologia não catalogada — interprete o símbolo clássico com conhecimento védico)`;
+  return [
+    `Símbolo sagrado: ${sm.symbolTitle}`,
+    `O que representa: ${sm.physicalMeaning}`,
+    `Significado profundo: ${sm.deepMeaning}`,
+  ].join("\n");
 })()}`;
   const client = getGeminiClient();
   const response = await callGeminiWithRetry(client, {
     model: "gemini-3.5-flash-lite",
     contents: `Gere o Céu do Dia para as redes sociais com base neste payload técnico:\n${JSON.stringify(payload, null, 2)}`,
-    config: { systemInstruction, temperature: 0.5, maxOutputTokens: 3072, responseMimeType: "application/json", responseSchema: dailySkyContentSchema },
+    config: { systemInstruction, temperature: 0.5, maxOutputTokens: 3584, responseMimeType: "application/json", responseSchema: dailySkyContentSchema },
   });
   const parsed = JSON.parse((response.text || "{}").replace(/```json\s*/g, "").replace(/```/g, "").trim());
-  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 1 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardTitle || !parsed.nakshatraCardText || !parsed.nakshatraDeepText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
+  if (!parsed.theme || !Array.isArray(parsed.stories) || parsed.stories.length !== 1 || !Array.isArray(parsed.aspectCoverage) || !parsed.nakshatraCardTitle || !parsed.nakshatraCardText || !parsed.nakshatraDeepText || !parsed.symbolCardText || !parsed.pillarGuidance?.vara || !parsed.pillarGuidance?.tithi || !parsed.pillarGuidance?.yoga || !parsed.pillarGuidance?.karana || !Array.isArray(parsed.feedParagraphs) || parsed.feedParagraphs.length !== 3) throw new Error("Gemini retornou uma estrutura inválida para o Céu do Dia.");
   const expectedIds = payload.tropical.exactMoonAspects.map((aspect) => aspect.id).sort();
   const coveredIds = parsed.aspectCoverage.map((item: any) => String(item.aspectId)).sort();
   if (JSON.stringify(expectedIds) !== JSON.stringify(coveredIds)) throw new Error("Gemini omitiu ou alterou aspectos exatos na auditoria editorial.");
