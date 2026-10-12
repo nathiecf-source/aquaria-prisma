@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { normalizeLang } from "../lib/lang";
 
 export type ChatMessageRole = "user" | "bot";
 
@@ -27,6 +29,7 @@ export interface SendMessageOptions {
 }
 
 export function useChat(userId: string | undefined) {
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -77,6 +80,7 @@ export function useChat(userId: string | undefined) {
             mode,
             history: messages,
             transitContext: options?.transitContext,
+            lang: normalizeLang(i18n.language),
           }),
         });
 
@@ -107,14 +111,14 @@ export function useChat(userId: string | undefined) {
           ...prev,
           {
             role: "bot",
-            text: "Perdão, houve uma interferência em nossa conexão cósmica. Poderia tentar novamente?",
+            text: t("chat.error", "Perdão, houve uma interferência em nossa conexão cósmica. Poderia tentar novamente?"),
           },
         ]);
       } finally {
         setIsLoading(false);
       }
     },
-    [userId, mode, messages]
+    [userId, mode, messages, t, i18n.language]
   );
 
   const reset = useCallback(() => {

@@ -13,6 +13,8 @@ import { Accordion } from "./Accordion";
 import PlanetGlyphBar from "./PlanetGlyphBar";
 import { PlanetaryDynamicsPanel } from "./PlanetaryDynamicsPanel";
 import { hasPlusAccess, hasChamadoFeature } from "../lib/access";
+import { useTranslation } from "react-i18next";
+import { normalizeLang } from "../lib/lang";
 import { splitDynamicsCombinations } from "../lib/dynamicsFilter";
 import ChamadoTimer from "./ChamadoTimer";
 import PlanetReadingPanel from "./PlanetReadingPanel";
@@ -533,6 +535,8 @@ export default function AstrologyMandala({
   const [activeTransit, setActiveTransit] = React.useState<ActiveTransit | null>(null);
   const subscriptionTier: "FREE" | "PLUS" = hasPlusAccess(userProfile) ? "PLUS" : "FREE";
   const portalAge = calculateAge(profile?.birthData?.birthDate);
+  const { i18n } = useTranslation();
+  const appLang = normalizeLang(i18n.language);
 
   // Cosmic events do dia (público — todos os usuários)
   const cosmicCheckedRef = React.useRef(false);
@@ -617,7 +621,7 @@ export default function AstrologyMandala({
     fetch("/api/generate-transit-cycles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, userId: userProfile?.id })
+      body: JSON.stringify({ profile, userId: userProfile?.id, lang: appLang })
     })
     .then(res => res.json())
     .then(data => {
@@ -635,7 +639,7 @@ export default function AstrologyMandala({
     fetch("/api/cycles/dashas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, userId: userProfile.id, subscriptionTier })
+      body: JSON.stringify({ profile, userId: userProfile.id, subscriptionTier, lang: appLang })
     })
     .then(res => res.json())
     .then(data => {
@@ -652,7 +656,7 @@ export default function AstrologyMandala({
     fetch("/api/cycles/profection", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, userId: userProfile?.id, subscriptionTier })
+      body: JSON.stringify({ profile, userId: userProfile?.id, subscriptionTier, lang: appLang })
     })
     .then(res => res.json())
     .then(data => {
@@ -669,7 +673,7 @@ export default function AstrologyMandala({
     fetch("/api/cycles/rapid-activations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, userId: userProfile?.id, subscriptionTier })
+      body: JSON.stringify({ profile, userId: userProfile?.id, subscriptionTier, lang: appLang })
     })
     .then(res => res.json())
     .then(data => {
@@ -678,6 +682,23 @@ export default function AstrologyMandala({
     .catch(err => console.error("Erro Ativações Rápidas:", err))
     .finally(() => setIsFetchingRapidActivations(false));
   };
+
+  // Troca de idioma: invalida conteúdo gerado já carregado e regera no novo idioma
+  const prevLangRef = React.useRef(appLang);
+  React.useEffect(() => {
+    if (prevLangRef.current === appLang) return;
+    prevLangRef.current = appLang;
+    setTransits(null);
+    setDashaText(null);
+    setProfectionData(null);
+    setRapidActivationsData(null);
+    if (profile && isTransitsModalOpen) {
+      fetchDashas();
+      fetchTransits();
+      fetchProfection();
+      fetchRapidActivations();
+    }
+  }, [appLang]);
 
   const handleOpenTransits = (targetTab?: TransitPanelTab) => {
     setIsPanelOpen(false);
