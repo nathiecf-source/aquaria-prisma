@@ -1,21 +1,5 @@
 import React from "react";
 import { Loader2, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import {
-  planetKey,
-  signKey,
-  parseAspectToNatal,
-  natureKey,
-  dignityInfo,
-  dignityShortKey,
-  houseClassKey,
-  houseTypeKey,
-  ASPECT_GLYPHS,
-  restructuringCycleKey,
-  dashaSectionKey,
-} from "../i18n/canonical";
-import { normalizeLang } from "../lib/lang";
-import { LanguageSelector } from "./LanguageSelector";
 
 const BreathingLoader: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
   <div className="flex flex-col items-center justify-center py-16 space-y-6 text-center">
@@ -132,15 +116,14 @@ interface TransitPanelProps {
 }
 
 const PLANET_ICONS: Record<string, string> = {
-  sun: "☀️", moon: "🌙", mercury: "☿", venus: "♀️", mars: "♂️",
-  jupiter: "♃", saturn: "♄", uranus: "⛢", neptune: "♆", pluto: "♇",
-  northNode: "☊", southNode: "☋", rahu: "☊", ketu: "☋",
+  Sol: "☀️", Lua: "🌙", "Mercúrio": "☿", "Vênus": "♀️", Marte: "♂️",
+  "Júpiter": "♃", Saturno: "♄", Urano: "⛢", Netuno: "♆", "Plutão": "♇",
 };
 
 const EXCLUSIONS = /Nodo|Node|Lilith|Ascendente|Ascendant|Meio do Céu|MC|Parte|Fortuna|Rahu|Ketu/i;
 
-function formatTransitDate(value: string, lang: string): string {
-  return new Date(value).toLocaleDateString(lang, {
+function formatTransitDate(value: string): string {
+  return new Date(value).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -264,6 +247,21 @@ function getRitmoBadge(ritmo: string): string {
 
 // ─── Lista de Trânsitos com carregamento sob demanda ─────────────────────────
 
+const TRANSIT_HOUSE_THEMES: Record<number, string> = {
+  1:  "Identidade e Presença Física",
+  2:  "Valores e Recursos Naturais",
+  3:  "Comunicação, Aprendizado e Cotidiano",
+  4:  "Lar, Raízes e Base Emocional",
+  5:  "Criatividade, Prazer e Autenticidade",
+  6:  "Rotina, Corpo e Serviço",
+  7:  "Relacionamentos, Parcerias e o Espelho do Outro",
+  8:  "Transformações, Heranças e as Profundezas da Troca",
+  9:  "Visão de Mundo, Crenças e Sentido da Jornada",
+  10: "Realização, Direção e Legado",
+  11: "Grupos, Causas e Visão de Futuro",
+  12: "Interioridade, Inconsciente e Espiritualidade",
+};
+
 function groupTransitsByHouse(transits: TransitSummary[]): [number, TransitSummary[]][] {
   const map = new Map<number, TransitSummary[]>();
   for (const t of transits) {
@@ -288,14 +286,13 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
   profile,
   onActivate,
 }) => {
-  const { t: tr, i18n } = useTranslation();
   const [details, setDetails] = React.useState<Record<string, TransitDetail | "loading" | "error" | null>>({});
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const inFlight = React.useRef(new Set<string>());
 
   const getKey = (t: TransitSummary) => `${t.planet}|${t.aspectToNatal}`;
 
-  const fetchDetail = React.useCallback(async (t: TransitSummary, key: string, lang: string) => {
+  const fetchDetail = React.useCallback(async (t: TransitSummary, key: string) => {
     if (inFlight.current.has(key)) return;
     inFlight.current.add(key);
     setDetails(prev => ({ ...prev, [key]: "loading" }));
@@ -305,7 +302,7 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
       const res = await fetch("/api/generate-transit-cycle-detail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, userId, transit: t, lang }),
+        body: JSON.stringify({ profile, userId, transit: t }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -321,20 +318,12 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
     }
   }, [profile, userId]);
 
-  // Troca de idioma: limpa detalhes/estado para regerar no novo idioma
-  const currentLang = normalizeLang(i18n.language);
-  React.useEffect(() => {
-    setDetails({});
-    setExpanded({});
-    inFlight.current.clear();
-  }, [currentLang]);
-
   // Pré-carrega o primeiro trânsito em background para melhorar a percepção de velocidade
   React.useEffect(() => {
     if (!transits[0]) return;
     const key = getKey(transits[0]);
-    fetchDetail(transits[0], key, currentLang);
-  }, [transits, fetchDetail, currentLang]);
+    fetchDetail(transits[0], key);
+  }, [transits, fetchDetail]);
 
   const grouped = React.useMemo(() => groupTransitsByHouse(transits), [transits]);
 
@@ -344,11 +333,11 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
         <div key={house}>
           <div className="flex items-center gap-2 mb-3 px-1">
             <span className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest bg-[#8c7f70]/8 border border-[#8c7f70]/15 rounded px-1.5 py-0.5 flex-shrink-0">
-              {tr("cycles.house", { house })}
+              Casa {house}
             </span>
             <div className="h-px flex-1 bg-[#8c7f70]/10" />
             <span className="font-serif text-xs text-[#3c352d]">
-              {tr(`houseThemes.h${house}`, { defaultValue: "" }) || tr("cycles.sphereFallback", { house })}
+              {TRANSIT_HOUSE_THEMES[house] || `Esfera ${house}`}
             </span>
           </div>
           <div className="space-y-3">
@@ -361,9 +350,9 @@ const TransitAccordionList: React.FC<TransitAccordionListProps> = ({
                 onToggle={() => {
                   const key = getKey(t);
                   setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-                  if (!details[key]) fetchDetail(t, key, currentLang);
+                  if (!details[key]) fetchDetail(t, key);
                 }}
-                onRetry={() => fetchDetail(t, getKey(t), currentLang)}
+                onRetry={() => fetchDetail(t, getKey(t))}
                 onActivate={onActivate}
               />
             ))}
@@ -391,46 +380,7 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
   onRetry,
   onActivate,
 }) => {
-  const { t: tr, i18n } = useTranslation();
-  const lang = i18n.language;
-
-  const pKey = planetKey(transit.planet);
-  const icon = (pKey && PLANET_ICONS[pKey]) || "✦";
-  const planetLabel = pKey ? tr(`planets.${pKey}`) : transit.planet;
-
-  const { aspect: aspectK, natalPlanet } = parseAspectToNatal(transit.aspectToNatal);
-  const natalK = planetKey(natalPlanet);
-  const natalLabel = natalK ? tr(`planets.${natalK}`) : (natalPlanet ?? "");
-  const aspectLabel = aspectK ? tr(`aspects.${aspectK}`) : transit.aspectToNatal;
-  const glyph = aspectK ? (ASPECT_GLYPHS[aspectK] ?? "") : "";
-  const aspectTitle = aspectK && natalLabel
-    ? tr("cycles.aspectWithNatal", { aspect: aspectLabel, planet: natalLabel })
-    : transit.aspectToNatal;
-
-  const signLabel = (name: string | null | undefined) => {
-    const k = signKey(name);
-    return k ? tr(`signs.${k}`) : (name ?? "");
-  };
-
-  const nKey = natureKey(transit.nature?.label);
-  const dKey = dignityShortKey(transit.nature?.dignityShort);
-  const structuralLayer = transit.terrain_mode === "tropical"
-    ? tr("cycles.seals.layerWholeSign")
-    : tr("cycles.seals.layerSideral");
-  const tropicalSeal = tr("cycles.seals.psych", {
-    planet: planetLabel,
-    sign: signLabel(transit.tropical_sign_at_peak ?? transit.tropical_sign),
-    glyph,
-    natal: natalLabel,
-    house: transit.tropical_house,
-  });
-  const sideralSeal = tr("cycles.seals.structural", {
-    layer: structuralLayer,
-    planet: planetLabel,
-    sign: signLabel(transit.structural_sign),
-    dignity: tr(`dignities.${dKey}`),
-    house: transit.structural_house,
-  });
+  const icon = PLANET_ICONS[transit.planet] || "✦";
 
   const activePayload: ActiveTransit = {
     planetaTransito: transit.planet,
@@ -441,10 +391,10 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
   };
 
   const statusLabel = transit.status === "active"
-    ? tr("cycles.status.active")
+    ? "ATIVO AGORA"
     : transit.daysUntilPeak != null
-      ? tr("cycles.status.upcomingDays", { days: transit.daysUntilPeak })
-      : tr("cycles.status.upcoming");
+      ? `ATIVAÇÃO FUTURA EM ${transit.daysUntilPeak} DIAS`
+      : "ATIVAÇÃO FUTURA";
 
   const isUpcoming = transit.status === "upcoming";
 
@@ -467,7 +417,7 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-base leading-none flex-shrink-0">{icon}</span>
             <span className={`font-serif text-[13.5px] leading-snug truncate ${isUpcoming ? "text-[#5c544d]" : "text-[#3c352d]"}`}>
-              {planetLabel} {aspectTitle}
+              {transit.planet} {transit.aspectToNatal}
             </span>
           </div>
           <span className="font-mono text-[9px] uppercase tracking-widest text-[#8c7f70] pl-7">
@@ -483,19 +433,19 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
         <div className="px-5 pb-5 space-y-4 border-t border-[#8c7f70]/10 pt-4">
           {/* Selos técnicos */}
           <div className="space-y-1.5 text-[11px] text-[#5c544d] font-mono bg-[#f4f1eb]/60 p-3 rounded-lg border border-[#8c7f70]/10">
-            <p>{tropicalSeal}</p>
-            <p>{sideralSeal}</p>
+            <p>{transit.seals.tropicalSeal}</p>
+            <p>{transit.seals.sideralSeal}</p>
           </div>
 
           <section className="space-y-2">
             <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#5c4d66]">
-              {tr("cycles.data.title")}
+              🏛 Dados do Ciclo
             </h4>
             <div className="grid gap-1 font-sans text-[12px] text-[#3c352d]">
-              <p><span className="font-medium">{tr("cycles.data.orbEntry")}</span> {formatTransitDate(transit.activationDate, lang)}</p>
-              <p><span className="font-medium">{tr("cycles.data.exactTrigger")}</span> {transit.peakDate ? formatTransitDate(transit.peakDate, lang) : tr("cycles.data.peakPassed")}</p>
-              <p><span className="font-medium">{tr("cycles.data.orbExit")}</span> {formatTransitDate(transit.exitDate, lang)}</p>
-              <p><span className="font-medium">{tr("cycles.data.nature")}</span> {tr(`nature.${nKey}.label`)} — {tr(`nature.${nKey}.sentence`)}</p>
+              <p><span className="font-medium">Entrada no orbe:</span> {formatTransitDate(transit.activationDate)}</p>
+              <p><span className="font-medium">Gatilho exato:</span> {transit.peakDate ? formatTransitDate(transit.peakDate) : "pico recém-passado; trânsito ainda dentro do orbe"}</p>
+              <p><span className="font-medium">Saída do orbe:</span> {formatTransitDate(transit.exitDate)}</p>
+              <p><span className="font-medium">Natureza do evento:</span> {transit.nature.label} — {transit.nature.sentence}</p>
             </div>
           </section>
 
@@ -504,7 +454,7 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
               <div className="flex items-center gap-3 rounded-lg bg-[#8c6239]/5 p-4 border border-[#8c6239]/10">
                 <Loader2 className="w-4 h-4 text-[#8c6239] animate-spin" />
                 <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest">
-                  {tr("cycles.preparing")}
+                  Preparando desafio e integração...
                 </p>
               </div>
             )}
@@ -512,10 +462,10 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
             {detail === "error" && (
               <div className="rounded-lg bg-[#8c6239]/5 p-4 border border-[#8c6239]/10 space-y-3">
                 <p className="font-sans text-[12px] text-[#5c544d]">
-                  {tr("cycles.detailError")}
+                  A interpretação aprofundada demorou mais que o esperado. Os dados astrológicos acima continuam disponíveis.
                 </p>
                 <button type="button" onClick={onRetry} className="font-mono text-[10px] uppercase tracking-widest text-[#8c6239] hover:underline">
-                  {tr("cycles.retry")}
+                  Tentar novamente
                 </button>
               </div>
             )}
@@ -524,7 +474,7 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
               <>
                 <section>
                   <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#8c6239] mb-2">
-                    {tr("cycles.challenge")}
+                    ⚡ O Desafio Estrutural & Interno
                   </h4>
                   <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
                     <Markdown rehypePlugins={[rehypeSanitize]}>{detail.desafio}</Markdown>
@@ -533,7 +483,7 @@ const TransitAccordion: React.FC<TransitAccordionProps> = ({
 
                 <section className="rounded-lg bg-[#3c6e4a]/5 p-4 border border-[#3c6e4a]/15">
                   <h4 className="font-sans text-[11px] font-semibold uppercase tracking-widest text-[#3c6e4a] mb-2">
-                    {tr("cycles.integration")}
+                    🌿 A Integração & Prática Contemplativa
                   </h4>
                   <div className="font-sans text-[13px] text-[#3c352d] leading-relaxed">
                     <Markdown rehypePlugins={[rehypeSanitize]}>{detail.integracao}</Markdown>
@@ -559,6 +509,14 @@ interface DashaSection {
   index: number;
 }
 
+const TOP_LEVEL_DASHA_HEADINGS = [
+  "sua fase atual",
+  "o grande oceano",
+  "a correnteza",
+  "a onda",
+  "o desafio",
+  "a sintese",
+];
 
 function normalizeHeading(title: string): string {
   return title
@@ -584,7 +542,7 @@ function parseDashaSections(text: string): DashaSection[] {
     const title = titleMatch ? titleMatch[1].trim() : "";
     const normalizedTitle = normalizeHeading(title);
 
-    if (dashaSectionKey(normalizedTitle) !== null) {
+    if (TOP_LEVEL_DASHA_HEADINGS.includes(normalizedTitle)) {
       // Fecha a seção anterior, se existir
       if (currentSection) {
         const content = currentSection.lines.slice(1).join("\n").trim();
@@ -624,7 +582,7 @@ function parseDashaSections(text: string): DashaSection[] {
 }
 
 function splitDashaGeography(content: string): { body: string; geography?: string } {
-  const match = content.match(/\n(?:\*\*)?(?:A geografia de|La geograf[ií]a de|The geography of)\s+([^\n]+?)\s+(?:no mapa natal|en la carta natal|in the natal chart)(?:\*\*)?\n/i);
+  const match = content.match(/\n(?:\*\*)?A geografia de ([^\n]+) no mapa natal(?:\*\*)?\n/);
   if (!match || match.index === undefined) return { body: content };
   const body = content.slice(0, match.index).trim();
   const rawHeading = match[0].trim().replace(/^\*\*|\*\*$/g, "");
@@ -634,12 +592,8 @@ function splitDashaGeography(content: string): { body: string; geography?: strin
 }
 
 const DashaAccordion: React.FC<{ section: DashaSection }> = ({ section }) => {
-  const { t: tr } = useTranslation();
   const [expanded, setExpanded] = React.useState(true);
-  const sectionKey = dashaSectionKey(normalizeHeading(section.title));
-  const title = sectionKey ? tr(`dasha.sections.${sectionKey}`) : section.title;
-  const pKey = planetKey(section.planet);
-  const icon = pKey ? (PLANET_ICONS[pKey] || "✦") : (section.planet ? "✦" : "");
+  const icon = section.planet ? (PLANET_ICONS[section.planet] || "✦") : "";
   const { body, geography } = splitDashaGeography(section.content);
 
   return (
@@ -652,7 +606,7 @@ const DashaAccordion: React.FC<{ section: DashaSection }> = ({ section }) => {
           <span className="font-mono text-[#8c7f70] text-[11px] tabular-nums flex-shrink-0">{section.index}.</span>
           {icon && <span className="text-base leading-none flex-shrink-0">{icon}</span>}
           <span className="font-serif text-[#3c352d] text-[13.5px] leading-snug">
-            {title}
+            {section.title}
           </span>
         </div>
         <span className="text-[#8c7f70] flex-shrink-0">
@@ -697,7 +651,6 @@ const DashaAccordion: React.FC<{ section: DashaSection }> = ({ section }) => {
 // ─── Campo de Insight interativo ────────────────────────────────────────────
 
 const InsightField: React.FC<{ transitKey: string; userId: string | null }> = ({ transitKey, userId }) => {
-  const { t: tr } = useTranslation();
   const [text, setText] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved]   = React.useState(false);
@@ -728,18 +681,18 @@ const InsightField: React.FC<{ transitKey: string; userId: string | null }> = ({
   return (
     <div className="mt-2 space-y-2">
       <p className="font-mono text-[9px] uppercase tracking-widest text-[#8c7f70]">
-        {tr("cycles.insight.label")}
+        Sinta, volte e anote
       </p>
       <textarea
         value={text}
         onChange={e => { setText(e.target.value); setSaved(false); }}
         rows={3}
-        placeholder={tr("cycles.insight.placeholder")}
+        placeholder="Sinta, volte e anote o que acessou..."
         className="w-full resize-none rounded-lg border border-[#8c7f70]/20 bg-[#faf9f6] px-4 py-3 text-[13px] font-sans text-[#3c352d] placeholder-[#8c7f70]/50 focus:outline-none focus:border-[#8c6239]/40 focus:bg-white transition-all leading-relaxed"
       />
       <div className="flex items-center justify-between">
         {saved ? (
-          <span className="font-mono text-[10px] text-[#3c6e4a] tracking-wider">{tr("cycles.insight.saved")}</span>
+          <span className="font-mono text-[10px] text-[#3c6e4a] tracking-wider">✓ Insight salvo</span>
         ) : (
           <span />
         )}
@@ -749,7 +702,7 @@ const InsightField: React.FC<{ transitKey: string; userId: string | null }> = ({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest bg-[#3c352d] text-[#f4e8d0] hover:bg-[#5c4d3d] disabled:opacity-30 transition-all"
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookOpen className="w-3 h-3" />}
-          {tr("cycles.insight.save")}
+          Salvar Insight
         </button>
       </div>
     </div>
@@ -758,54 +711,78 @@ const InsightField: React.FC<{ transitKey: string; userId: string | null }> = ({
 
 // ─── Fases Reestruturantes ───────────────────────────────────────────────────
 
-type TFn = (key: string, opts?: Record<string, unknown>) => string;
+const HOUSE_THEMES: Record<number, string> = {
+  1: "identidade e presença",
+  2: "valores e recursos",
+  3: "mente e comunicação",
+  4: "lar e fundamentos emocionais",
+  5: "criatividade e autoexpressão",
+  6: "rotina, corpo e serviço",
+  7: "relacionamentos e o outro",
+  8: "transformações e entregas profundas",
+  9: "visão de mundo e expansão",
+  10: "realização e legado",
+  11: "coletivo e futuro",
+  12: "inconsciente e espiritualidade",
+};
 
-function cycleDisplayName(cycle: RestructuringCycle, tr: TFn): string {
-  const key = restructuringCycleKey(cycle.cycleName);
-  return key ? tr(`cycles.phases.names.${key}`) : cycle.cycleName;
-}
+const UPCOMING_CYCLE_TEXT: Record<string, string> = {
+  "Retorno de Saturno": "período de revisão de estruturas, responsabilidades e legado pessoal.",
+  "Quadratura de Saturno": "período de teste de limites, ajuste de rota e consolidação de maturidade.",
+  "Oposição de Saturno": "período de revisão no meio do ciclo: o que foi construído pede avaliação.",
+  "Quadratura de Urano": "período de impulso para ruptura, independência e mudança de direção.",
+  "Oposição de Urano": "período de crise de meia-idade: liberdade, renovação e autenticidade.",
+  "Retorno de Urano": "período de fechamento de um grande ciclo de mudança e autonomia.",
+  "Quadratura de Netuno": "período de dissolução de certezas e redifinição de visão de mundo.",
+  "Quadratura de Plutão": "período de transformação profunda, crise de poder e reconstrução.",
+  "Retorno Nodal": "período de redefinição de direção, escolhas e prioridades de vida.",
+  "Oposição Nodal": "período de revisão e realinhamento entre o passado e o futuro.",
+  "Shani Sade Sati — Fase Ascendente": "início de uma fase de reestruturação emocional e responsabilização.",
+  "Shani Sade Sati — Fase de Pico": "ponto de maior pressão para maturidade emocional e reorganização interna.",
+  "Shani Sade Sati — Fase de Descida": "finalização de um ciclo profundo de aprendizado emocional.",
+  "Ardha-Ashtama Shani / Kantaka Shani da Lua": "ajuste na base emocional, lar e questões de segurança.",
+  "Ashtama Shani da Lua": "profunda transformação emocional, pedindo paciência e reconstrução gradual.",
+  "Kantaka Shani do Ascendente": "reajuste na base externa de vida, carreira e estruturas cotidianas.",
+  "Ashtama Shani do Ascendente": "período de reorganização de vitalidade, saúde e processos práticos.",
+};
 
-function activeCycleParagraph(cycle: RestructuringCycle, tr: TFn): string {
-  const houseLabel = cycle.affectedHouse
-    ? tr("cycles.phases.houseArea", {
-        house: cycle.affectedHouse,
-        theme: tr(`houseThemesShort.h${cycle.affectedHouse}`, { defaultValue: "" }) || tr("cycles.phases.themeFallback"),
-      })
-    : tr("cycles.phases.themeFallback");
-  const tradition = tr(cycle.tradition === "vedic" ? "cycles.phases.traditionVedic" : "cycles.phases.traditionTropical");
+function activeCycleParagraph(cycle: RestructuringCycle): string {
+  const house = cycle.affectedHouse ? `Casa ${cycle.affectedHouse} (${HOUSE_THEMES[cycle.affectedHouse] || "tema de vida"})` : "uma área estrutural do mapa";
+  const tradition = cycle.tradition === "vedic" ? "camada védica" : "camada tropical";
   const concurrent = cycle.concurrentTransits && cycle.concurrentTransits.length > 0
-    ? tr("cycles.phases.concurrent", { list: cycle.concurrentTransits.join(" / ") })
+    ? `Ao mesmo tempo, ${cycle.concurrentTransits.join(" e ")} atuam sobre o mesmo tema, intensificando a pressão de mudança.`
     : "";
 
-  const key = restructuringCycleKey(cycle.cycleName);
-  if (key) {
-    return tr(`cycles.phases.templates.${key}`, {
-      house: houseLabel,
-      tradition,
-      concurrent,
-    });
-  }
-  return tr("cycles.phases.defaultTemplate", {
-    name: cycle.cycleName,
-    house: houseLabel,
-    tradition,
-    concurrent,
-  });
+  const templates: Record<string, string> = {
+    "Retorno de Saturno": `Você vive um Retorno de Saturno que ressoa na ${house}. É um tempo de auditoria de estruturas, responsabilidades e legado. O que foi construído sem alma pede reorganização; o que foi feito com compromisso, solidificação. ${concurrent}`,
+    "Quadratura de Saturno": `A Quadratura de Saturno ativa a ${house}, trazendo testes de limites e ajustes de rota. A fricção pede paciência e realismo, não autopunição. ${concurrent}`,
+    "Oposição de Saturno": `A Oposição de Saturno ilumina a ${house} como ponto de revisão no meio do ciclo. É hora de avaliar o que serve e o que precisa ser reorganizado com consciência. ${concurrent}`,
+    "Quadratura de Urano": `A Quadratura de Urano desperta a ${house} com um impulso de liberdade e ruptura. Estruturas antigas podem ceder para dar lugar à autenticidade. ${concurrent}`,
+    "Oposição de Urano": `A Oposição de Urano ressoa na ${house}, acionando a necessidade de viver de acordo com quem você realmente é. A crise é de sentido, não de culpa. ${concurrent}`,
+    "Retorno de Urano": `O Retorno de Urano completa um ciclo de cerca de 84 anos na ${house}. É uma conclusão de trajetória sobre autonomia e originalidade. ${concurrent}`,
+    "Quadratura de Netuno": `A Quadratura de Netuno dissolve certezas na ${house}. Idealizações deixam de funcionar e uma nova visão de mundo emerge. ${concurrent}`,
+    "Quadratura de Plutão": `A Quadratura de Plutão escava a ${house}. É um período de transformação profunda, poder e destruição criativa do que já não sustenta. ${concurrent}`,
+    "Retorno Nodal": `O Retorno Nodal ativa a ${house}, convidando a uma redefinição de direção, escolhas e prioridades de vida. ${concurrent}`,
+    "Oposição Nodal": `A Oposição Nodal ilumina a ${house} como ponto de revisão: você equilibra o que herdou e o que escolhe construir daqui em diante. ${concurrent}`,
+    "Shani Sade Sati — Fase Ascendente": `Você está na fase ascendente do Shani Sade Sati, quando Saturno se aproxima da Lua pela ${house}. É um tempo de preparação, desapego gradual e reorganização emocional. ${concurrent}`,
+    "Shani Sade Sati — Fase de Pico": `Você vive o pico do Shani Sade Sati, com Saturno diretamente sobre a Lua (${house}). A maturidade emocional é exigida de forma intensa e concreta. ${concurrent}`,
+    "Shani Sade Sati — Fase de Descida": `Você está na fase de descida do Shani Sade Sati, com Saturno se afastando da Lua pela ${house}. O ciclo pede integração do que foi trabalhado. ${concurrent}`,
+    "Ardha-Ashtama Shani / Kantaka Shani da Lua": `O Ardha-Ashtama Shani atinge a ${house}, pedindo ajustes na base emocional, lar e questões de segurança. ${concurrent}`,
+    "Ashtama Shani da Lua": `O Ashtama Shani da Lua ressoa na ${house}, marcando um período de profunda transformação emocional. A pressão pede reconstrução gradual, não fuga. ${concurrent}`,
+    "Kantaka Shani do Ascendente": `O Kantaka Shani do Ascendente atinge a ${house}, pedindo reajuste na base externa de vida, carreira e estruturas cotidianas. ${concurrent}`,
+    "Ashtama Shani do Ascendente": `O Ashtama Shani do Ascendente atinge a ${house}, convidando a uma reorganização de vitalidade, saúde e processos práticos. ${concurrent}`,
+  };
+
+  return templates[cycle.cycleName] || `O ciclo ${cycle.cycleName} atua sobre a ${house} na ${tradition}. É um período de reestruturação que pede consciência e paciência. ${concurrent}`;
 }
 
-function upcomingCycleLine(cycle: RestructuringCycle, tr: TFn): string {
-  const key = restructuringCycleKey(cycle.cycleName);
-  const base = key
-    ? tr(`cycles.phases.upcomingText.${key}`)
-    : tr("cycles.phases.defaultUpcoming");
-  const when = cycle.startDate
-    ? tr("cycles.phases.startsIn", { year: cycle.startDate.split("-")[0] })
-    : tr("cycles.phases.approaching");
-  return `${cycleDisplayName(cycle, tr)} ${when} — ${base}`;
+function upcomingCycleLine(cycle: RestructuringCycle): string {
+  const base = UPCOMING_CYCLE_TEXT[cycle.cycleName] || `período de reestruturação e maturação.`;
+  const when = cycle.startDate ? `começa em ${cycle.startDate.split("-")[0]}` : "se aproxima";
+  return `${cycle.cycleName} ${when} — ${base}`;
 }
 
 const RestructuringPhasesAccordion: React.FC<{ cycles: RestructuringCycle[] }> = ({ cycles }) => {
-  const { t: tr } = useTranslation();
   const [expanded, setExpanded] = React.useState(true);
   const active = cycles.filter(c => c.isActive);
   const upcoming = cycles.filter(c => !c.isActive && c.type === "proximo");
@@ -819,7 +796,7 @@ const RestructuringPhasesAccordion: React.FC<{ cycles: RestructuringCycle[] }> =
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-base leading-none flex-shrink-0">◈</span>
           <span className="font-serif text-[#3c352d] text-[14px] tracking-wide">
-            {tr("cycles.phases.title")}
+            Fases Reestruturantes
           </span>
         </div>
         <span className="text-[#8c7f70] flex-shrink-0">
@@ -831,36 +808,36 @@ const RestructuringPhasesAccordion: React.FC<{ cycles: RestructuringCycle[] }> =
         <div className="px-5 pb-5 pt-4 space-y-4">
           {active.length === 0 ? (
             <p className="font-sans text-[13px] text-[#5c544d] leading-relaxed">
-              {tr("cycles.phases.none")}
+              Você não está em uma fase crítica de reestruturação profunda.
             </p>
           ) : (
             <div className="space-y-3">
               <p className="font-mono text-[9px] uppercase tracking-widest text-[#8c6239]">
-                {tr("cycles.phases.activeNow")}
+                Ativos agora
               </p>
               {active.map((cycle, idx) => (
                 <div key={idx} className="rounded-lg border border-[#8c7f70]/10 bg-white p-4 space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="font-serif text-[#3c352d] text-[13px]">
-                      {cycleDisplayName(cycle, tr)}
+                      {cycle.cycleName}
                     </span>
                     <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
                       cycle.tradition === "vedic"
                         ? "bg-[#5c4d66]/10 text-[#5c4d66] border-[#5c4d66]/20"
                         : "bg-[#8c6239]/10 text-[#8c6239] border-[#8c6239]/20"
                     }`}>
-                      {tr(cycle.tradition === "vedic" ? "cycles.phases.vedic" : "cycles.phases.tropical")}
+                      {cycle.tradition === "vedic" ? "Védico" : "Tropical"}
                     </span>
                   </div>
                   <p className="font-sans text-[12.5px] text-[#5c544d] leading-relaxed">
-                    {activeCycleParagraph(cycle, tr)}
+                    {activeCycleParagraph(cycle)}
                   </p>
                   {(cycle.startDate || cycle.endDate) && (
                     <p className="font-mono text-[9px] text-[#8c7f70]">
                       {cycle.startDate && cycle.endDate
                         ? `${cycle.startDate} → ${cycle.endDate}`
                         : cycle.startDate || cycle.endDate}
-                      {cycle.orb !== undefined && ` · ${tr("cycles.phases.orb", { orb: cycle.orb })}`}
+                      {cycle.orb !== undefined && ` · orbe ${cycle.orb}°`}
                     </p>
                   )}
                 </div>
@@ -871,13 +848,13 @@ const RestructuringPhasesAccordion: React.FC<{ cycles: RestructuringCycle[] }> =
           {upcoming.length > 0 && (
             <div className="space-y-3 pt-2 border-t border-[#8c7f70]/10">
               <p className="font-mono text-[9px] uppercase tracking-widest text-[#8c7f70]">
-                {tr("cycles.phases.upcoming")}
+                Próximos ciclos
               </p>
               <ul className="space-y-2">
                 {upcoming.map((cycle, idx) => (
                   <li key={idx} className="font-sans text-[12px] text-[#5c544d] leading-snug flex items-start gap-2">
                     <span className="text-[#8c6239] mt-1">•</span>
-                    {upcomingCycleLine(cycle, tr)}
+                    {upcomingCycleLine(cycle)}
                   </li>
                 ))}
               </ul>
@@ -912,7 +889,6 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
   subscriptionTier,
   initialTab = "dashas",
 }) => {
-  const { t: tr } = useTranslation();
   const userId: string | null = userIdProp ?? profile?.user_id ?? null;
   const [activeTab, setActiveTab] = React.useState<TransitPanelTab>(initialTab);
 
@@ -935,28 +911,27 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
       <div className="flex items-center justify-between mb-6 px-1">
         <div>
           <h2 className="font-serif text-[#3c352d] text-base tracking-widest uppercase">
-            {tr("cycles.title")}
+            Portais de Ativação
           </h2>
           <p className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest mt-0.5">
-            {tr("cycles.subtitle")}
+            Próximos 30 dias — clique para abrir
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <LanguageSelector />
+        <div className="flex gap-2">
           {onRefresh && (
             <button
               onClick={onRefresh}
               disabled={isLoading}
               className="font-mono text-[10px] text-[#8c6239] uppercase tracking-widest hover:text-[#3c352d] transition-colors px-2 py-1 rounded hover:bg-[#8c6239]/10 disabled:opacity-40"
             >
-              {isLoading ? tr("cycles.refreshing") : tr("cycles.refresh")}
+              {isLoading ? "Carregando..." : "↺ Atualizar"}
             </button>
           )}
           <button
             onClick={onClose}
             className="font-mono text-[10px] text-[#8c7f70] uppercase tracking-widest hover:text-[#3c352d] transition-colors px-2 py-1 rounded hover:bg-[#8c7f70]/10"
           >
-            {tr("cycles.close")}
+            Fechar
           </button>
         </div>
       </div>
@@ -971,7 +946,7 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
               : "border-transparent text-[#8c7f70] hover:text-[#5c4d66]"
           }`}
         >
-          {tr("cycles.tabs.dashas")}
+          A tríade do tempo cósmico
         </button>
         <button
           onClick={() => setActiveTab("portal")}
@@ -981,7 +956,7 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
               : "border-transparent text-[#8c7f70] hover:text-[#5c4d66]"
           }`}
         >
-          {age !== undefined ? tr("cycles.tabs.portalAge", { age }) : tr("cycles.tabs.portal")}
+          {age !== undefined ? `Portal dos ${age}` : "Portal do ano"}
         </button>
         <button
           onClick={() => setActiveTab("transits")}
@@ -991,7 +966,7 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
               : "border-transparent text-[#8c7f70] hover:text-[#5c4d66]"
           }`}
         >
-          {tr("cycles.tabs.transits")}
+          Ciclos planetários
         </button>
       </div>
 
@@ -999,12 +974,12 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
       {activeTab === "dashas" && (
         isLoadingDashas ? (
           <BreathingLoader
-            title={tr("cycles.loaders.dashas")}
-            subtitle={tr("cycles.loaders.breath")}
+            title="Sincronizando tríade do tempo cósmico..."
+            subtitle="Aproveite para regular sua respiração enquanto sincronizamos seus dados — este processo pode levar entre 1 e 2 minutos. Ou aproveite para fazer outras leituras enquanto sua sincronização é carregada."
           />
         ) : !dashaText ? (
           <div className="text-center py-12 text-[#8c7f70] font-sans text-sm">
-            {tr("cycles.empty")}
+            Nenhuma leitura disponível.
           </div>
         ) : (
           <div className="mb-8 pb-6">
@@ -1020,8 +995,8 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
         <div className="mb-8 pb-6">
           {(isFetchingProfection || isFetchingRapidActivations) && !profectionData && !rapidActivationsData && (
             <BreathingLoader
-              title={tr("cycles.loaders.portal")}
-              subtitle={tr("cycles.loaders.breath")}
+              title="Sincronizando portal do ano..."
+              subtitle="Aproveite para regular sua respiração enquanto sincronizamos seus dados — este processo pode levar entre 1 e 2 minutos. Ou aproveite para fazer outras leituras enquanto sua sincronização é carregada."
             />
           )}
           <SenhorDoAnoCard
@@ -1050,14 +1025,14 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
 
           {isLoading && !transits && (
             <BreathingLoader
-              title={tr("cycles.loaders.transits")}
-              subtitle={tr("cycles.loaders.breath")}
+              title="Sincronizando leitura dos próximos 30 dias..."
+              subtitle="Aproveite para regular sua respiração enquanto sincronizamos seus dados — este processo pode levar entre 1 e 2 minutos. Ou aproveite para fazer outras leituras enquanto sua sincronização é carregada."
             />
           )}
 
           {!isLoading && !transits && (
             <div className="text-center py-12 text-[#8c7f70] font-sans text-sm">
-              {tr("cycles.empty")}
+              Nenhuma leitura disponível.
             </div>
           )}
 
@@ -1066,13 +1041,13 @@ const TransitPanel: React.FC<TransitPanelProps> = ({
               {transits.length === 0 ? (
                 <div className="rounded-xl border border-[#8c7f70]/15 bg-[#faf9f6] px-6 py-8 text-center">
                   <p className="font-serif text-[#8c7f70] text-sm">
-                    {tr("cycles.noPortals")}
+                    Nenhum portal ativo no orbe de 4° no momento.
                   </p>
                 </div>
               ) : (
                 <div>
                   <p className="font-mono text-[9px] text-[#8c7f70] uppercase tracking-[0.2em] mb-4 px-1">
-                    {tr("cycles.portalsHint")}
+                    Portais ativos nos próximos 30 dias — clique para expandir
                   </p>
                   <TransitAccordionList
                     transits={transits}

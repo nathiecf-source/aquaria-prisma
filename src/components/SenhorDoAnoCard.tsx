@@ -2,8 +2,6 @@ import React from "react";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { Loader2, Sparkles } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { planetKey, signKey } from "../i18n/canonical";
 
 interface ProfectionLord {
   name: string;
@@ -23,10 +21,17 @@ interface SenhorDoAnoCardProps {
   isLoading?: boolean;
 }
 
-const SOURCE_KEYS: Record<string, string> = {
-  natal: "senhor.source.natal",
-  "solar-return": "senhor.source.solarReturn",
-  ruler: "senhor.source.ruler",
+const sourceLabel = (source?: string): string => {
+  switch (source) {
+    case "natal":
+      return "a partir do mapa natal";
+    case "solar-return":
+      return "a partir da Revolução Solar";
+    case "ruler":
+      return "a partir da regência tradicional";
+    default:
+      return "";
+  }
 };
 
 export const SenhorDoAnoCard: React.FC<SenhorDoAnoCardProps> = ({
@@ -39,17 +44,8 @@ export const SenhorDoAnoCard: React.FC<SenhorDoAnoCardProps> = ({
   reading,
   isLoading,
 }) => {
-  const { t } = useTranslation();
   const [expanded, setExpanded] = React.useState(false);
   const hasReading = !!reading && reading.trim().length > 0;
-
-  const nameOf = (name: string) => {
-    const k = planetKey(name);
-    return k ? t(`planets.${k}`) : name;
-  };
-  const signLabel = signKey(sign) ? t(`signs.${signKey(sign)}`) : sign;
-  const sourceKey = source ? SOURCE_KEYS[source] : undefined;
-  const sourceText = sourceKey ? ` — ${t(sourceKey)}` : "";
 
   const coLords = (lords || []).filter((l) => l.name !== primaryLord);
 
@@ -61,21 +57,18 @@ export const SenhorDoAnoCard: React.FC<SenhorDoAnoCardProps> = ({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#8c6239]">
-            {t("senhor.profection", { age })}
+            ✦ Profecção — {age} anos
           </p>
           <h3 className="mt-1 font-serif text-lg font-medium text-[#3c352d]">
-            {t("senhor.title", { lord: nameOf(primaryLord) })}{" "}
-            <span className="text-[#8c7f70]">{t("senhor.houseTag", { house: profectedHouse })}</span>
+            O Regente do Ano: {primaryLord} <span className="text-[#8c7f70]">(Casa {profectedHouse})</span>
           </h3>
           <p className="mt-1 text-sm text-[#5c544d]">
-            {t("senhor.houseIn", { house: profectedHouse, sign: signLabel })}
-            {sourceText}
+            Casa {profectedHouse} em {sign}
+            {source ? ` — ${sourceLabel(source)}` : ""}
           </p>
           {coLords.length > 0 && (
             <p className="mt-1 text-xs text-[#8c7f70]">
-              {t("senhor.coLords", {
-                lords: coLords.map((l) => `${nameOf(l.name)}${l.sign ? ` (${l.sign})` : ""}`).join(", "),
-              })}
+              Co-regentes: {coLords.map((l) => `${l.name}${l.sign ? ` (${l.sign})` : ""}`).join(", ")}
             </p>
           )}
         </div>
@@ -84,7 +77,7 @@ export const SenhorDoAnoCard: React.FC<SenhorDoAnoCardProps> = ({
       {isLoading ? (
         <div className="mt-4 flex items-center gap-2 text-[#8c7f70]">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="font-mono text-xs uppercase tracking-wider">{t("senhor.loading")}</span>
+          <span className="font-mono text-xs uppercase tracking-wider">Sincronizando com o ciclo anual...</span>
         </div>
       ) : hasReading ? (
         <div className="mt-4">
@@ -92,7 +85,7 @@ export const SenhorDoAnoCard: React.FC<SenhorDoAnoCardProps> = ({
             onClick={() => setExpanded((prev) => !prev)}
             className="text-xs font-mono uppercase tracking-wider text-[#8c6239] hover:text-[#3c352d] transition-colors"
           >
-            {expanded ? t("senhor.collapse") : t("senhor.expand")}
+            {expanded ? "Recolher leitura" : "Ler a leitura do ano"}
           </button>
           {expanded && (
             <div className="mt-3 max-w-none text-sm leading-relaxed text-[#5c544d]">

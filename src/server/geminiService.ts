@@ -8,7 +8,6 @@ import { getPlanetFichamento, PlanetFichamentoEntry } from "./planetFichamento";
 import type { SolarReturnAnalysis } from "./solarReturnEngine";
 import type { DailySkyPayload } from "./dailySkyEngine";
 import { getNakshatraKnowledge } from "../knowledge/nakshatras";
-import { AppLanguage, dashaLanguageDirective, languageDirective, normalizeLang } from "./i18n";
 
 // Verbos arquetípicos determinísticos para cada signo — aplicados ao domínio do planeta/ponto.
 // O domínio é fornecido pelo planeta (Sol=identidade, Lua=emocional, Ascendente=estilo de presença,
@@ -3252,12 +3251,9 @@ const transitCycleDetailSchema = {
 
 export async function generateTransitCycleDetail(
   profile: CompleteAstrologicalProfile,
-  facts: any,
-  lang: string = "pt-BR"
+  facts: any
 ): Promise<TransitCycleDetail> {
   const gender = getEffectiveGender(profile);
-  const language = normalizeLang(lang);
-  const outputLangDirective = languageDirective(language);
 
   const systemInstruction = `[PAPEL DO SISTEMA]
 Você é um guia terapêutico e astrológico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que entende astrologia e psicologia de forma profunda.
@@ -3290,7 +3286,6 @@ REGRAS DE OURO — NÃO QUEBRAR
   Palavras-chave permitidas para o subjetivo: talvez, pode ser, caso, se, convidado/a, convocado/a, impelido/a, parece, como se, sinal de que, sensação de que.
   Proibições de afirmação sobre o usuário: "você sente", "você pensa", "você precisa", "você deve", "você está sendo forçado/a", "é uma pressão" (como afirmação absoluta), "o estômago revira" (como fato), "o ego quer" (como fato), "não dá mais para negociar" (como imposição).
 - Antes de finalizar, faça uma AUTO-AUDITORIA linha a linha: se uma frase disser algo sobre o corpo, a emoção ou a compulsão do usuário como se fosse verdade, reescreva-a imediatamente como sugestão. Esta regra vale para desafio e integracao em todos os cards.
-${outputLangDirective}
 `;
 
   const sideralWindow = facts?.sideral_ingress && facts?.sideral_egress !== undefined
@@ -3415,10 +3410,8 @@ function formatSideralWindow(planet: string, ingress: Date, egress: Date | null)
     : "os próximos dias";
   return `De ${startText} a ${endText}`;
 }
-export async function generateDashaReading(profile: CompleteAstrologicalProfile, lang: string = "pt-BR"): Promise<string> {
+export async function generateDashaReading(profile: CompleteAstrologicalProfile): Promise<string> {
   const gender = getEffectiveGender(profile);
-  const language: AppLanguage = normalizeLang(lang);
-  const outputLangDirective = dashaLanguageDirective(language);
 
   const systemInstruction = `[PAPEL DO SISTEMA]
 Você é um guia terapêutico com linguagem íntima, direta e somática. Sua escrita é visceral, poética e pessoal — como uma carta de um amigo que conhece astrologia e psicologia de forma profunda.
@@ -3501,7 +3494,7 @@ Regras para este parágrafo:
 **A síntese**
 [Frase única e final costurando a resolução mística e a integração dos três planetas em um ponto de cura, sem rótulos como 'resolução' ou introduções]
 
-Use os nomes exatos dos planetas e estrelas ativos do usuário fornecidos em PERÍODO ATUAL DE DASHAS VÉDICAS como marcadores. Não use aspas nas frases e não inclua explicações redundantes nos tópicos finais.${outputLangDirective}`;
+Use os nomes exatos dos planetas e estrelas ativos do usuário fornecidos em PERÍODO ATUAL DE DASHAS VÉDICAS como marcadores. Não use aspas nas frases e não inclua explicações redundantes nos tópicos finais.`;
 
   const mahadashaLord = profile.vedic_timing.mahadasha;
   const mahadashaNakshatra = profile.vedic_timing.mahadashaNakshatra || "Rohini";
@@ -4348,11 +4341,9 @@ export async function generateHouseMantra(domText: string): Promise<string> {
 
 export async function generateProfectionLordReading(
   profile: CompleteAstrologicalProfile,
-  profectionData: any,
-  lang: string = "pt-BR"
+  profectionData: any
 ): Promise<string> {
   const gender = getEffectiveGender(profile);
-  const outputLangDirective = languageDirective(normalizeLang(lang));
 
   const lordsText = (profectionData.lords || [])
     .map((l: any) => {
@@ -4409,7 +4400,7 @@ Descreva como o planeta (ou planetas) Regente do Ano conduz o ano. Que qualidade
 Termine com UMA pergunta curta, direta e existencial — não uma tarefa, mas uma pergunta que coloque a pessoa em diálogo com o tema do ano.
 
 [FORMATAÇÃO]
-Use markdown simples com subtítulos em negrito. Não use listas. Não use emojis. Texto fluído, em português brasileiro.${outputLangDirective}`;
+Use markdown simples com subtítulos em negrito. Não use listas. Não use emojis. Texto fluído, em português brasileiro.`;
 
   try {
     const client = getGeminiClient();
@@ -4497,7 +4488,6 @@ function formatSolarDegree(degree: number): string {
 export async function generateSolarReturnReading(
   analysis: SolarReturnAnalysis,
   gender: string,
-  lang: string = "pt-BR",
 ): Promise<SolarReturnReading> {
   const facts = {
     cidade_aniversario: analysis.location.name,
@@ -4546,7 +4536,7 @@ ${getGenderFlexionInstruction(gender)}
 4. Meio do Céu: título com signo/grau e casa natal; introdução; A Entrega.
 5. Marcas do Tempo: apenas ciclos ativos. Use os títulos Retorno Metônico da Lua, Espelho dos Ângulos, Raridade do Regente Retrógrado e Trânsito sobre a Identidade conforme as flags.
 6. Síntese: linhas Lente (Ascendente), Guia da Ação, Solo Emocional, A Grande Obra e Ciclo de Vida somente quando houver ciclo maior.
-7. Encerramento poético sobre habitar o novo ano com reverência e ancoragem no próprio centro.${languageDirective(normalizeLang(lang))}`;
+7. Encerramento poético sobre habitar o novo ano com reverência e ancoragem no próprio centro.`;
 
   const client = getGeminiClient();
   const response = await callGeminiWithRetry(client, {
@@ -4571,11 +4561,9 @@ ${getGenderFlexionInstruction(gender)}
 export async function generateRapidActivationsReading(
   profile: CompleteAstrologicalProfile,
   profectionData: any,
-  activations: any[],
-  lang: string = "pt-BR"
+  activations: any[]
 ): Promise<string> {
   const gender = getEffectiveGender(profile);
-  const outputLangDirective = languageDirective(normalizeLang(lang));
 
   const activationTypeLabel: Record<string, string> = {
     invasao: "entrada",
@@ -4663,7 +4651,7 @@ Ao longo da semana, observe os pensamentos sem precisar organizá-los de imediat
 [REGRAS FINAIS]
 - Gere uma interpretação completa e distinta para cada ativação listada.
 - Não repita a mesma frase entre ativações diferentes.
-- Não use emojis. Texto em português brasileiro, markdown simples.${outputLangDirective}`;
+- Não use emojis. Texto em português brasileiro, markdown simples.`;
 
   try {
     const client = getGeminiClient();

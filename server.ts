@@ -58,7 +58,6 @@ import { analyzeSolarReturnChart, calculateSolarReturnChart, findExactSolarRetur
 import { createDashaSignature, createPortalSignature, createTransitSignature, CycleNoticeTab } from "./src/server/cycleNotice";
 import { calculateDailySky } from "./src/server/dailySkyEngine";
 import { splitDynamicsCombinations } from "./src/lib/dynamicsFilter";
-import { normalizeLang } from "./src/server/i18n";
 
 const cleanEnvVar = (val: any): string | undefined => {
   if (!val) return undefined;
@@ -1023,8 +1022,7 @@ async function createApp(): Promise<express.Application> {
   // API Route: Chat Astrológico — Oráculo Pessoal
   app.post("/api/chat", async (req, res) => {
     try {
-      const { userId, message, mode, history, transitContext, lang } = req.body;
-      const language = normalizeLang(lang);
+      const { userId, message, mode, history, transitContext } = req.body;
 
       if (!userId || typeof userId !== "string") {
         return res.status(400).json({ error: "userId é obrigatório." });
@@ -1157,8 +1155,7 @@ async function createApp(): Promise<express.Application> {
         message.trim(),
         chartMode,
         Array.isArray(history) ? history : [],
-        transitContext || undefined,
-        language
+        transitContext || undefined
       );
 
       // Incrementa o contador / decrementa quota gratuita
@@ -1838,12 +1835,10 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      const language = normalizeLang(req.body.lang);
-
       // Cache diário da leitura: horizonte futuro muda todo dia
       const now = new Date();
       const dateKey = now.toISOString().slice(0, 10);
-      const readingId = `transit-cycles-v7-${language}-${dateKey}`;
+      const readingId = `transit-cycles-v6-${dateKey}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached && Array.isArray(cached.transits)) {
         console.log(`[TRANSIT CYCLES] Cache hit ${readingId}`);
@@ -2022,12 +2017,10 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      const language = normalizeLang(req.body.lang);
-
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${getISOWeek(now)}`;
       const transitKey = `${transit.planet}-${transit.aspectToNatal || transit.aspecto}`.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "-");
-      const detailId = `transit-detail-v5-${language}-${userId}-${transitKey}-${weekKey}`;
+      const detailId = `transit-detail-v4-${userId}-${transitKey}-${weekKey}`;
       const cached = await getCachedReading(userId, detailId);
       if (cached && cached.desafio && cached.integracao) {
         console.log(`[TRANSIT CYCLE DETAIL] Cache hit ${detailId}`);
@@ -2037,7 +2030,7 @@ async function createApp(): Promise<express.Application> {
       let pending = transitDetailRequests.get(detailId);
       if (!pending) {
         pending = (async () => {
-          const detail = await generateTransitCycleDetail(profile, transit, language);
+          const detail = await generateTransitCycleDetail(profile, transit);
           const payload = { ...detail, generatedAt: now.toISOString() };
           await saveReading(userId, detailId, "transit-cycle-detail", payload, getNextSundayMidnight(now));
           return detail;
@@ -2069,11 +2062,9 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      const language = normalizeLang(req.body.lang);
-
       const referenceDate = new Date();
       const age = calculateCurrentAge(profile.birthData.birthDate, referenceDate);
-      const readingId = `senhor-do-ano-v2-${language}-idade-${age}`;
+      const readingId = `senhor-do-ano-idade-${age}`;
 
       const cached = await getCachedReading(userId, readingId);
       if (cached && cached.profection) {
@@ -2086,7 +2077,7 @@ async function createApp(): Promise<express.Application> {
       }
 
       const profectionData = await calculateProfectionLord(profile, referenceDate, { allowSolarReturnFetch: true });
-      const reading = await generateProfectionLordReading(profile, profectionData, language);
+      const reading = await generateProfectionLordReading(profile, profectionData);
 
       await saveReading(userId, readingId, "profection", {
         profection: profectionData,
@@ -2133,7 +2124,6 @@ async function createApp(): Promise<express.Application> {
         return res.status(400).json({ error: "Perfil astrológico completo é obrigatório." });
       }
       if (!(await requirePlusAccess(req, res))) return;
-      const language = normalizeLang(req.body.lang);
 
       const cycles = getSolarReturnCycles(profile.birthData, new Date(), profile.tropical_natal);
       const requestedYear = Number(targetYear);
@@ -2148,7 +2138,7 @@ async function createApp(): Promise<express.Application> {
       }
       const solarReturnYear = requestedYear;
 
-      const readingId = `revolucao-solar-v2-${language}-${solarReturnYear}`;
+      const readingId = `revolucao-solar-v1-${solarReturnYear}`;
       const cached = await getCachedReading(userId, readingId);
       if (cached?.analysis && cached?.reading) {
         return res.json({ ...cached, cached: true });
@@ -2172,7 +2162,7 @@ async function createApp(): Promise<express.Application> {
       const age = solarReturnYear - Number(String(profile.birthData.birthDate).slice(0, 4));
       const analysis = analyzeSolarReturnChart(chart, profile.tropical_natal, age, selectedLocation);
       const validUntil = findExactSolarReturnInstant(profile.birthData, solarReturnYear + 1, profile.tropical_natal).toISOString();
-      const reading = await generateSolarReturnReading(analysis, profile.birthData.gender || "neutro", language);
+      const reading = await generateSolarReturnReading(analysis, profile.birthData.gender || "neutro");
       const payload = {
         analysis,
         reading,
@@ -2201,11 +2191,9 @@ async function createApp(): Promise<express.Application> {
         return;
       }
 
-      const language = normalizeLang(req.body.lang);
-
       const referenceDate = new Date();
       const dateKey = referenceDate.toISOString().split("T")[0];
-      const readingId = `ativacoes-rapidas-v2-${language}-${dateKey}`;
+      const readingId = `ativacoes-rapidas-${dateKey}`;
 
       const cached = await getCachedReading(userId, readingId);
       if (cached && cached.activations) {
@@ -2223,7 +2211,7 @@ async function createApp(): Promise<express.Application> {
 
       let reading = "";
       if (activations.length > 0) {
-        reading = await generateRapidActivationsReading(profile, profectionData, activations, language);
+        reading = await generateRapidActivationsReading(profile, profectionData, activations);
       }
 
       await saveReading(userId, readingId, "rapid-activations", {
@@ -2268,8 +2256,7 @@ async function createApp(): Promise<express.Application> {
       const maha = normalizeKey(vedicTiming.mahadasha || "desconhecido");
       const antar = normalizeKey(vedicTiming.antardasha || "desconhecido");
       const pratyan = normalizeKey(vedicTiming.pratyantardasha || "desconhecido");
-      const language = normalizeLang(req.body.lang);
-      const readingId = `dasha-v3-${language}-${userId}-${maha}-${antar}-${pratyan}`;
+      const readingId = `dasha-v2-${userId}-${maha}-${antar}-${pratyan}`;
 
       const pratyantardashaEnd = vedicTiming.pratyantardashaEnd;
       const parsedDashaEnd = pratyantardashaEnd
@@ -2290,7 +2277,7 @@ async function createApp(): Promise<express.Application> {
         });
       }
 
-      const reading = await generateDashaReading(profile, language);
+      const reading = await generateDashaReading(profile);
 
       await saveReading(userId, readingId, "dasha", {
         reading,

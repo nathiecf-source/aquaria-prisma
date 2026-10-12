@@ -4,9 +4,6 @@ import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { useChat, ChartMode, ChatMessage, TransitContext } from "../hooks/useChat";
 import { exportChatToPdf } from "../lib/chatPdfExport";
-import { useTranslation } from "react-i18next";
-import { planetKey, signKey } from "../i18n/canonical";
-import { normalizeLang } from "../lib/lang";
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -17,7 +14,16 @@ interface ChatModalProps {
 
 type ChatTab = "tropical" | "sidereal" | "ciclos";
 
-const CHAT_TABS: ChatTab[] = ["tropical", "sidereal", "ciclos"];
+const WELCOME_MESSAGE: ChatMessage = {
+  role: "bot",
+  text: "Olá. Sou a Aquar.IA. Estou aqui para refletir com você o que seu mapa astral revela neste momento. Pergunte o seu mapa.",
+};
+
+const TAB_LABELS: Record<ChatTab, string> = {
+  tropical: "Tropical",
+  sidereal: "Sideral",
+  ciclos: "Ciclos",
+};
 
 /** Converte quebras de linha simples em hard-breaks do Markdown para preservá-las. */
 function preProcessForMarkdown(text: string): string {
@@ -82,28 +88,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({
     fetchEvents,
   } = useChat(userId);
 
-  const { t, i18n } = useTranslation();
-  const lang = normalizeLang(i18n.language);
   const [activeTab, setActiveTab] = useState<ChatTab>("tropical");
   const [selectedEvent, setSelectedEvent] = useState<TransitContext | null>(null);
   const [showEventsSheet, setShowEventsSheet] = useState(false);
 
-  const welcomeMessage: ChatMessage = { role: "bot", text: t("chat.welcome") };
-  const messagesWithWelcome = activeTab === "ciclos" ? messages : [welcomeMessage, ...messages];
-
-  const eventLabel = (event: TransitContext): string => {
-    const typeKey = `chat.events.types.${event.type}`;
-    const pKey = planetKey(event.planet);
-    const sKey = signKey(event.sign);
-    if (!sKey) return event.event;
-    const planet = pKey ? t(`planets.${pKey}`) : event.planet || "";
-    const rendered = t(typeKey, {
-      planet,
-      sign: t(`signs.${sKey}`),
-      defaultValue: "",
-    });
-    return rendered || event.event;
-  };
+  const messagesWithWelcome = activeTab === "ciclos" ? messages : [WELCOME_MESSAGE, ...messages];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -162,13 +151,13 @@ export const ChatModal: React.FC<ChatModalProps> = ({
       await exportChatToPdf(containerRef.current, userName);
     } catch (err) {
       console.error("Erro ao exportar PDF:", err);
-      alert(t("chat.pdfError"));
+      alert("Não foi possível salvar o PDF agora. Tente novamente.");
     }
   };
 
   const formatEventDate = (isoDate: string) => {
     const d = new Date(isoDate);
-    return d.toLocaleDateString(lang, {
+    return d.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "short",
     });
@@ -194,14 +183,14 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             </h2>
             <p className="text-xs text-[#8c7f70] font-light">
               {remaining !== null
-                ? t("chat.remaining", { count: remaining })
-                : t("chat.loadingLimit")}
+                ? `${remaining} pergunta${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""} este mês`
+                : "Carregando limite..."}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-white/60 rounded-lg p-0.5 border border-[#d9d4c7]">
-              {CHAT_TABS.map((tab) => (
+              {(["tropical", "sidereal", "ciclos"] as ChatTab[]).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -212,14 +201,14 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                       : "text-[#8c7f70] hover:text-[#4a3f35]"
                   }`}
                 >
-                  {t(`chat.tabs.${tab}`)}
+                  {TAB_LABELS[tab]}
                 </button>
               ))}
             </div>
 
             <button
               onClick={handleSavePdf}
-              title={t("chat.savePdf")}
+              title="Salvar conversa em PDF"
               className="p-2 rounded-lg text-[#8c7f70] hover:text-[#4a3f35] hover:bg-[#e8e4db] transition-colors"
             >
               <FileDown className="w-4 h-4" />
@@ -227,7 +216,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
 
             <button
               onClick={handleClose}
-              aria-label={t("chat.closeChat")}
+              aria-label="Fechar chat"
               className="p-2 rounded-lg text-[#8c7f70] hover:text-[#4a3f35] hover:bg-[#e8e4db] transition-colors"
             >
               <X className="w-5 h-5" />
@@ -241,18 +230,18 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             <div className="hidden md:flex w-56 lg:w-64 border-b md:border-b-0 md:border-r border-[#d9d4c7] bg-[#f4f1eb] flex-col">
               <div className="px-4 py-3 border-b border-[#d9d4c7]">
                 <h3 className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold">
-                  {t("chat.events.next30")}
+                  Próximos 30 dias
                 </h3>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {isLoadingEvents ? (
                   <div className="flex items-center justify-center py-6 text-[#8c7f70]">
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    <span className="text-xs">{t("chat.events.calculating")}</span>
+                    <span className="text-xs">Calculando ciclos...</span>
                   </div>
                 ) : events.length === 0 ? (
                   <p className="text-xs text-[#8c7f70] text-center py-4">
-                    {t("chat.events.none")}
+                    Nenhum evento encontrado.
                   </p>
                 ) : (
                   events.map((event, idx) => (
@@ -270,7 +259,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                         {formatEventDate(event.date)}
                       </span>
                       <span className="text-xs text-[#4a3f35] font-light leading-snug group-hover:text-[#8c6239] transition-colors">
-                        {eventLabel(event)}
+                        {event.event}
                       </span>
                     </button>
                   ))
@@ -293,11 +282,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                   <span className="flex items-center gap-2">
                     {selectedEvent ? (
                       <>
-                        <span className="text-[#8c7f70]">{t("chat.events.skyNow")}</span>
-                        <span className="font-light truncate max-w-[180px]">{eventLabel(selectedEvent)}</span>
+                        <span className="text-[#8c7f70]">Céu do momento:</span>
+                        <span className="font-light truncate max-w-[180px]">{selectedEvent.event}</span>
                       </>
                     ) : (
-                      <span className="text-[#8c7f70]">{t("chat.events.pickEvent")}</span>
+                      <span className="text-[#8c7f70]">Escolher evento do céu do momento</span>
                     )}
                   </span>
                   <ChevronDown className="w-4 h-4 text-[#8c7f70] shrink-0" />
@@ -327,13 +316,13 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                         <div className="mt-3 pt-3 border-t border-[#d9d4c7] text-xs text-[#8c7f70] space-y-1">
                           {msg.astrologicalSource && (
                             <p>
-                              <span className="text-[#8c7f70] font-medium">{t("chat.source")}:</span>{" "}
+                              <span className="text-[#8c7f70] font-medium">Fonte:</span>{" "}
                               {msg.astrologicalSource}
                             </p>
                           )}
                           {msg.activationKeywords && (
                             <p>
-                              <span className="text-[#8c7f70] font-medium">{t("chat.keys")}:</span>{" "}
+                              <span className="text-[#8c7f70] font-medium">Chaves:</span>{" "}
                               {msg.activationKeywords}
                             </p>
                           )}
@@ -377,14 +366,14 @@ export const ChatModal: React.FC<ChatModalProps> = ({
           {selectedEvent && (
             <div className="px-5 py-2 flex items-center gap-2 border-b border-[#d9d4c7]/50">
               <span className="text-[9px] text-[#8c7f70] uppercase tracking-wider">
-                {t("chat.events.selected")}
+                Evento selecionado
               </span>
               <span className="text-xs bg-[#8c6239]/10 text-[#8c6239] px-2 py-0.5 rounded-full border border-[#8c6239]/30 truncate max-w-[200px]">
-                {eventLabel(selectedEvent)}
+                {selectedEvent.event}
               </span>
               <button
                 onClick={() => setSelectedEvent(null)}
-                aria-label={t("chat.events.clear")}
+                aria-label="Limpar evento"
                 className="p-1 rounded-full text-[#8c7f70] hover:text-[#4a3f35] hover:bg-[#e8e4db] transition-colors"
               >
                 <X className="w-3 h-3" />
@@ -400,12 +389,12 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               <button
                 type="button"
                 onClick={() =>
-                  setInput(t("chat.suggestion"))
+                  setInput("Quero entender outro trânsito: Trânsito de [planeta] - [x] graus de [signo] - ")
                 }
                 disabled={isLoading}
                 className="mb-2 w-full text-left text-xs px-3 py-2 rounded-xl border border-[#d9d4c7] bg-white/60 text-[#4a3f35] hover:bg-white hover:border-[#c5a880] transition-colors disabled:opacity-50"
               >
-                {t("chat.suggestion")}
+                Quero entender outro trânsito: Trânsito de [planeta] - [x] graus de [signo] -
               </button>
             )}
             <div className="flex items-end gap-2">
@@ -420,7 +409,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                     handleSend();
                   }
                 }}
-                placeholder={t("chat.placeholder")}
+                placeholder="Pergunte o seu mapa astral"
                 disabled={isLoading}
                 className="flex-1 bg-white border border-[#d9d4c7] rounded-xl px-4 py-3 text-sm text-[#4a3f35] placeholder:text-[#8c7f70] focus:outline-none focus:border-[#8c6239] focus:ring-1 focus:ring-[#8c6239]/20 disabled:opacity-60"
               />
@@ -433,7 +422,8 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               </button>
             </div>
             <p className="mt-2 text-[10px] text-[#8c7f70] text-center">
-              {t("chat.pdfNote")}
+              A conversa não é salva no banco. Você pode exportar para PDF quando
+              quiser. Clique no ícone <FileDown className="inline w-3 h-3 mx-0.5" /> no topo do chat.
             </p>
           </form>
         </div>
@@ -448,7 +438,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             <div className="relative w-full max-h-[70vh] bg-[#f4f1eb] rounded-t-2xl border-t border-[#d9d4c7] shadow-2xl overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-5 py-3 border-b border-[#d9d4c7]">
                 <h3 className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold">
-                  {t("chat.events.sheetTitle")}
+                  Céu do momento — Próximos 30 dias
                 </h3>
                 <button
                   onClick={() => setShowEventsSheet(false)}
@@ -461,11 +451,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                 {isLoadingEvents ? (
                   <div className="flex items-center justify-center py-6 text-[#8c7f70]">
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    <span className="text-xs">{t("chat.events.calculating")}</span>
+                    <span className="text-xs">Calculando ciclos...</span>
                   </div>
                 ) : events.length === 0 ? (
                   <p className="text-xs text-[#8c7f70] text-center py-4">
-                    {t("chat.events.none")}
+                    Nenhum evento encontrado.
                   </p>
                 ) : (
                   events.map((event, idx) => (
@@ -483,7 +473,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                         {formatEventDate(event.date)}
                       </span>
                       <span className="text-xs text-[#4a3f35] font-light leading-snug group-hover:text-[#8c6239] transition-colors">
-                        {eventLabel(event)}
+                        {event.event}
                       </span>
                     </button>
                   ))

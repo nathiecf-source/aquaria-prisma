@@ -3,7 +3,6 @@ import { CompleteAstrologicalProfile } from "./astrology";
 import { buildChatSystemPrompt, ChatMessage } from "./chatPrompts";
 import { formatNatalContext, ChartMode } from "./formatNatalContext";
 import { getGeminiClient, callGeminiWithRetry } from "./geminiService";
-import { LANGUAGE_LOCALES, languageDirective, normalizeLang } from "./i18n";
 import {
   calculateChatTransits,
   getAllPlanetPositions,
@@ -34,48 +33,6 @@ const PLANET_NAMES = [
   "Netuno",
   "Plutão",
 ];
-
-// Aliases em inglês e espanhol → nome canônico em português.
-const PLANET_ALIASES: Record<string, string> = {
-  sun: "Sol",
-  moon: "Lua",
-  mercury: "Mercúrio",
-  venus: "Vênus",
-  mars: "Marte",
-  jupiter: "Júpiter",
-  saturn: "Saturno",
-  uranus: "Urano",
-  neptune: "Netuno",
-  pluto: "Plutão",
-  pluton: "Plutão",
-  mercurio: "Mercúrio",
-  neptuno: "Netuno",
-  luna: "Lua",
-};
-
-// Aliases de signos em inglês e espanhol → nome canônico em português.
-const SIGN_ALIASES: Record<string, string> = {
-  aries: "Áries",
-  taurus: "Touro",
-  gemini: "Gêmeos",
-  cancer: "Câncer",
-  leo: "Leão",
-  virgo: "Virgem",
-  libra: "Libra",
-  scorpio: "Escorpião",
-  sagittarius: "Sagitário",
-  capricorn: "Capricórnio",
-  aquarius: "Aquário",
-  pisces: "Peixes",
-  tauro: "Touro",
-  geminis: "Gêmeos",
-  escorpio: "Escorpião",
-  sagitario: "Sagitário",
-  capricornio: "Capricórnio",
-  acuario: "Aquário",
-  piscis: "Peixes",
-  escorpion: "Escorpião",
-};
 
 const NATAL_BLOCKERS = ["meu", "minha", "natal", "nascimento"];
 
@@ -138,12 +95,6 @@ function parseUserTransitQuestion(message: string): ParsedTransit | null {
   const tokens = lower.split(/[\s,;!?()[\]{}]+/).filter(Boolean);
   const signMap = new Map(SIGN_NAMES.map(s => [removeDiacritics(s).toLowerCase(), s]));
   const planetMap = new Map(PLANET_NAMES.map(p => [removeDiacritics(p).toLowerCase(), p]));
-  for (const [alias, canonical] of Object.entries(PLANET_ALIASES)) {
-    if (!planetMap.has(alias)) planetMap.set(alias, canonical);
-  }
-  for (const [alias, canonical] of Object.entries(SIGN_ALIASES)) {
-    if (!signMap.has(alias)) signMap.set(alias, canonical);
-  }
 
   for (let i = 0; i < tokens.length; i++) {
     const rawToken = tokens[i].replace(/[^a-z0-9]/g, "");
@@ -224,8 +175,7 @@ export async function generateChatResponse(
   message: string,
   mode: ChartMode,
   history: ChatMessage[] = [],
-  transitContext?: TransitContext,
-  lang: string = "pt-BR"
+  transitContext?: TransitContext
 ): Promise<ChatApiResponse> {
   let effectiveTransitContext = transitContext;
 
@@ -253,7 +203,7 @@ export async function generateChatResponse(
     try {
       const house = getHouseForLongitude(effectiveTransitContext.longitude, profile.tropical_natal.houses);
       eventHouseNumber = house?.house;
-      const eventDate = new Date(effectiveTransitContext.date).toLocaleDateString(LANGUAGE_LOCALES[normalizeLang(lang)], {
+      const eventDate = new Date(effectiveTransitContext.date).toLocaleDateString("pt-BR", {
         day: "2-digit",
         month: "long",
         year: "numeric",
@@ -298,9 +248,7 @@ export async function generateChatResponse(
     }
   }
 
-  const systemInstruction =
-    buildChatSystemPrompt(userName, contextText, history, effectiveMode, transitContextText) +
-    languageDirective(normalizeLang(lang));
+  const systemInstruction = buildChatSystemPrompt(userName, contextText, history, effectiveMode, transitContextText);
 
   const formattedHistory = history
     .map((msg) => `${msg.role === "user" ? "Consulente" : "Aquar.IA"}: ${msg.text}`)
