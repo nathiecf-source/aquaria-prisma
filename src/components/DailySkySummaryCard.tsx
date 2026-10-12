@@ -18,7 +18,7 @@ export const DailySkySummaryCard = React.forwardRef<HTMLDivElement, DailySkySumm
       <div className="mb-[10%] h-px w-[20%] bg-[#d4af37]/60" />
       <p className="max-w-[88%] whitespace-pre-wrap font-sans text-[4cqw] leading-[1.65] text-[#f4f1eb]">{summary}</p>
     </div>
-    <div className="text-center font-serif text-[3.2cqw] italic text-[#e6dfcf]">Portal 36_ · Presença e ritmo</div>
+    <div className="text-center font-serif text-[3.2cqw] italic text-[#e6dfcf]">Como acima, assim embaixo</div>
     <div className="absolute bottom-0 left-0 h-[1%] w-full bg-[#d4af37]" />
   </div>
 ));

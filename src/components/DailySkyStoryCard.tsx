@@ -16,7 +16,7 @@ export const DailySkyStoryCard = React.forwardRef<HTMLDivElement, DailySkyStoryC
       <h2 className="mb-[8%] font-serif text-[7cqw] leading-tight text-[#3c352d]">{title}</h2>
       <p className="whitespace-pre-wrap font-sans text-[4.2cqw] leading-[1.6] text-[#5c544d]">{text}</p>
     </div>
-    <div className="border-t border-[#8c7f70]/20 pt-[4%] text-center font-serif text-[3cqw] italic tracking-wide text-[#8c7f70]">Habitar a si mesma com reverência</div>
+    <div className="border-t border-[#8c7f70]/20 pt-[4%] text-center font-serif text-[3cqw] italic tracking-wide text-[#8c7f70]">Sob o mesmo céu, infinitas possibilidades</div>
     <div className="absolute bottom-0 left-0 h-[1%] w-full bg-[#d4af37]" />
   </div>
 ));
