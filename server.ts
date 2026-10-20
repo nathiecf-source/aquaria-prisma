@@ -4483,7 +4483,12 @@ async function createApp(): Promise<express.Application> {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Data inválida. Use YYYY-MM-DD." });
       const year = Number(date.slice(0, 4));
       if (year < 1900 || year > 2100) return res.status(400).json({ error: "A data deve estar entre 1900 e 2100." });
-      const payload = await calculateDailySky(date);
+      // Referência = horário do pedido quando a data é hoje; datas passadas/futuras usam 08:00
+      const spParts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+      const get = (type: string) => spParts.find((p) => p.type === type)?.value || "";
+      const spToday = `${get("year")}-${get("month")}-${get("day")}`;
+      const time = date === spToday ? `${get("hour") === "24" ? "00" : get("hour")}:${get("minute")}` : "08:00";
+      const payload = await calculateDailySky(date, time);
       try {
         const content = await generateDailySkyContent(payload);
         return res.json({ date, timezone: payload.timezone, referenceTime: payload.referenceTime, payload, content });

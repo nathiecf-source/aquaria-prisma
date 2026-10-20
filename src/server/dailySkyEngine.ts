@@ -115,10 +115,9 @@ function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
 }
 
-function formatDateTime(date: Date, sourceDate: string): string {
+function formatDateTime(date: Date): string {
   const localDate = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
-  const time = formatTime(date);
-  return localDate === sourceDate ? time : `${localDate.split("-").reverse().join("/")} ${time}`;
+  return `${localDate.split("-").reverse().join("/")} ${formatTime(date)}`;
 }
 
 function lahiri(year: number): number {
@@ -257,9 +256,9 @@ async function getMovementChanges(reference: Date): Promise<Array<{ planet: stri
   });
 }
 
-export async function calculateDailySky(date: string): Promise<DailySkyPayload> {
+export async function calculateDailySky(date: string, time = "08:00"): Promise<DailySkyPayload> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T12:00:00Z`).getTime())) throw new Error("Data inválida.");
-  const reference = zonedDateTime(date, "08:00");
+  const reference = zonedDateTime(date, time);
   const start = zonedDateTime(date, "00:00");
   const end = zonedDateTime(addDays(date, 1), "00:00");
   const positions = await getAllPlanetPositions(reference);
@@ -277,7 +276,7 @@ export async function calculateDailySky(date: string): Promise<DailySkyPayload> 
   return {
     date,
     timezone: TIMEZONE,
-    referenceTime: "08:00",
+    referenceTime: time,
     tropical: {
       moon: { phase: moonPhase(elongation), sign: SIGN_NAMES[Math.floor(normalize(positions.Lua) / 30)], degree: Math.round((normalize(positions.Lua) % 30) * 100) / 100 },
       ingresses,
@@ -286,7 +285,7 @@ export async function calculateDailySky(date: string): Promise<DailySkyPayload> 
       movementChanges,
     },
     vedic: {
-      nakshatra: { name: nakshatraName, symbol, deity: NAKSHATRAS[nakshatraIndex][2], pada: padaFor(siderealMoon), padaElement: PADA_ELEMENTS[(padaFor(siderealMoon) - 1) % 4], activeUntil: formatDateTime(nakshatraEnd, date), next: NAKSHATRAS[(nakshatraIndex + 1) % 27][0] },
+      nakshatra: { name: nakshatraName, symbol, deity: NAKSHATRAS[nakshatraIndex][2], pada: padaFor(siderealMoon), padaElement: PADA_ELEMENTS[(padaFor(siderealMoon) - 1) % 4], activeUntil: formatDateTime(nakshatraEnd), next: NAKSHATRAS[(nakshatraIndex + 1) % 27][0] },
       vara: varaFor(reference),
       tithi: tithiFor(elongation),
       yoga: nityaYogaFor(siderealSun, siderealMoon),
