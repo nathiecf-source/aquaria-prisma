@@ -20,3 +20,7 @@ sql-script.sql
 project.tar.gz
 metadata.json
 supabase/.temp/
+android-twa/
+internal-release.keystore
+internal-release-certificate.pem
+android-twa*.zip

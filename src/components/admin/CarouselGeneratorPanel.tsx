@@ -203,7 +203,7 @@ export const CarouselGeneratorPanel: React.FC<CarouselGeneratorPanelProps> = ({ 
               onClick={() => setFormat("feed")}
               className={`px-3 py-1.5 text-xs ${format === "feed" ? "bg-[#3c352d] text-[#fbf9f5]" : "text-[#6e6356]"}`}
             >
-              4:5 Feed
+              3:4 Feed
             </button>
             <button
               onClick={() => setFormat("stories")}

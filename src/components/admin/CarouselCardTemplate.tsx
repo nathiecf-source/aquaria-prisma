@@ -14,7 +14,7 @@ interface CarouselCardTemplateProps {
 }
 
 const FORMAT_DIMENSIONS: Record<"feed" | "stories", { width: number; height: number }> = {
-  feed: { width: 1080, height: 1350 },
+  feed: { width: 1080, height: 1440 },
   stories: { width: 1080, height: 1920 },
 };
 
