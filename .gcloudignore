@@ -7,3 +7,9 @@ dist
 .env*
 **/.env*
 build-log.txt
+
+# Artefatos Android TWA (builds locais)
+android-twa/
+android-twa*.zip
+*.keystore
+*.jks
