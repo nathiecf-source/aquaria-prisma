@@ -2730,9 +2730,24 @@ export const vedicReportSchema = {
         },
         required: ["house", "ocupantesDrishti", "bhaveshaKaraka", "argalas", "sintese"]
       }
+    },
+    criticalTransits: {
+      type: Type.ARRAY,
+      description: "Uma entrada para cada item da lista TRÂNSITOS CRÍTICOS DETECTADOS da matriz (mesma quantidade e ordem). Se a lista estiver vazia, retorne array vazio.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          key: { type: Type.STRING, description: "Mesma key do item detectado na matriz." },
+          title: { type: Type.STRING, description: "Mesmo título do item detectado." },
+          status: { type: Type.STRING, description: "ativo | proximo | encerrado — mesmo status da matriz." },
+          period: { type: Type.STRING, description: "Janela formatada 'dd/mm/aaaa → dd/mm/aaaa' quando houver datas na matriz; senão string vazia." },
+          impact: { type: Type.STRING, description: "Impacto estrutural didático em 1-2 linhas (glosa o termo técnico + efeito prático de vida)." }
+        },
+        required: ["key", "title", "status", "period", "impact"]
+      }
     }
   },
-  required: ["summary", "planets", "houses"]
+  required: ["summary", "planets", "houses", "criticalTransits"]
 };
 
 export async function generateVedicReport(input: VedicReportInput): Promise<string> {
@@ -2787,7 +2802,8 @@ Atue como um astrólogo didático: um professor de astrologia explicando o mapa 
 Responda estritamente no JSON Schema fornecido:
 - summary: visão geral integrada
 - planets: 9 entradas na ordem Sol, Lua, Marte, Mercúrio, Júpiter, Vênus, Saturno, Rahu, Ketu — use exatamente esses nomes em "planet"
-- houses: 12 entradas na ordem 1-12 com o número em "house"`;
+- houses: 12 entradas na ordem 1-12 com o número em "house"
+- criticalTransits: uma entrada por item de "criticalTransits" na matriz — copie key/title/status exatos; escreva o "impact" no mesmo tom didático (glosa do termo + efeito prático em 1-2 linhas). Em "period", formate as datas como 'dd/mm/aaaa → dd/mm/aaaa' quando presentes.`;
 
   try {
     const client = getGeminiClient();
@@ -2805,6 +2821,79 @@ Responda estritamente no JSON Schema fornecido:
     return response.text || "";
   } catch (error) {
     cleanLogError("[Gemini API] Falha no relatório védico estrutural", error);
+    throw error;
+  }
+}
+
+// ─── Leitura de um período de Dasha (MD/AD) sob demanda ─────────────────────
+
+export interface DashaPeriodInput {
+  clientName: string;
+  gender: string;
+  mahaLord: string;
+  antarLord: string;
+  period: string;               // "dd/mm/aaaa → dd/mm/aaaa"
+  status: string;               // passado | atual | futuro
+  /** Contexto estrutural serializado (condições dos dois regentes, relação angular, Tara Bala, vargas). */
+  contextJson: string;
+}
+
+export const dashaPeriodSchema = {
+  type: Type.OBJECT,
+  properties: {
+    reading: {
+      type: Type.STRING,
+      description: "Leitura didática do período em 3-4 parágrafos curtos, seguindo o módulo de análise de dasha."
+    }
+  },
+  required: ["reading"]
+};
+
+export async function generateDashaPeriodReading(input: DashaPeriodInput): Promise<string> {
+  const systemInstruction = `[PAPEL DO SISTEMA]
+Você é o motor de análise temporal védica da AQUAR.IA, sob a tradição de Parasara Hora Sastra. Escreva a interpretação estrutural de UM período de dasha (Maha Dasha × Antar Dasha), conectando a Promessa Natal (condição dos regentes) ao Relógio Interno (ativação temporal).
+
+[PERÍODO]
+Cliente: ${input.clientName}
+Maha Dasha: ${input.mahaLord} · Antar Dasha: ${input.antarLord}
+Janela: ${input.period} — status: ${input.status}
+
+[CONTEXTO ESTRUTURAL — FATOS CALCULADOS]
+${input.contextJson}
+
+[MÓDULO DE ANÁLISE — CUBRA NA ORDEM, EM PROSA FLUIDA]
+1. Papel do Maha Dasha Lord: a atmosfera geral e o foco da consciência que esse ciclo instala — ancorada na dignidade, casa ocupada, avasthas e BAV do regente.
+2. Relação Angular MD × AD: explique a relação entre os dois regentes (${input.mahaLord} → ${input.antarLord}). Se 1/7 ou 5/9 → cooperação fluida e progresso; se 6/8 (Shashtashtaka) → atrito, reajustes forçados, despesas ou crises; se 2/12 (Dwirdwadasa) → desgaste e despesas. Diga isso didaticamente.
+3. Tara Bala: a classificação do nakshatra do regente da Antar Dasha contado do Janma Nakshatra (Sampat = prosperidade / Vipat = obstáculo / Sadhaka = realização / Naidhana = dissolução etc.) — explique o que esse tom significa na prática do período.
+4. Ativação: quais casas o regente ocupa e rege, e quais arudha padas são tocados (ex.: ativar A8 → crises e transformações; A10 → viradas de carreira), se constarem no contexto.
+5. Condição nos vargas quando disponível (D-9 vida interior/dharma, D-10 carreira).
+6. Síntese de cruzamento em 2-3 frases: tema do período cruzando força do regente × relação angular × tara × ativação.
+
+[ESTILO — DIDÁTICO OBRIGATÓRIO]
+- Professor explicando a um leigo: mantenha os termos técnicos (dasha, antar dasha, Shashtashtaka, Tara Bala, Navatara, arudha) com glosa curta na primeira ocorrência (ex: "Antar Dasha (o subperíodo que coloriza os meses dentro do ciclo maior)").
+- Dado concreto → técnica → efeito de vida. Sem gordura, frases curtas, segunda pessoa ("você").
+- Status passado/futuro: escreva no tempo adequado (retrospectiva analítica para passado; preparação para futuro).
+- Sem determinismo de saúde/dinheiro/morte; tendências estruturais apenas.
+- ${getGenderFlexionInstruction(input.gender)}
+
+[FORMATO — JSON] Responda estritamente no schema: { reading }.`;
+
+  try {
+    const client = getGeminiClient();
+    const response = await callGeminiWithRetry(client, {
+      model: "gemini-3.5-flash-lite",
+      contents: "Gere a interpretação do período de dasha seguindo o módulo e o estilo didático.",
+      config: {
+        systemInstruction,
+        temperature: 0.35,
+        maxOutputTokens: 2500,
+        responseMimeType: "application/json",
+        responseSchema: dashaPeriodSchema,
+      },
+    });
+    return response.text || "";
+  } catch (error) {
+    cleanLogError("[Gemini API] Falha na leitura de dasha", error);
     throw error;
   }
 }

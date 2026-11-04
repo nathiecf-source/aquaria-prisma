@@ -160,6 +160,8 @@ export interface VedicTiming {
   nextPratyantardashaStart: string;
   startDate: string;
   endDate: string;
+  /** Sequência Vimshottari completa (nível pratyantar), nomes traduzidos, ordenada por início. */
+  sequence?: { names: string[]; start: string; end: string }[];
 }
 
 export interface VedicVargas {
@@ -657,6 +659,7 @@ export function mapTiming(result: AstrologyProviderResult, currentDateStr: strin
     nextMahadasha: nextMaha?.names[0] || "", nextAntardasha: nextAntar?.names[1] || "", nextPratyantardasha: nextPrat?.names[2] || "",
     nextMahadashaStart: nextMaha?.start || "", nextAntardashaStart: nextAntar?.start || "", nextPratyantardashaStart: nextPrat?.start || "",
     startDate: normalized[0]?.start || "", endDate: normalized.at(-1)?.end || normalized.at(-1)?.start || "",
+    sequence: normalized,
   };
 }
 

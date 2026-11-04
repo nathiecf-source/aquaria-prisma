@@ -36,10 +36,58 @@ interface HouseSection {
   sintese: string;
 }
 
+interface DashaAntar {
+  lord: string;
+  displayLord: string;
+  start: string;
+  end: string;
+  status: "passado" | "atual" | "futuro";
+  angularRelation: string;
+  taraBala: string;
+}
+
+interface DashaMaha {
+  lord: string;
+  displayLord: string;
+  start: string;
+  end: string;
+  status: "passado" | "atual" | "futuro";
+  antars: DashaAntar[];
+}
+
+interface CriticalTransit {
+  key: string;
+  title: string;
+  status: "ativo" | "proximo" | "encerrado";
+  phase?: string;
+  startDate?: string;
+  endDate?: string;
+  ref?: string;
+  detail: string;
+}
+
+interface TransitImpact {
+  key: string;
+  title: string;
+  status: string;
+  period: string;
+  impact: string;
+}
+
+interface TimingBlock {
+  generatedAt: string;
+  window: { from: string; to: string };
+  dashas: DashaMaha[];
+  criticalTransits: CriticalTransit[];
+  unavailable: string[];
+}
+
 interface ReportPayload {
   summary: string;
   planets: PlanetSection[];
   houses: HouseSection[];
+  criticalTransits?: TransitImpact[];
+  dashaReadings?: Record<string, { reading: string; generated_at: string }>;
 }
 
 interface FullReport {
@@ -98,6 +146,29 @@ function reportToMarkdown(r: FullReport): string {
     }
     lines.push(`**Síntese:** ${h.sintese}`, ``);
   }
+
+  const timing: TimingBlock | undefined = r.structural?.timing;
+  if (timing?.dashas?.length) {
+    lines.push(`## Dashas — janela ${timing.window.from} → ${timing.window.to}`);
+    for (const md of timing.dashas) {
+      lines.push(`### ${md.displayLord} (${md.start} → ${md.end}) — ${md.status}`);
+      for (const ad of md.antars || []) {
+        lines.push(`- **${md.displayLord} / ${ad.displayLord}** · ${ad.start} → ${ad.end} · ${ad.status} · ${ad.angularRelation} · ${ad.taraBala}`);
+        const cached = r.report.dashaReadings?.[`${md.displayLord}/${ad.displayLord}`]?.reading
+          || r.report.dashaReadings?.[`${md.lord}/${ad.lord}`]?.reading;
+        if (cached) lines.push(`  > ${cached.replace(/\n+/g, "\n  > ")}`);
+      }
+    }
+    lines.push(``);
+  }
+  if (r.report.criticalTransits?.length) {
+    lines.push(`## Trânsitos Críticos`);
+    for (const t of r.report.criticalTransits) {
+      lines.push(`- **${t.title}** — ${t.status}${t.period ? ` · ${t.period}` : ""}`);
+      if (t.impact) lines.push(`  ${t.impact}`);
+    }
+    lines.push(``);
+  }
   return lines.join("\n");
 }
 
@@ -111,6 +182,8 @@ export const VedicReportPanel: React.FC<VedicReportPanelProps> = ({ getToken }) 
   const [listLoading, setListLoading] = React.useState(false);
   const [active, setActive] = React.useState<FullReport | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [dashaLoading, setDashaLoading] = React.useState<string | null>(null);
+  const [expandedDasha, setExpandedDasha] = React.useState<Record<string, boolean>>({});
 
   // Modo usuário
   const [searchEmail, setSearchEmail] = React.useState("");
@@ -303,6 +376,39 @@ export const VedicReportPanel: React.FC<VedicReportPanelProps> = ({ getToken }) 
     }
   };
 
+  const requestDashaReading = async (md: DashaMaha, ad: DashaAntar) => {
+    if (!active) return;
+    const key = `${md.displayLord}/${ad.displayLord}`;
+    setDashaLoading(key);
+    try {
+      const res = await fetch(`/api/admin/vedic-reports/${active.id}/dasha-reading`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ maha: md.displayLord, antar: ad.displayLord, start: ad.start, end: ad.end, status: ad.status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.reading) {
+        setActive((prev) => prev ? {
+          ...prev,
+          report: {
+            ...prev.report,
+            dashaReadings: {
+              ...(prev.report.dashaReadings || {}),
+              [`${md.displayLord}/${ad.displayLord}`]: { reading: data.reading, generated_at: new Date().toISOString() },
+            },
+          },
+        } : prev);
+        setExpandedDasha((e) => ({ ...e, [key]: true }));
+      } else {
+        setError(data.error || "Erro ao gerar interpretação da dasha.");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Erro ao gerar interpretação da dasha.");
+    } finally {
+      setDashaLoading(null);
+    }
+  };
+
   const copyReport = async () => {
     if (!active) return;
     await navigator.clipboard.writeText(reportToMarkdown(active));
@@ -404,6 +510,98 @@ export const VedicReportPanel: React.FC<VedicReportPanelProps> = ({ getToken }) 
             ))}
           </div>
         </div>
+
+        {(() => {
+          const timing: TimingBlock | undefined = active.structural?.timing;
+          const impacts = new Map((active.report.criticalTransits || []).map((t) => [t.key, t]));
+          const statusChip = (s: string) =>
+            s === "atual" || s === "ativo" ? "bg-emerald-100 text-emerald-800"
+            : s === "proximo" || s === "futuro" ? "bg-amber-100 text-amber-800"
+            : "bg-[#ede9de] text-[#8c7f70]";
+          if (!timing || (!timing.dashas?.length && !timing.criticalTransits?.length)) return null;
+          return (
+            <>
+              {!!timing.dashas?.length && (
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+                  <h3 className="mb-1 text-xs uppercase tracking-widest text-[#6e6356]">Dashas — relógio temporal</h3>
+                  <p className="mb-5 text-[10px] text-[#8c7f70]">
+                    Janela {timing.window.from} → {timing.window.to} · clique num subperíodo para gerar a interpretação
+                  </p>
+                  <div className="space-y-4">
+                    {timing.dashas.map((md) => (
+                      <div key={`${md.lord}-${md.start}`} className="rounded-xl border border-[#e6e2d8] bg-white/60 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-serif text-base text-[#3c352d]">Mahadasha {md.displayLord}</h4>
+                          <span className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusChip(md.status)}`}>{md.status}</span>
+                          <span className="text-[10px] text-[#8c7f70]">{md.start} → {md.end}</span>
+                        </div>
+                        <div className="mt-3 space-y-1.5">
+                          {md.antars.map((ad) => {
+                            const key = `${md.displayLord}/${ad.displayLord}`;
+                            const reading = active.report.dashaReadings?.[key]?.reading
+                              || active.report.dashaReadings?.[`${md.lord}/${ad.lord}`]?.reading;
+                            const isExpanded = !!expandedDasha[key];
+                            return (
+                              <div key={`${ad.lord}-${ad.start}`} className="rounded-lg border border-[#efeadf]">
+                                <button
+                                  onClick={() => reading ? setExpandedDasha((e) => ({ ...e, [key]: !isExpanded })) : requestDashaReading(md, ad)}
+                                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[#f4f1eb] transition-colors"
+                                >
+                                  <span className="text-xs font-semibold text-[#3c352d]">
+                                    {md.displayLord} / {ad.displayLord}
+                                    <span className="ml-2 font-normal text-[#8c7f70]">{ad.start} → {ad.end}</span>
+                                  </span>
+                                  <span className="flex items-center gap-2">
+                                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${statusChip(ad.status)}`}>{ad.status}</span>
+                                    {dashaLoading === key
+                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#8c6239]" />
+                                      : <span className="text-[9px] font-bold uppercase tracking-wider text-[#8c6239]">{reading ? (isExpanded ? "Ocultar" : "Ler") : "Interpretar"}</span>}
+                                  </span>
+                                </button>
+                                {isExpanded && reading && (
+                                  <div className="border-t border-[#efeadf] px-3 py-2.5">
+                                    <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-[#8c7f70]">{ad.angularRelation} · {ad.taraBala}</p>
+                                    {reading.split(/\n+/).filter(Boolean).map((p, i) => (
+                                      <p key={i} className="mb-1.5 text-xs leading-relaxed text-[#5c544d]">{p}</p>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!!timing.criticalTransits?.length && (
+                <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
+                  <h3 className="mb-5 text-xs uppercase tracking-widest text-[#6e6356]">Trânsitos Críticos — Saturno & Nodos</h3>
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {timing.criticalTransits.map((t) => {
+                      const impact = impacts.get(t.key);
+                      return (
+                        <div key={`${t.key}-${t.startDate || ""}`} className="rounded-xl border border-[#e6e2d8] bg-white/60 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-xs font-bold text-[#3c352d]">{t.title}</h4>
+                            <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${statusChip(t.status)}`}>{t.status}</span>
+                          </div>
+                          {t.phase && <p className="mt-1 text-[10px] font-semibold text-[#8c6239]">{t.phase}</p>}
+                          {(t.startDate || t.endDate) && (
+                            <p className="mt-1 text-[10px] text-[#8c7f70]">{t.startDate} → {t.endDate}{t.ref ? ` · ref: ${t.ref}` : ""}</p>
+                          )}
+                          <p className="mt-2 text-xs leading-relaxed text-[#5c544d]">{impact?.impact || t.detail}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         <div className="rounded-2xl border border-[#e6e2d8] bg-[#fbf9f5] p-6 shadow-sm">
           <h3 className="mb-5 text-xs uppercase tracking-widest text-[#6e6356]">Diagnóstico Integrado das 12 Casas</h3>

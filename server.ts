@@ -41,8 +41,8 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
 import { ensureDrishtis } from "./src/server/astrologyProviders";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, generateCarouselFromText, generateVedicReport, HouseReadingSection } from "./src/server/geminiService";
-import { buildVedicStructuralMatrix } from "./src/server/vedicStructuralEngine";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, generateCarouselFromText, generateVedicReport, generateDashaPeriodReading, HouseReadingSection } from "./src/server/geminiService";
+import { buildVedicStructuralMatrix, buildVedicTimingBlock, resolveDashaLord } from "./src/server/vedicStructuralEngine";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -3887,6 +3887,8 @@ async function createApp(): Promise<express.Application> {
       }
 
       const matrix = buildVedicStructuralMatrix(profile);
+      const timing = await buildVedicTimingBlock(profile, matrix, new Date());
+      const structural: any = { ...matrix, timing, unavailable: [...matrix.unavailable, ...timing.unavailable] };
       const specs = profile.vedic_specifics || ({} as any);
       const extrasText = [
         specs.karakas ? `Chara Karakas: Atmakaraka ${specs.karakas.atmakaraka || "?"}, Amatyakaraka ${specs.karakas.amatyakaraka || "?"}, Darakaraka ${specs.karakas.darakaraka || "?"}` : "",
@@ -3894,7 +3896,7 @@ async function createApp(): Promise<express.Application> {
         Array.isArray(specs.doshas) && specs.doshas.length ? `Doshas presentes: ${specs.doshas.join(" | ")}` : "",
         specs.janmaNakshatra ? `Janma Nakshatra: ${specs.janmaNakshatra}` : "",
         profile.vedic_timing?.mahadasha ? `Dasha atual: ${profile.vedic_timing.mahadasha}` : "",
-        matrix.unavailable.length ? `Blocos indisponíveis (omitir do relatório): ${matrix.unavailable.join(", ")}` : "",
+        structural.unavailable.length ? `Blocos indisponíveis (omitir do relatório): ${structural.unavailable.join(", ")}` : "",
       ].filter(Boolean).join("\n");
 
       const reportText = await generateVedicReport({
@@ -3902,7 +3904,7 @@ async function createApp(): Promise<express.Application> {
         gender,
         lagna: matrix.lagna || "desconhecido",
         lagnesha: matrix.lagnesha ? `${matrix.lagnesha.name} na Casa ${matrix.lagnesha.house} (${matrix.lagnesha.dignity})` : "desconhecido",
-        matrixJson: JSON.stringify(matrix),
+        matrixJson: JSON.stringify(structural),
         extrasText,
       });
       const report = JSON.parse(reportText);
@@ -3926,7 +3928,7 @@ async function createApp(): Promise<express.Application> {
           gender,
           birth_data: birthData,
           profile_snapshot: snapshot,
-          structural: matrix,
+          structural,
           report,
           source: profile.dataSource || "jhora",
         })
@@ -3998,6 +4000,108 @@ async function createApp(): Promise<express.Application> {
       return res.json({ ok: true });
     } catch (err: any) {
       return res.status(500).json({ error: err?.message || "Erro interno." });
+    }
+  });
+
+  // POST /api/admin/vedic-reports/:id/dasha-reading — interpretação de UM período MD/AD
+  // Body: { maha, antar, start, end, status }
+  app.post("/api/admin/vedic-reports/:id/dasha-reading", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const { maha, antar, start, end, status } = req.body || {};
+      if (!maha || !antar || typeof start !== "string" || typeof end !== "string") {
+        return res.status(400).json({ error: "maha, antar, start e end são obrigatórios." });
+      }
+
+      const { data: row, error: loadErr } = await admin.supabase
+        .from("admin_vedic_reports")
+        .select("id, client_name, gender, structural, report, profile_snapshot")
+        .eq("id", req.params.id)
+        .maybeSingle();
+      if (loadErr || !row) {
+        return res.status(404).json({ error: "Relatório não encontrado." });
+      }
+
+      const key = `${maha}/${antar}`;
+      const cached = row.report?.dashaReadings?.[key];
+      if (cached?.reading) {
+        return res.json({ reading: cached.reading, cached: true });
+      }
+
+      // Contexto estrutural dos dois regentes + dados pré-calculados do bloco temporal
+      const structural = row.structural || {};
+      const planets: any[] = Array.isArray(structural.planets) ? structural.planets : [];
+      const canon = (n: string) => resolveDashaLord(n);
+      const mahaCanon = canon(maha);
+      const antarCanon = canon(antar);
+      const cond = (p: any) => p ? {
+        signo: p.sign, casa: p.house, grau: p.degree, dignidade: p.dignity,
+        nakshatra: p.nakshatra, retrogrado: p.isRetrograde,
+        combustao: p.combustion?.active ? `combusto (${p.combustion.distanceDeg?.toFixed?.(1) ?? "?"}° do Sol)` : false,
+        yuddha: p.grahaYuddha ? `guerra planetária com ${p.grahaYuddha.opponent} — vencedor: ${p.grahaYuddha.winner}` : false,
+        vargottama: p.vargottama, gandanta: p.gandanta, avasthaIdade: p.ageAvastha?.label,
+        avasthaConsciencia: p.consciousnessAvastha, bav: p.bav, digbala: p.digbala, mks: p.mks,
+        funcao: p.functionalNature, dispositor: p.dispositor,
+      } : null;
+      const mahaCond = cond(planets.find((p) => p.name === mahaCanon));
+      const antarCond = cond(planets.find((p) => p.name === antarCanon));
+
+      const adBlock = structural.timing?.dashas
+        ?.find((md: any) => md.lord === mahaCanon || md.displayLord === maha)
+        ?.antars?.find((ad: any) => ad.lord === antarCanon || ad.displayLord === antar);
+
+      const vargas = row.profile_snapshot?.vedic_vargas || {};
+      const d9 = vargas.d9Navamsa || {}, d10 = vargas.d10Dasamsa || {};
+      const vargaOf = (c: string) => ({
+        d9: d9[c] ? `${d9[c]} (Navamsha)` : null,
+        d10: d10[c] ? `${d10[c]} (Dasamsa)` : null,
+      });
+
+      const arudhas = row.profile_snapshot?.vedic_specifics?.arudhaPadas || {};
+      const karakas = row.profile_snapshot?.vedic_specifics?.karakas || {};
+
+      const context = {
+        mahaDashaLord: { nome: mahaCanon, condicaoD1: mahaCond, vargas: vargaOf(mahaCanon) },
+        antarDashaLord: { nome: antarCanon, condicaoD1: antarCond, vargas: vargaOf(antarCanon) },
+        relacaoAngular: adBlock?.angularRelation || "não calculada",
+        taraBala: adBlock?.taraBala || "não calculada",
+        arudhaPadas: arudhas,
+        charaKarakas: karakas,
+        casasRegidas: {
+          maha: structural.houses?.filter((h: any) => h.bhavesha?.name === (mahaCanon === "Nodo Norte" ? "Rahu" : mahaCanon === "Nodo Sul" ? "Ketu" : planets.find((p) => p.name === mahaCanon)?.displayName)).map((h: any) => h.house) || [],
+          antar: structural.houses?.filter((h: any) => h.bhavesha?.name === (planets.find((p) => p.name === antarCanon)?.displayName || antarCanon)).map((h: any) => h.house) || [],
+        },
+      };
+
+      const fmt = (iso: string) => {
+        const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+      };
+
+      const text = await generateDashaPeriodReading({
+        clientName: row.client_name || "Cliente",
+        gender: row.gender || "neutro",
+        mahaLord: mahaCanon === "Nodo Norte" ? "Rahu" : mahaCanon === "Nodo Sul" ? "Ketu" : mahaCanon,
+        antarLord: antarCanon === "Nodo Norte" ? "Rahu" : antarCanon === "Nodo Sul" ? "Ketu" : antarCanon,
+        period: `${fmt(start)} → ${fmt(end)}`,
+        status: status || "atual",
+        contextJson: JSON.stringify(context),
+      });
+      const parsed = JSON.parse(text);
+
+      // Persiste a leitura dentro do JSONB do relatório (sem migration)
+      const dashaReadings = { ...(row.report?.dashaReadings || {}), [key]: { reading: parsed.reading, generated_at: new Date().toISOString() } };
+      const { error: upErr } = await admin.supabase
+        .from("admin_vedic_reports")
+        .update({ report: { ...(row.report || {}), dashaReadings } })
+        .eq("id", row.id);
+      if (upErr) console.error("[Admin VedicReport] Falha ao cachear leitura de dasha:", upErr.message);
+
+      return res.json({ reading: parsed.reading, cached: false });
+    } catch (err: any) {
+      console.error("[Admin VedicReport] Erro na leitura de dasha:", err);
+      return res.status(500).json({ error: "Erro ao gerar interpretação da dasha.", details: err?.message || String(err) });
     }
   });
 

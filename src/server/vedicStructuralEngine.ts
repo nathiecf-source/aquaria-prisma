@@ -6,9 +6,21 @@
  * Avasthas de idade e consciência, BAV/SAV, Digbala, MKS, Kartari,
  * Neechabhanga e natureza funcional por lagna.
  *
+ * Também expõe buildVedicTimingBlock: janela de dashas MD/AD com contexto
+ * (relação angular, Tara Bala, vargas) e trânsitos críticos de Saturno
+ * (Sade Sati/Ashtama/Kantaka/Lagna Shani) e dos nodos (inversão, retorno,
+ * luminares e eixos) detectados sobre a janela do relatório.
+ *
  * Nomes de grahas seguem o formato já persistido no perfil:
  * Sol, Lua, Marte, Mercúrio, Júpiter, Vênus, Saturno, Nodo Norte (Rahu), Nodo Sul (Ketu).
  */
+
+import {
+  getTropicalTransitDegrees,
+  getMeanLunarNode,
+  computeLahiriAyanamsha,
+  tropicalToSideral,
+} from "./transitEngine";
 
 const SIGN_NAMES = [
   "Áries", "Touro", "Gêmeos", "Câncer", "Leão", "Virgem",
@@ -495,4 +507,451 @@ export function buildVedicStructuralMatrix(profile: any): VedicStructuralMatrix 
     houses,
     unavailable,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOCO TEMPORAL — Dashas MD/AD (janela −1 ano → +2 anos) e Trânsitos Críticos
+// ═══════════════════════════════════════════════════════════════════════════
+
+const NAKSHATRAS_ORDER = [
+  "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu",
+  "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta",
+  "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha",
+  "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada",
+  "Uttara Bhadrapada", "Revati",
+];
+
+/** Navatara: tara contada do Janma Nakshatra (ciclo 1..9). */
+const NAVATARA: Record<number, string> = {
+  1: "Janma (nascimento — neutro, identidade)",
+  2: "Sampat (prosperidade, ganho)",
+  3: "Vipat (perigo, obstáculo, perda)",
+  4: "Kshema (bem-estar, segurança)",
+  5: "Pratyari (oposição, inimizade)",
+  6: "Sadhaka (realização, cumprimento)",
+  7: "Naidhana (destruição, dissolução de ciclos)",
+  8: "Maitra (amizade, apoio)",
+  9: "Parama Maitra (apoio supremo, grande aliado)",
+};
+
+/** Resolve nomes de lord de dasha (abreviações Vimshottari ou nomes completos) para o nome canônico PT. */
+const DASHA_LORD_ALIASES: Record<string, string> = {
+  su: "Sol", sun: "Sol", sol: "Sol",
+  mo: "Lua", moon: "Lua", lua: "Lua", ch: "Lua", chandra: "Lua",
+  ma: "Marte", mars: "Marte", marte: "Marte", mangal: "Marte", kuja: "Marte",
+  me: "Mercúrio", mercury: "Mercúrio", "mercúrio": "Mercúrio", budha: "Mercúrio",
+  ju: "Júpiter", jupiter: "Júpiter", "júpiter": "Júpiter", guru: "Júpiter",
+  ve: "Vênus", venus: "Vênus", "vênus": "Vênus", shukra: "Vênus",
+  sa: "Saturno", saturn: "Saturno", saturno: "Saturno", shani: "Saturno",
+  ra: "Nodo Norte", rahu: "Nodo Norte", "nodo norte": "Nodo Norte",
+  ke: "Nodo Sul", ketu: "Nodo Sul", "nodo sul": "Nodo Sul",
+};
+
+export function resolveDashaLord(name: string): string {
+  return DASHA_LORD_ALIASES[name.trim().toLowerCase()] || name;
+}
+
+function parseDashaDate(value: string): number {
+  if (!value) return NaN;
+  const s = String(value).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return Date.UTC(+iso[1], +iso[2] - 1, +iso[3]);
+  const br = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (br) return Date.UTC(+br[3], +br[2] - 1, +br[1]);
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function isoDay(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+export type DashaStatus = "passado" | "atual" | "futuro";
+
+export interface DashaAntar {
+  lord: string;
+  displayLord: string;
+  start: string;
+  end: string;
+  status: DashaStatus;
+  angularRelation: string;
+  taraBala: string;
+}
+
+export interface DashaMaha {
+  lord: string;
+  displayLord: string;
+  start: string;
+  end: string;
+  status: DashaStatus;
+  antars: DashaAntar[];
+}
+
+export interface CriticalTransit {
+  key: string;
+  title: string;
+  status: "ativo" | "proximo" | "encerrado";
+  phase?: string;
+  startDate?: string;
+  endDate?: string;
+  ref?: string;
+  detail: string;
+}
+
+export interface VedicTimingBlock {
+  generatedAt: string;
+  window: { from: string; to: string };
+  dashas: DashaMaha[];
+  criticalTransits: CriticalTransit[];
+  unavailable: string[];
+}
+
+const statusFor = (start: number, end: number, ref: number): DashaStatus =>
+  start > ref ? "futuro" : end <= ref ? "passado" : "atual";
+
+function angularRelationLabel(count: number): string {
+  switch (count) {
+    case 1: return "1/1 — conjunção (fusão de agendas)";
+    case 7: return "1/7 — eixo de confronto e equilíbrio";
+    case 5: return "5/9 — trígono dhármico (cooperação fluida)";
+    case 9: return "9/5 — trígono dhármico (cooperação fluida)";
+    case 6: case 8: return "6/8 — Shashtashtaka (atrito, reajuste forçado, possíveis crises)";
+    case 2: case 12: return "2/12 — Dwirdwadasa (despesas, desgaste, reajustes)";
+    default: return `${count} — relação neutra`;
+  }
+}
+
+function nakshatraIndexOf(name: string): number {
+  if (!name) return -1;
+  const clean = name.trim().toLowerCase().replace(/[^a-z]/g, "");
+  return NAKSHATRAS_ORDER.findIndex((n) => n.toLowerCase().replace(/[^a-z]/g, "") === clean);
+}
+
+/** Longitude sideral (0-360) de um corpo lento numa data. */
+async function siderealLongitudeAt(body: "Saturno" | "Rahu" | "Ketu", ms: number): Promise<number> {
+  const date = new Date(ms);
+  const ayanamsha = computeLahiriAyanamsha(date.getUTCFullYear());
+  let tropical: number;
+  if (body === "Saturno") {
+    const positions = await getTropicalTransitDegrees(date, true);
+    tropical = positions["Saturno"];
+  } else {
+    // JDE aproximado por timestamp Unix — erro desprezível para o nodo médio.
+    const jde = ms / 86400000 + 2440587.5;
+    tropical = getMeanLunarNode(jde);
+    if (body === "Ketu") tropical = (tropical + 180) % 360;
+  }
+  return tropicalToSideral(tropical, ayanamsha);
+}
+
+/**
+ * Janelas [start,end] em que `body` ocupa `targetSignIdx` dentro de [fromMs, toMs].
+ * Varredura de 10 dias + refinamento binário (~1 dia) nos limites.
+ */
+async function collectSignWindows(
+  body: "Saturno" | "Rahu" | "Ketu",
+  targetSignIdx: number,
+  fromMs: number,
+  toMs: number
+): Promise<{ start: string; end: string }[]> {
+  const stepMs = 10 * 86400000;
+  const signAt = async (ms: number) => Math.floor((await siderealLongitudeAt(body, ms)) / 30) % 12;
+
+  const refineEdge = async (inSignMs: number, outSignMs: number): Promise<number> => {
+    let inP = inSignMs, outP = outSignMs;
+    for (let i = 0; i < 12; i++) {
+      const mid = (inP + outP) / 2;
+      const s = await signAt(mid);
+      if (s === targetSignIdx) inP = mid; else outP = mid;
+    }
+    return (inP + outP) / 2;
+  };
+
+  const windows: { start: string; end: string }[] = [];
+  let runStart: number | null = null;
+  let t = fromMs;
+  while (t <= toMs) {
+    const inSign = (await signAt(t)) === targetSignIdx;
+    if (inSign && runStart === null) runStart = t;
+    if (!inSign && runStart !== null) {
+      const ingress = runStart - stepMs < fromMs
+        ? await refineEdge(runStart, Math.max(0, runStart - stepMs))
+        : await refineEdge(runStart - stepMs, runStart);
+      const egress = await refineEdge(t - stepMs, t);
+      windows.push({ start: isoDay(ingress), end: isoDay(egress) });
+      runStart = null;
+    }
+    t += stepMs;
+  }
+  if (runStart !== null) {
+    const ingress = runStart - stepMs < fromMs
+      ? await refineEdge(runStart, Math.max(0, runStart - stepMs))
+      : await refineEdge(runStart - stepMs, runStart);
+    windows.push({ start: isoDay(ingress), end: isoDay(toMs) });
+  }
+  return windows;
+}
+
+function saturnPeriodOverlaps(
+  periods: { startDate?: string; endDate?: string }[] | undefined,
+  fromMs: number,
+  toMs: number
+): { startDate?: string; endDate?: string; phase1?: any; phase2?: any; phase3?: any }[] {
+  if (!Array.isArray(periods)) return [];
+  return periods.filter((p) => {
+    const s = parseDashaDate(p.startDate || "");
+    const e = parseDashaDate(p.endDate || "");
+    return Number.isFinite(s) && Number.isFinite(e) && e >= fromMs && s <= toMs;
+  });
+}
+
+function transitStatus(start: number, end: number, ref: number): CriticalTransit["status"] {
+  return start > ref ? "proximo" : end <= ref ? "encerrado" : "ativo";
+}
+
+/**
+ * Monta a janela temporal do relatório:
+ * - dashas MD/AD agrupadas da sequência Vimshottari (−1 ano → +2 anos)
+ * - trânsitos críticos de Saturno (JHora saturn_transits + efeméride local) e dos nodos
+ */
+export async function buildVedicTimingBlock(
+  profile: any,
+  matrix: VedicStructuralMatrix,
+  generatedAt: Date = new Date()
+): Promise<VedicTimingBlock> {
+  const ref = generatedAt.getTime();
+  const fromMs = ref - 366 * 86400000;
+  const toMs = ref + 2 * 366 * 86400000;
+  const unavailable: string[] = [];
+
+  const vedicPlanets: any[] = Array.isArray(profile?.vedic_natal?.planets) ? profile.vedic_natal.planets : [];
+  const byName = new Map(vedicPlanets.map((p) => [p.name, p]));
+  const lagnaIdx = SIGN_NAMES.indexOf(matrix.lagna || profile?.vedic_specifics?.lagna || "");
+  const janmaNak = profile?.vedic_specifics?.janmaNakshatra || byName.get("Lua")?.nakshatra || "";
+  const janmaNakIdx = nakshatraIndexOf(janmaNak);
+
+  // ─── Dashas: agrupa sequência pratyantar → AD → MD ──────────────────────
+  const dashas: DashaMaha[] = [];
+  const seq = Array.isArray(profile?.vedic_timing?.sequence) ? profile.vedic_timing.sequence : [];
+  const entries = seq
+    .map((e: any) => ({ names: Array.isArray(e?.names) ? e.names : [], start: parseDashaDate(e?.start || "") }))
+    .filter((e: any) => e.names.length >= 2 && Number.isFinite(e.start))
+    .sort((a: any, b: any) => a.start - b.start);
+
+  if (!entries.length) {
+    unavailable.push("dashas (sequência vimshottari ausente)");
+  } else {
+    interface AdBlock { maha: string; antar: string; start: number; end: number }
+    const adBlocks: AdBlock[] = [];
+    for (const e of entries) {
+      const maha = resolveDashaLord(String(e.names[0]));
+      const antar = resolveDashaLord(String(e.names[1]));
+      const last = adBlocks[adBlocks.length - 1];
+      if (last && last.maha === maha && last.antar === antar) continue;
+      adBlocks.push({ maha, antar, start: e.start, end: e.start });
+    }
+    for (let i = 0; i < adBlocks.length; i++) {
+      adBlocks[i].end = i + 1 < adBlocks.length ? adBlocks[i + 1].start : adBlocks[i].start + 92 * 86400000;
+    }
+
+    interface MdBlock { maha: string; start: number; end: number; ads: AdBlock[] }
+    const mdBlocks: MdBlock[] = [];
+    for (const ad of adBlocks) {
+      const last = mdBlocks[mdBlocks.length - 1];
+      if (last && last.maha === ad.maha) {
+        last.ads.push(ad);
+        last.end = ad.end;
+      } else {
+        mdBlocks.push({ maha: ad.maha, start: ad.start, end: ad.end, ads: [ad] });
+      }
+    }
+
+    for (const md of mdBlocks) {
+      if (md.end < fromMs || md.start > toMs) continue;
+      const ads = md.ads.filter((ad) => ad.end >= fromMs && ad.start <= toMs);
+      if (!ads.length) continue;
+      dashas.push({
+        lord: md.maha,
+        displayLord: displayName(md.maha),
+        start: isoDay(md.start),
+        end: isoDay(md.end),
+        status: statusFor(md.start, md.end, ref),
+        antars: ads.map((ad) => ({
+          lord: ad.antar,
+          displayLord: displayName(ad.antar),
+          start: isoDay(ad.start),
+          end: isoDay(ad.end),
+          status: statusFor(ad.start, ad.end, ref),
+          angularRelation: angularRelation(md.maha, ad.antar, byName),
+          taraBala: taraBalaOf(ad.antar, janmaNakIdx, byName),
+        })),
+      });
+    }
+    if (!dashas.length) unavailable.push("dashas (nenhum período sobrepõe a janela)");
+  }
+
+  // ─── Trânsitos críticos ─────────────────────────────────────────────────
+  const criticalTransits: CriticalTransit[] = [];
+  const saturnData = profile?.vedic_saturn_transits;
+
+  // Sade Sati (JHora, signBased)
+  for (const p of saturnPeriodOverlaps(saturnData?.sadeSati?.signBased, fromMs, toMs)) {
+    const s = parseDashaDate(p.startDate || ""), e = parseDashaDate(p.endDate || "");
+    let phase: string | undefined;
+    for (const [n, ph] of [["1", p.phase1], ["2", p.phase2], ["3", p.phase3]] as const) {
+      const ps = parseDashaDate(ph?.startDate || ""), pe = parseDashaDate(ph?.endDate || "");
+      if (Number.isFinite(ps) && Number.isFinite(pe) && ref >= ps && ref <= pe) {
+        phase = `Fase ${n} — Saturno na casa ${ph?.house || "?"} a partir da Lua natal`;
+      }
+    }
+    criticalTransits.push({
+      key: "sade-sati",
+      title: "Sade Sati (7,5 anos de reestruturação)",
+      status: transitStatus(s, e, ref),
+      phase,
+      startDate: p.startDate, endDate: p.endDate,
+      ref: "Lua natal",
+      detail: "Saturno transitando pela 12ª, 1ª e 2ª casas a partir do Chandra Lagna — término de ciclos, pressão sobre o ego e reorganização de valores.",
+    });
+  }
+
+  // Ashtama Shani (8ª casa a partir da Lua)
+  for (const p of saturnPeriodOverlaps(saturnData?.moonTransits?.eighthHouse?.signBased, fromMs, toMs)) {
+    criticalTransits.push({
+      key: "ashtama-shani",
+      title: "Ashtama Shani (Saturno na 8ª da Lua natal)",
+      status: transitStatus(parseDashaDate(p.startDate || ""), parseDashaDate(p.endDate || ""), ref),
+      startDate: p.startDate, endDate: p.endDate,
+      ref: "Lua natal",
+      detail: "~2,5 anos de transformação profunda: interrupções, crises de saúde ou término de estruturas vulneráveis.",
+    });
+  }
+
+  // Kantaka Shani: 4ª e 8ª da Lua (JHora) + 10ª da Lua (efeméride local)
+  for (const p of saturnPeriodOverlaps(saturnData?.moonTransits?.fourthHouse?.signBased, fromMs, toMs)) {
+    criticalTransits.push({
+      key: "kantaka-shani-4",
+      title: "Kantaka Shani — Saturno na 4ª da Lua",
+      status: transitStatus(parseDashaDate(p.startDate || ""), parseDashaDate(p.endDate || ""), ref),
+      startDate: p.startDate, endDate: p.endDate,
+      ref: "Lua natal",
+      detail: "Saturno como 'espinho' na base doméstica: paz doméstica, propriedades e estabilidade emocional sob teste.",
+    });
+  }
+
+  const moon = byName.get("Lua");
+  const moonSignIdx = moon ? SIGN_NAMES.indexOf(moon.sign) : -1;
+  const sunSignIdx = byName.get("Sol") ? SIGN_NAMES.indexOf(byName.get("Sol").sign) : -1;
+  const kantaka10Target = moonSignIdx >= 0 ? (moonSignIdx + 9) % 12 : -1;
+  if (kantaka10Target >= 0) {
+    try {
+      for (const sp of await collectSignWindows("Saturno", kantaka10Target, fromMs, toMs)) {
+        criticalTransits.push({
+          key: "kantaka-shani-10",
+          title: "Kantaka Shani — Saturno na 10ª da Lua",
+          status: transitStatus(parseDashaDate(sp.start), parseDashaDate(sp.end), ref),
+          startDate: sp.start, endDate: sp.end,
+          ref: "Lua natal",
+          detail: "Espinho saturnino na carreira: sobrecarga, instabilidade profissional ou cobrança de resultados.",
+        });
+      }
+    } catch { /* efeméride indisponível — omite */ }
+  }
+
+  // Lagna Shani: Saturno no signo do Ascendente
+  if (lagnaIdx >= 0) {
+    try {
+      for (const sp of await collectSignWindows("Saturno", lagnaIdx, fromMs, toMs)) {
+        criticalTransits.push({
+          key: "lagna-shani",
+          title: "Lagna Shani — Saturno transitando o Ascendente",
+          status: transitStatus(parseDashaDate(sp.start), parseDashaDate(sp.end), ref),
+          startDate: sp.start, endDate: sp.end,
+          ref: "Ascendente",
+          detail: "Disciplina rigorosa com saúde e corpo; reformulação da imagem pessoal e das rotinas.",
+        });
+      }
+    } catch { /* omite */ }
+  }
+
+  // ─── Nodos ─────────────────────────────────────────────────────────────
+  const rahuNatalIdx = byName.get("Nodo Norte") ? SIGN_NAMES.indexOf(byName.get("Nodo Norte").sign) : -1;
+  const ketuNatalIdx = byName.get("Nodo Sul") ? SIGN_NAMES.indexOf(byName.get("Nodo Sul").sign) : -1;
+
+  const nodeSpans = async (body: "Rahu" | "Ketu", signIdx: number) => {
+    try { return await collectSignWindows(body, signIdx, fromMs, toMs); }
+    catch { return []; }
+  };
+  const addNodeSpans = async (
+    key: string, title: string, body: "Rahu" | "Ketu", signIdx: number, refLabel: string, detail: string
+  ) => {
+    for (const sp of await nodeSpans(body, signIdx)) {
+      criticalTransits.push({
+        key, title,
+        status: transitStatus(parseDashaDate(sp.start), parseDashaDate(sp.end), ref),
+        startDate: sp.start, endDate: sp.end, ref: refLabel, detail,
+      });
+    }
+  };
+
+  await addNodeSpans("nodal-inversion", "Inversão Nodal (Rahu sobre o Ketu natal)", "Rahu", ketuNatalIdx,
+    "Ketu natal",
+    "Colisão kármica entre hábitos consolidados do passado e impulsos de expansão futura — viradas radicais de rumo.");
+  await addNodeSpans("nodal-return", "Retorno Nodal (Rahu sobre o Rahu natal)", "Rahu", rahuNatalIdx,
+    "Rahu natal",
+    "Reativa a missão kármica primária: o eixo Rahu-Ketu volta ao ponto de partida e cobra a direção original.");
+  await addNodeSpans("rahu-over-moon", "Rahu em trânsito sobre a Lua natal", "Rahu", moonSignIdx,
+    "Lua natal", "Amplificação mental: obsessão, ansiedade ou fascínio emocional no período.");
+  await addNodeSpans("ketu-over-moon", "Ketu em trânsito sobre a Lua natal", "Ketu", moonSignIdx,
+    "Lua natal", "Desapego e isolamento psíquico: a mente pede silêncio e recolhimento.");
+  await addNodeSpans("rahu-over-sun", "Rahu em trânsito sobre o Sol natal", "Rahu", sunSignIdx,
+    "Sol natal", "Ambição ampliada com risco de inautenticidade: o ego é inflado e testado.");
+  await addNodeSpans("rahu-over-lagna", "Rahu em trânsito sobre o Ascendente", "Rahu", lagnaIdx,
+    "Ascendente", "Impulso de reinvenção da identidade: novos apetites, imagem e direção pessoal em mutação.");
+
+  // Eixo nodal sobre casas críticas (1/7 e 2/8 a partir do lagna)
+  if (lagnaIdx >= 0) {
+    for (const [house, label, detail] of [
+      [7, "1ª/7ª — identidade e parcerias", "Rahu-Ketu cortando o eixo eu/outro: redefinições em relacionamentos e parcerias."],
+      [2, "2ª/8ª — recursos e longevidade", "Rahu-Ketu cortando o eixo valores/transformação: reconfiguração financeira, heranças e crises de intimidade."],
+      [8, "2ª/8ª — recursos e longevidade", "Rahu-Ketu cortando o eixo valores/transformação: reconfiguração financeira, heranças e crises de intimidade."],
+    ] as const) {
+      const targetSign = (lagnaIdx + house - 1) % 12;
+      for (const sp of await nodeSpans("Rahu", targetSign)) {
+        criticalTransits.push({
+          key: `nodal-axis-${house}`,
+          title: `Eixo nodal ativando casas ${label}`,
+          status: transitStatus(parseDashaDate(sp.start), parseDashaDate(sp.end), ref),
+          startDate: sp.start, endDate: sp.end,
+          ref: "Eixo Rahu/Ketu",
+          detail,
+        });
+      }
+    }
+  }
+
+  return {
+    generatedAt: isoDay(ref),
+    window: { from: isoDay(fromMs), to: isoDay(toMs) },
+    dashas,
+    criticalTransits,
+    unavailable,
+  };
+}
+
+function angularRelation(mahaLord: string, antarLord: string, byName: Map<string, any>): string {
+  const a = byName.get(mahaLord), b = byName.get(antarLord);
+  const ai = a ? SIGN_NAMES.indexOf(a.sign) : -1;
+  const bi = b ? SIGN_NAMES.indexOf(b.sign) : -1;
+  if (ai < 0 || bi < 0) return "relação indisponível";
+  return angularRelationLabel(((bi - ai + 12) % 12) + 1);
+}
+
+function taraBalaOf(lord: string, janmaNakIdx: number, byName: Map<string, any>): string {
+  const planet = byName.get(lord);
+  const lordIdx = nakshatraIndexOf(planet?.nakshatra || "");
+  if (janmaNakIdx < 0 || lordIdx < 0) return "Tara Bala indisponível";
+  const count = ((lordIdx - janmaNakIdx + 27) % 27) + 1;
+  const navatara = ((count - 1) % 9) + 1;
+  return `${NAVATARA[navatara]} (tara ${count} a partir da estrela natal)`;
 }
