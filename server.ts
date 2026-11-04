@@ -41,7 +41,8 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
 import { ensureDrishtis } from "./src/server/astrologyProviders";
-import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, generateCarouselFromText, HouseReadingSection } from "./src/server/geminiService";
+import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, generateCarouselFromText, generateVedicReport, HouseReadingSection } from "./src/server/geminiService";
+import { buildVedicStructuralMatrix } from "./src/server/vedicStructuralEngine";
 import { calculateProfectionLord, calculateRapidActivations, calculateCurrentAge } from "./src/server/profectionEngine";
 import { generateChatResponse } from "./src/server/chatService";
 import { getGlossaryDefinition } from "./src/server/glossaryData";
@@ -3809,6 +3810,194 @@ async function createApp(): Promise<express.Application> {
     } catch (err: any) {
       console.error("[Admin] Erro na busca:", err);
       return res.status(500).json({ error: "Erro interno." });
+    }
+  });
+
+  // ─── Relatórios Védicos Estruturais (geração sob demanda) ────────────────
+
+  // POST /api/admin/vedic-reports — gera UM relatório por chamada.
+  // Body: { mode: "user" | "external", userId?, client? }
+  app.post("/api/admin/vedic-reports", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { mode, userId, client } = req.body || {};
+
+      if (mode !== "user" && mode !== "external") {
+        return res.status(400).json({ error: "mode deve ser 'user' ou 'external'." });
+      }
+
+      let birthData: any = null;
+      let targetUserId: string | null = null;
+      let clientName = "";
+      let clientEmail: string | null = null;
+      let gender = "neutro";
+      let profile: CompleteAstrologicalProfile | null = null;
+
+      if (mode === "user") {
+        if (!userId || typeof userId !== "string") {
+          return res.status(400).json({ error: "userId é obrigatório no modo 'user'." });
+        }
+        const { data: chart, error: chartErr } = await admin.supabase
+          .from("user_chart")
+          .select("birth_data")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (chartErr) {
+          console.error("[Admin VedicReport] Erro ao ler user_chart:", chartErr);
+          return res.status(500).json({ error: "Erro ao ler dados do usuário." });
+        }
+        birthData = chart?.birth_data;
+        if (!birthData?.birthDate || !birthData?.birthTime || !birthData?.birthPlace) {
+          return res.status(404).json({ error: "Usuário sem dados de nascimento registrados." });
+        }
+        targetUserId = userId;
+        clientName = birthData.name || "Usuário";
+        const { data: authUser } = await admin.supabase.auth.admin.getUserById(userId);
+        clientEmail = authUser?.user?.email || null;
+        gender = birthData.gender_preference || birthData.gender || "neutro";
+      } else {
+        if (!client || typeof client !== "object") {
+          return res.status(400).json({ error: "client é obrigatório no modo 'external'." });
+        }
+        const { name, email, gender: g, birthDate, birthTime, birthPlace } = client;
+        if (!name || !birthDate || !birthTime || !birthPlace?.timezone ||
+            typeof birthPlace.latitude !== "number" || typeof birthPlace.longitude !== "number") {
+          return res.status(400).json({ error: "client requer name, birthDate, birthTime e birthPlace {latitude, longitude, timezone}." });
+        }
+        birthData = {
+          name,
+          gender: g === "masculino" ? "masculino" : "feminino",
+          gender_preference: g || "neutro",
+          birthDate, birthTime, birthPlace,
+        };
+        clientName = name;
+        clientEmail = typeof email === "string" && email.trim() ? email.trim() : null;
+        gender = g || "neutro";
+      }
+
+      const currentDate = new Date().toISOString().split("T")[0];
+      // Modo "user": reusa o cache da user_chart via fetchAstrologicalData.
+      // Modo "external": sem userId → chamada direta ao provedor (JHora primeiro).
+      profile = await fetchAstrologicalData(birthData, currentDate, targetUserId || undefined);
+
+      if (!profile?.vedic_natal?.planets?.length) {
+        return res.status(502).json({ error: "Provedor não retornou dados védicos para este mapa." });
+      }
+
+      const matrix = buildVedicStructuralMatrix(profile);
+      const specs = profile.vedic_specifics || ({} as any);
+      const extrasText = [
+        specs.karakas ? `Chara Karakas: Atmakaraka ${specs.karakas.atmakaraka || "?"}, Amatyakaraka ${specs.karakas.amatyakaraka || "?"}, Darakaraka ${specs.karakas.darakaraka || "?"}` : "",
+        Array.isArray(specs.yogas) && specs.yogas.length ? `Yogas presentes: ${specs.yogas.join(" | ")}` : "",
+        Array.isArray(specs.doshas) && specs.doshas.length ? `Doshas presentes: ${specs.doshas.join(" | ")}` : "",
+        specs.janmaNakshatra ? `Janma Nakshatra: ${specs.janmaNakshatra}` : "",
+        profile.vedic_timing?.mahadasha ? `Dasha atual: ${profile.vedic_timing.mahadasha}` : "",
+        matrix.unavailable.length ? `Blocos indisponíveis (omitir do relatório): ${matrix.unavailable.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+
+      const reportText = await generateVedicReport({
+        clientName,
+        gender,
+        lagna: matrix.lagna || "desconhecido",
+        lagnesha: matrix.lagnesha ? `${matrix.lagnesha.name} na Casa ${matrix.lagnesha.house} (${matrix.lagnesha.dignity})` : "desconhecido",
+        matrixJson: JSON.stringify(matrix),
+        extrasText,
+      });
+      const report = JSON.parse(reportText);
+
+      const snapshot = {
+        vedic_natal: profile.vedic_natal,
+        vedic_specifics: profile.vedic_specifics,
+        vedic_balas: profile.vedic_balas,
+        vedic_vargas: profile.vedic_vargas,
+        vedic_timing: profile.vedic_timing,
+        dataSource: profile.dataSource,
+      };
+
+      const { data: inserted, error: insertErr } = await admin.supabase
+        .from("admin_vedic_reports")
+        .insert({
+          created_by: admin.user.id,
+          target_user_id: targetUserId,
+          client_name: clientName,
+          client_email: clientEmail,
+          gender,
+          birth_data: birthData,
+          profile_snapshot: snapshot,
+          structural: matrix,
+          report,
+          source: profile.dataSource || "jhora",
+        })
+        .select("id, client_name, client_email, source, created_at")
+        .single();
+
+      if (insertErr) {
+        console.error("[Admin VedicReport] Erro ao salvar relatório:", insertErr);
+        return res.status(500).json({ error: "Relatório gerado, mas falhou ao salvar.", details: insertErr.message });
+      }
+
+      return res.json({ id: inserted.id, report, structural: matrix, source: inserted.source, created_at: inserted.created_at });
+    } catch (err: any) {
+      console.error("[Admin VedicReport] Erro ao gerar relatório:", err);
+      return res.status(500).json({ error: "Erro ao gerar relatório védico.", details: err?.message || String(err) });
+    }
+  });
+
+  // GET /api/admin/vedic-reports — lista resumida
+  app.get("/api/admin/vedic-reports", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const { data, error } = await admin.supabase
+        .from("admin_vedic_reports")
+        .select("id, client_name, client_email, target_user_id, source, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) {
+        console.error("[Admin VedicReport] Erro ao listar:", error);
+        return res.status(500).json({ error: "Erro ao listar relatórios." });
+      }
+      return res.json({ reports: data || [] });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || "Erro interno." });
+    }
+  });
+
+  // GET /api/admin/vedic-reports/:id — relatório completo
+  app.get("/api/admin/vedic-reports/:id", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const { data, error } = await admin.supabase
+        .from("admin_vedic_reports")
+        .select("*")
+        .eq("id", req.params.id)
+        .maybeSingle();
+      if (error) {
+        return res.status(500).json({ error: "Erro ao abrir relatório." });
+      }
+      if (!data) return res.status(404).json({ error: "Relatório não encontrado." });
+      return res.json({ report: data });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || "Erro interno." });
+    }
+  });
+
+  // DELETE /api/admin/vedic-reports/:id
+  app.delete("/api/admin/vedic-reports/:id", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const { error } = await admin.supabase
+        .from("admin_vedic_reports")
+        .delete()
+        .eq("id", req.params.id);
+      if (error) return res.status(500).json({ error: "Erro ao excluir relatório." });
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || "Erro interno." });
     }
   });
 

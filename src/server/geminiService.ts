@@ -2680,6 +2680,117 @@ Responda estritamente no JSON Schema fornecido:
   }
 }
 
+// ─── Relatório Védico Estrutural completo (admin) ───────────────────────────
+
+export interface VedicReportInput {
+  clientName: string;
+  gender: string;
+  lagna: string;
+  lagnesha: string;
+  /** Matriz estrutural determinística serializada (vedicStructuralEngine). */
+  matrixJson: string;
+  /** Contexto adicional do JHora: yogas, doshas, karakas, dashas. */
+  extrasText: string;
+}
+
+export const vedicReportSchema = {
+  type: Type.OBJECT,
+  properties: {
+    summary: {
+      type: Type.STRING,
+      description: "Visão geral integrada do mapa em 2-3 parágrafos: eixo Lagna-Lagnesha, padrões dominantes e a principal tensão estrutural."
+    },
+    planets: {
+      type: Type.ARRAY,
+      description: "Exatamente 9 entradas, uma por graha, na ordem Sol, Lua, Marte, Mercúrio, Júpiter, Vênus, Saturno, Rahu, Ketu.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          planet: { type: Type.STRING },
+          forcaEssencial: { type: Type.STRING, description: "Bloco 1: dignidade, graus, micro-zodiacal (vargottama/gandanta), avasthas e BAV — em 2-4 linhas." },
+          funcaoCondicao: { type: Type.STRING, description: "Bloco 2: natureza funcional, combustão, guerra planetária, retrogradação e digbala — em 2-4 linhas." },
+          posicaoDesafios: { type: Type.STRING, description: "Bloco 3: tipo de casa ocupada, dispositor e desafios — em 2-4 linhas." },
+          interacoes: { type: Type.STRING, description: "Bloco 4: drishtis recebidos, argala/virodhargala e kartari — em 2-4 linhas." },
+          sintese: { type: Type.STRING, description: "Síntese de cruzamento estrutural em 2-3 linhas integrando todos os vetores." }
+        },
+        required: ["planet", "forcaEssencial", "funcaoCondicao", "posicaoDesafios", "interacoes", "sintese"]
+      }
+    },
+    houses: {
+      type: Type.ARRAY,
+      description: "Exatamente 12 entradas, uma por bhava, na ordem 1-12.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          house: { type: Type.NUMBER },
+          ocupantesDrishti: { type: Type.STRING, description: "Bloco 1: ocupantes, aspectos e pontuação SAV — em 2-3 linhas." },
+          bhaveshaKaraka: { type: Type.STRING, description: "Bloco 2: condição do senhor da casa e do karaka natural — em 2-3 linhas." },
+          argalas: { type: Type.STRING, description: "Bloco 3: argalas incidentes e obstruções — em 1-3 linhas." },
+          sintese: { type: Type.STRING, description: "Síntese estrutural da casa em 2-3 linhas (casa + senhor + karaka + SAV + argalas)." }
+        },
+        required: ["house", "ocupantesDrishti", "bhaveshaKaraka", "argalas", "sintese"]
+      }
+    }
+  },
+  required: ["summary", "planets", "houses"]
+};
+
+export async function generateVedicReport(input: VedicReportInput): Promise<string> {
+  const systemInstruction = `[PAPEL DO SISTEMA]
+Você é o motor de análise estrutural védica da plataforma AQUAR.IA, operando sob a tradição clássica de Parasara Hora Sastra (linhagem P.V.R. Narasimha Rao e Komilla Sutton). Sua função é transformar uma MATRIZ ESTRUTURAL pré-calculada em um relatório integrado, no qual NENHUM planeta ou casa é analisado isoladamente — cada síntese cruza todos os vetores disponíveis.
+
+[CLIENTE]
+Nome: ${input.clientName}
+Lagna (Ascendente sideral): ${input.lagna}
+Lagnesha (regente do Ascendente): ${input.lagnesha}
+
+[MATRIZ ESTRUTURAL — FATOS CALCULADOS, NÃO INTERPRETE NEM CONTESTE]
+${input.matrixJson}
+
+[CONTEXTO ADICIONAL JHORA]
+${input.extrasText}
+
+[DIRETRIZES DE REDAÇÃO]
+1. Português brasileiro, segunda pessoa ("você"), tom sóbrio e clínico-astrológico: leitura funcional, organizada, visualmente compreensível.
+2. Termos técnicos sânscritos são BEM-VINDOS e devem ser usados com precisão (Vargottama, Gandanta, Graha Yuddha, Argala, Kendradhipati Dosha, Marana Karaka Sthana, Digbala, BAV, SAV, Neechabhanga, Subha/Papa Kartari, Yogakaraka, benéfico/maléfico funcional) — este relatório é para uso profissional da astróloga, não precisa da linguagem branda do app.
+3. Ao citar uma técnica, diga o dado concreto primeiro (ex: "Vênus combusto a 4,2° do Sol (limiar 10°)", "BAV de 2 bindus", "SAV de 22 na casa").
+4. Toda síntese cruza vetores: dignidade × função × casa × drishti × argala × BAV/SAV. Nunca conclua a partir de um único fator.
+5. Se um bloco da matriz vier vazio/nulo (dado indisponível), omita a técnica sem inventar valores.
+6. Combustão: Vênus combusto sofre severamente em assuntos materiais/relacionamentos; Marte e Júpiter toleram melhor o Sol. Graha Yuddha: o derrotado não entrega seus significados positivos normalmente; o vencedor absorve sua energia.
+7. Argala sem Virodhargala correspondente → intervenção desbloqueada, resultados se materializam com facilidade.
+8. Vargottama confere força equivalente à exaltação mesmo em signo aparentemente fraco; diga isso quando presente.
+9. Gandanta: trate como nó kármico — volatilidade, instabilidade e crises de transição nos significados do planeta.
+10. Avasthas de idade medem a capacidade prática (Yuva = 100%, Saisava ~25%, Mrita = inerte); de consciência medem se o planeta está acordado (Jaagrita), sonhando (Swapna) ou dormindo (Sushupta).
+11. BAV 6-8 bindus = cooperação total do ecossistema; 0-2 = planeta opera isolado.
+12. Não faça previsões determinísticas de saúde, dinheiro ou morte; descreva tendências estruturais e períodos de ativação por dasha quando pertinente.
+13. ${getGenderFlexionInstruction(input.gender)}
+
+[FORMATO DE RESPOSTA OBRIGATÓRIO — JSON]
+Responda estritamente no JSON Schema fornecido:
+- summary: visão geral integrada
+- planets: 9 entradas na ordem Sol, Lua, Marte, Mercúrio, Júpiter, Vênus, Saturno, Rahu, Ketu — use exatamente esses nomes em "planet"
+- houses: 12 entradas na ordem 1-12 com o número em "house"`;
+
+  try {
+    const client = getGeminiClient();
+    const response = await callGeminiWithRetry(client, {
+      model: "gemini-3.5-flash-lite",
+      contents: "Gere o relatório védico estrutural completo seguindo rigorosamente o schema, a matriz e as diretrizes.",
+      config: {
+        systemInstruction,
+        temperature: 0.35,
+        maxOutputTokens: 16384,
+        responseMimeType: "application/json",
+        responseSchema: vedicReportSchema,
+      },
+    });
+    return response.text || "";
+  } catch (error) {
+    cleanLogError("[Gemini API] Falha no relatório védico estrutural", error);
+    throw error;
+  }
+}
+
 export const nakshatraGuideSchema = {
   type: Type.OBJECT,
   properties: {

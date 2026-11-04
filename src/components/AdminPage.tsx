@@ -10,6 +10,7 @@ import { Calendar, Mail, Send, Bell, Rocket, Copy, Download, Sparkles } from "lu
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { downloadImage, generatePngFromElement } from "./share/shareUtils";
 import { CarouselGeneratorPanel } from "./admin/CarouselGeneratorPanel";
+import { VedicReportPanel } from "./admin/VedicReportPanel";
 
 interface AdminPageProps {
   userProfile?: any;
@@ -130,6 +131,7 @@ const TABS = [
   { id: "push", label: "Push" },
   { id: "ceu-do-dia", label: "Céu do Dia" },
   { id: "carrossel", label: "Carrossel" },
+  { id: "relatorio-vedico", label: "Relatório Védico" },
   { id: "avisos", label: "Avisos Globais" },
   { id: "suporte", label: "Suporte Técnico" },
 ];
@@ -1684,6 +1686,10 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
 
         {activeTab === "carrossel" && (
           <CarouselGeneratorPanel getToken={getToken} />
+        )}
+
+        {activeTab === "relatorio-vedico" && (
+          <VedicReportPanel getToken={getToken} />
         )}
 
         {activeTab === "avisos" && (
