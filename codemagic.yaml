@@ -8,14 +8,17 @@ workflows:
         # Integracao App Store Connect configurada na UI do Codemagic
         # (fornece APP_STORE_CONNECT_* keys para assinatura automatica e publish)
         - app_store_connect
+        # Variaveis do app cadastradas na UI do Codemagic
+        # (inclui VITE_REVENUECAT_IOS_KEY)
+        - aquaria_env
       vars:
         XCODE_PROJECT: "App.xcodeproj"
         XCODE_SCHEME: "App"
-        # Chave publica RevenueCat iOS — pode ser sobrescrita por env group
-        VITE_REVENUECAT_IOS_KEY: ""
       node: latest
       xcode: latest
       cocoapods: default
+    integrations:
+      app_store_connect: AquarIA Codemagic
     scripts:
       - name: Install dependencies
         script: npm ci
