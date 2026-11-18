@@ -3609,6 +3609,145 @@ async function createApp(): Promise<express.Application> {
     }
   });
 
+  // POST /api/webhooks/revenuecat — eventos de assinatura iOS (In-App Purchase).
+  // O RevenueCat envia Authorization: Bearer REVENUECAT_WEBHOOK_SECRET.
+  // app_user_id = id do usuário Supabase (vinculado via Purchases.logIn).
+  app.post("/api/webhooks/revenuecat", async (req, res) => {
+    try {
+      const webhookSecret = cleanEnvVar(process.env.REVENUECAT_WEBHOOK_SECRET);
+      const authHeader = String(req.headers.authorization || "");
+      const provided = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
+
+      if (!webhookSecret || provided !== webhookSecret) {
+        console.warn("[RevenueCat Webhook] Token inválido ou REVENUECAT_WEBHOOK_SECRET não configurado.");
+        return res.status(401).send("Unauthorized");
+      }
+
+      const event = req.body?.event;
+      if (!event || typeof event !== "object") {
+        return res.status(200).send("OK");
+      }
+
+      const type = String(event.type || "");
+      const userId = String(event.app_user_id || "");
+      if (!userId || userId.startsWith("$RCAnonymousID")) {
+        return res.status(200).send("OK");
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).send("Server Error");
+      }
+
+      const GRANT_EVENTS = new Set([
+        "INITIAL_PURCHASE",
+        "RENEWAL",
+        "UNCANCELLATION",
+        "PRODUCT_CHANGE",
+        "NON_RENEWING_PURCHASE",
+      ]);
+      const REVOKE_EVENTS = new Set(["EXPIRATION", "REFUND"]);
+
+      if (GRANT_EVENTS.has(type)) {
+        const expiresAt = event.expiration_at_ms
+          ? new Date(Number(event.expiration_at_ms)).toISOString()
+          : null;
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            has_access: true,
+            subscription_tier: "PLUS",
+            current_plan_id: `ios_${event.product_id || "rc"}`,
+            ...(expiresAt ? { access_expires_at: expiresAt } : {}),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId);
+        if (error) {
+          console.error("[RevenueCat Webhook] Erro ao conceder acesso:", error.message);
+          return res.status(500).send("Server Error");
+        }
+        console.log("[RevenueCat Webhook] Acesso iOS concedido:", { userId, type });
+      } else if (REVOKE_EVENTS.has(type)) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            has_access: false,
+            subscription_tier: "FREE",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId);
+        if (error) {
+          console.error("[RevenueCat Webhook] Erro ao revogar acesso:", error.message);
+          return res.status(500).send("Server Error");
+        }
+        console.log("[RevenueCat Webhook] Acesso iOS revogado:", { userId, type });
+      }
+
+      return res.status(200).send("OK");
+    } catch (err: any) {
+      console.error("[RevenueCat Webhook] Erro:", err);
+      return res.status(400).send("Bad Request");
+    }
+  });
+
+  // POST /api/account/delete — exclusão permanente da conta (Apple Guideline 5.1.1(v)).
+  // Protegido pelo requireAuth global: req.userId vem do token validado.
+  app.post("/api/account/delete", async (req: any, res) => {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Sessão inválida." });
+      }
+
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const tables = [
+        "user_devices",
+        "user_cycle_notice_state",
+        "user_insights",
+        "user_paths",
+        "user_readings",
+        "user_chart",
+        "journal_notes",
+        "chat_usage",
+        "meditations",
+        "admin_vedic_reports",
+        "user_feedbacks",
+        "analytics_events",
+        "transactions",
+        "profiles",
+      ];
+
+      for (const table of tables) {
+        const { error } = await supabase.from(table).delete().eq("user_id", userId);
+        if (error) {
+          // profiles usa "id" como chave — trata abaixo
+          if (table === "profiles") {
+            const { error: pErr } = await supabase.from("profiles").delete().eq("id", userId);
+            if (pErr) console.warn(`[Account Delete] profiles:`, pErr.message);
+          } else {
+            console.warn(`[Account Delete] Falha em ${table}:`, error.message);
+          }
+        }
+      }
+
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      if (authError) {
+        console.error("[Account Delete] Erro ao remover usuário do Auth:", authError.message);
+        return res.status(500).json({ error: "Não foi possível concluir a exclusão." });
+      }
+
+      console.log("[Account Delete] Conta excluída permanentemente:", userId);
+      return res.status(200).json({ ok: true });
+    } catch (err: any) {
+      console.error("[Account Delete] Erro:", err);
+      return res.status(500).json({ error: "Erro interno ao excluir conta." });
+    }
+  });
+
   // ============================================================
   // Admin Panel API
   // ============================================================

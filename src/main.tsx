@@ -4,7 +4,10 @@ import App from './App.tsx';
 import './index.css';
 
 // Service worker do PWA (cache offline + push FCM em segundo plano).
-if ("serviceWorker" in navigator) {
+// No iOS nativo (WKWebView/Capacitor) não existe Push API — não registrar o SW
+// de push para evitar erros silenciosos e fluxos quebrados.
+import {isIosApp} from './lib/isTwa';
+if ("serviceWorker" in navigator && !isIosApp()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   });

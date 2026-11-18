@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Star, Check, Loader2, Lock, Tag } from "lucide-react";
 import { paymentService } from "../lib/paymentService";
-import { isRunningAsApp } from "../lib/isTwa";
+import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { IosPlanosPage } from "./IosPaywall";
 import { hasPlusAccess, getDaysUntilExpiry } from "../lib/access";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { trackEvent } from "../lib/analytics";
@@ -187,6 +188,12 @@ export default function PlanosPage({ userProfile, onBack }: PlanosPageProps) {
       window.location.href = "/";
     }
   };
+
+  // No iOS nativo, a compra é exclusivamente via In-App Purchase (RevenueCat) —
+  // a Apple proíbe links/checkout externos para bens digitais (Guideline 3.1.1).
+  if (isIosApp()) {
+    return <IosPlanosPage onBack={handleBack} />;
+  }
 
   // No app instalado (TWA/standalone) o checkout externo não pode ser exibido
   // (política de pagamentos do Google Play para bens digitais).

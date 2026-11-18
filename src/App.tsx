@@ -4,7 +4,7 @@ import LoadingScreen from "./components/LoadingScreen";
 import ConfirmData from "./components/ConfirmData";
 import AstrologyMandala from "./components/AstrologyMandala";
 import { ReadingData } from "./lib/mockReadings";
-import { AlertCircle, RefreshCw, Star, LogOut } from "lucide-react";
+import { AlertCircle, RefreshCw, Star, LogOut, Settings, Trash2 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { AuthScreen } from "./components/AuthScreen";
@@ -26,6 +26,7 @@ import { CommunityPopup } from "./components/CommunityPopup";
 import { hasPlusAccess, hasChamadoFeature } from "./lib/access";
 import { useUserFlags } from "./hooks/useUserFlags";
 import { requestPushPermissionAndToken, fetchAndStoreFcmToken, removeFcmToken, listenForegroundMessages } from "./lib/firebase";
+import { purchasesLogIn, purchasesLogOut } from "./lib/purchases";
 
 type FlowStep = "form" | "confirm" | "loading" | "mandala";
 
@@ -60,6 +61,11 @@ export default function App() {
   const [showChatPaywall, setShowChatPaywall] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [chatActive, setChatActive] = useState(true);
   const [chamado, setChamado] = useState<{ active: boolean; expiresAt: string | null; features: string[]; bannerText: string }>({
     active: false,
@@ -317,6 +323,7 @@ export default function App() {
         fetchUserProfile(currentUserId, currentSession);
         fetchAndStoreFcmToken(currentUserId);
         listenForegroundMessages();
+        purchasesLogIn(currentUserId);
         if (!chartLoadedRef.current && !isSpecialRoute(pathname)) {
           chartLoadedRef.current = true;
           loadChartOnLogin(currentUserId, currentSession);
@@ -366,6 +373,7 @@ export default function App() {
 
   const handleSignOut = async () => {
     removeFcmToken(userProfile?.id);
+    purchasesLogOut();
     await supabase.auth.signOut();
     chartLoadedRef.current = false;
     isLoadingChartRef.current = false;
@@ -377,6 +385,29 @@ export default function App() {
     setHighlights([]);
     setPendingFormData(null);
     setUserName("");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "EXCLUIR" || isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Erro ${res.status}`);
+      }
+      await supabase.auth.signOut().catch(() => {});
+      window.location.href = "/";
+    } catch (err: any) {
+      setDeleteError(err?.message || "Não foi possível excluir a conta.");
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleFormSubmit = (formData: {
@@ -663,6 +694,72 @@ export default function App() {
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowAccountMenu((v) => !v)}
+              title="Configurações da conta"
+              className="p-2.5 bg-white/90 hover:bg-gray-50 text-gray-500 hover:text-[#5c4d66] rounded-full shadow-sm border border-[#e6e2d8] transition-all hover:scale-105 cursor-pointer flex items-center justify-center"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+            {showAccountMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-[#e6e2d8] py-1.5 z-50">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full text-left px-4 py-2.5 text-xs text-[#3c352d] hover:bg-[#f4f1eb] flex items-center gap-2 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sair
+                </button>
+                <button
+                  onClick={() => { setShowAccountMenu(false); setShowDeleteModal(true); }}
+                  className="w-full text-left px-4 py-2.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Excluir minha conta
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-red-100">
+            <h3 className="text-base font-semibold text-red-700 mb-2">Excluir minha conta</h3>
+            <p className="text-xs text-[#3c352d]/80 leading-relaxed mb-4">
+              Esta ação é <strong>permanente</strong>. Seus dados, mapa astral,
+              diário e histórico serão removidos e não poderão ser recuperados.
+            </p>
+            <p className="text-xs text-[#3c352d]/80 mb-2">
+              Para confirmar, digite <strong>EXCLUIR</strong>:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="EXCLUIR"
+              className="w-full px-3 py-2 text-sm border border-[#e6e2d8] rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-red-300"
+            />
+            {deleteError && (
+              <p className="text-xs text-red-600 mb-3">{deleteError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(""); setDeleteError(null); }}
+                className="flex-1 px-4 py-2.5 text-xs font-medium text-[#3c352d] bg-[#f4f1eb] hover:bg-[#e6e2d8] rounded-lg transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== "EXCLUIR" || isDeletingAccount}
+                className="flex-1 px-4 py-2.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors cursor-pointer"
+              >
+                {isDeletingAccount ? "Excluindo..." : "Excluir permanentemente"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       

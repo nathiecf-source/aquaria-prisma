@@ -6,6 +6,17 @@
  * pela Google Play (política de pagamentos exige Play Billing para bens
  * digitais; o site na web segue usando o checkout externo normalmente).
  */
+import { Capacitor } from "@capacitor/core";
+
+/** Retorna true apenas quando roda dentro do app nativo iOS (Capacitor). */
+export function isIosApp(): boolean {
+  try {
+    return Capacitor.getPlatform() === "ios";
+  } catch {
+    return false;
+  }
+}
+
 export function isRunningAsApp(): boolean {
   if (typeof window === "undefined") return false;
   const standalone =

@@ -1,0 +1,42 @@
+workflows:
+  ios-app-store:
+    name: iOS App Store (AquarIA)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      groups:
+        # Integracao App Store Connect configurada na UI do Codemagic
+        # (fornece APP_STORE_CONNECT_* keys para assinatura automatica e publish)
+        - app_store_connect
+      vars:
+        XCODE_PROJECT: "App.xcodeproj"
+        XCODE_SCHEME: "App"
+        # Chave publica RevenueCat iOS — pode ser sobrescrita por env group
+        VITE_REVENUECAT_IOS_KEY: ""
+      node: latest
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Build web app
+        script: npm run build
+      - name: Sync Capacitor iOS
+        script: npx cap sync ios
+      - name: Increment build number
+        script: |
+          cd ios/App
+          agvtool new-version -all "$BUILD_NUMBER"
+      - name: Build signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --project "ios/App/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Logs/Cocoapods/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

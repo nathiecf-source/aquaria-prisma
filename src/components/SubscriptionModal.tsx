@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { X, CalendarClock, Check, Star, RefreshCcw, ExternalLink, ArrowRight } from "lucide-react";
 import { hasActiveAccess, formatAccessExpiry } from "../lib/access";
-import { isRunningAsApp } from "../lib/isTwa";
+import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { IosPackages } from "./IosPaywall";
 import { getPlanDisplayName, isPlanRecurring, MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { supabase } from "../lib/supabaseClient";
 
@@ -72,7 +73,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       .finally(() => setLoadingHistory(false));
   }, []);
 
-  const inApp = isRunningAsApp();
+  const inApp = isRunningAsApp() || isIosApp();
   const hasBoughtLongTermPass = history?.hasBoughtLongTermPass === true;
   const hasAnyAccessHistory = hasBoughtLongTermPass || history?.hasBoughtMonthly;
   const expiry = profileExpiry || (history?.accessExpiresAt ? new Date(history.accessExpiresAt).toLocaleDateString("pt-BR") : null);
@@ -170,7 +171,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <p className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-2">
                     Continuidade
                   </p>
-                  {inApp ? (
+                  {isIosApp() ? (
+                    <IosPackages />
+                  ) : inApp ? (
                     <p className="text-xs text-[#6e6356] leading-relaxed">
                       A manutenção da assinatura está disponível na versão web do Aquar.IA.
                     </p>
@@ -238,7 +241,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     ))}
                   </ul>
 
-                  {inApp ? (
+                  {isIosApp() ? (
+                    <IosPackages />
+                  ) : inApp ? (
                     <p className="text-xs text-[#6e6356] leading-relaxed">
                       A reativação está disponível na versão web do Aquar.IA.
                     </p>

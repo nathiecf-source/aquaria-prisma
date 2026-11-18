@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { X, RefreshCcw } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
-import { isRunningAsApp } from "../lib/isTwa";
+import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { IosPackages } from "./IosPaywall";
 
 interface RenewalPopupProps {
   userProfile?: any;
@@ -123,7 +124,9 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
 
         <p className="text-sm text-[#5c544d] leading-relaxed mb-6">{body}</p>
 
-        {isRunningAsApp() ? (
+        {isIosApp() ? (
+          <IosPackages />
+        ) : isRunningAsApp() ? (
           <p className="text-xs text-[#6e6356] leading-relaxed text-center">
             A renovação da assinatura está disponível na versão web do Aquar.IA.
           </p>

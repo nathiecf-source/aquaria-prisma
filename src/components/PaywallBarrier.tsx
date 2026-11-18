@@ -1,7 +1,8 @@
 import React, { useEffect } from "react";
 import { Lock, Sparkles, CreditCard, X, ArrowRight } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
-import { isRunningAsApp } from "../lib/isTwa";
+import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { IosPackages } from "./IosPaywall";
 
 interface PaywallBarrierProps {
   featureId: string;
@@ -36,7 +37,7 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
     return <>{children}</>;
   }
 
-  const inApp = isRunningAsApp();
+  const inApp = isRunningAsApp() || isIosApp();
 
   const handleUnlock = () => {
     window.location.href = "/planos";
@@ -77,7 +78,11 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
       )}
 
       {/* Upgrade Button */}
-      {inApp ? (
+      {isIosApp() ? (
+        <div className="w-full">
+          <IosPackages />
+        </div>
+      ) : inApp ? (
         <p className="font-sans text-xs text-[#6e6356] leading-relaxed text-center">
           O acesso completo está disponível na versão web do Aquar.IA.
         </p>

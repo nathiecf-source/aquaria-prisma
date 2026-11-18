@@ -4,6 +4,7 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, deleteToken, isSupported, onMessage, type Messaging } from "firebase/messaging";
 import { supabase } from "./supabaseClient";
+import { isIosApp } from "./isTwa";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBW8mMJf7JiksMLGW8bO7ARtBZAX4NWr-w",
@@ -52,6 +53,7 @@ async function saveFcmToken(userId: string, token: string) {
 
 /** Obtém o token e salva no Supabase (sem pedir permissão — só se já concedida). */
 export async function fetchAndStoreFcmToken(userId?: string | null): Promise<string | null> {
+  if (isIosApp()) return null; // WKWebView não suporta Web Push/PushManager
   try {
     const messaging = await getMessagingIfSupported();
     if (!messaging || !VAPID_KEY || Notification.permission !== "granted") return null;
@@ -68,6 +70,7 @@ export async function fetchAndStoreFcmToken(userId?: string | null): Promise<str
 
 /** Pede permissão de notificação e, se concedida, registra o token FCM. */
 export async function requestPushPermissionAndToken(userId?: string | null): Promise<string | null> {
+  if (isIosApp()) return null; // iOS nativo: sem prompt de Web Push
   try {
     const messaging = await getMessagingIfSupported();
     if (!messaging) {
@@ -89,6 +92,7 @@ export async function requestPushPermissionAndToken(userId?: string | null): Pro
 let foregroundBound = false;
 /** Exibe notificação também quando o app está aberto (foreground). */
 export async function listenForegroundMessages(): Promise<void> {
+  if (isIosApp()) return;
   try {
     const messaging = await getMessagingIfSupported();
     if (!messaging || foregroundBound) return;
@@ -113,6 +117,7 @@ export async function listenForegroundMessages(): Promise<void> {
 
 /** Remove o token do dispositivo (logout). */
 export async function removeFcmToken(userId?: string | null): Promise<void> {
+  if (isIosApp()) return;
   try {
     const messaging = await getMessagingIfSupported();
     const registration = await getSwRegistration();
