@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { X, CalendarClock, Check, Star, RefreshCcw, ExternalLink, ArrowRight } from "lucide-react";
 import { hasActiveAccess, formatAccessExpiry } from "../lib/access";
+import { isRunningAsApp } from "../lib/isTwa";
 import { getPlanDisplayName, isPlanRecurring, MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { supabase } from "../lib/supabaseClient";
 
@@ -71,6 +72,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       .finally(() => setLoadingHistory(false));
   }, []);
 
+  const inApp = isRunningAsApp();
   const hasBoughtLongTermPass = history?.hasBoughtLongTermPass === true;
   const hasAnyAccessHistory = hasBoughtLongTermPass || history?.hasBoughtMonthly;
   const expiry = profileExpiry || (history?.accessExpiresAt ? new Date(history.accessExpiresAt).toLocaleDateString("pt-BR") : null);
@@ -168,16 +170,24 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <p className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-2">
                     Continuidade
                   </p>
-                  <p className="text-xs text-[#6e6356] mb-4 leading-relaxed">
-                    Quer garantir que seus ciclos permaneçam ativos sem depender da renovação de um passe?
-                  </p>
-                  <button
-                    onClick={openMonthlyLink}
-                    className="w-full py-3 px-4 rounded-xl border border-[#8c6239] text-[#8c6239] hover:bg-[#8c6239] hover:text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                  >
-                    <RefreshCcw className="w-4 h-4" />
-                    Assinar manutenção R$ 12,90/mês
-                  </button>
+                  {inApp ? (
+                    <p className="text-xs text-[#6e6356] leading-relaxed">
+                      A manutenção da assinatura está disponível na versão web do Aquar.IA.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-[#6e6356] mb-4 leading-relaxed">
+                        Quer garantir que seus ciclos permaneçam ativos sem depender da renovação de um passe?
+                      </p>
+                      <button
+                        onClick={openMonthlyLink}
+                        className="w-full py-3 px-4 rounded-xl border border-[#8c6239] text-[#8c6239] hover:bg-[#8c6239] hover:text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                      >
+                        <RefreshCcw className="w-4 h-4" />
+                        Assinar manutenção R$ 12,90/mês
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </>
@@ -228,13 +238,19 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     ))}
                   </ul>
 
-                  <button
-                    onClick={openMonthlyLink}
-                    className="w-full py-3.5 px-6 rounded-xl bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-[#8c6239]/10 flex items-center justify-center gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Reativar Ciclos por R$ 12,90/mês
-                  </button>
+                  {inApp ? (
+                    <p className="text-xs text-[#6e6356] leading-relaxed">
+                      A reativação está disponível na versão web do Aquar.IA.
+                    </p>
+                  ) : (
+                    <button
+                      onClick={openMonthlyLink}
+                      className="w-full py-3.5 px-6 rounded-xl bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-[#8c6239]/10 flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Reativar Ciclos por R$ 12,90/mês
+                    </button>
+                  )}
                 </div>
               ) : null}
 

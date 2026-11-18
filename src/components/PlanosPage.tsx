@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Star, Check, Loader2, Lock, Tag } from "lucide-react";
 import { paymentService } from "../lib/paymentService";
+import { isRunningAsApp } from "../lib/isTwa";
 import { hasPlusAccess, getDaysUntilExpiry } from "../lib/access";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { trackEvent } from "../lib/analytics";
@@ -186,6 +187,34 @@ export default function PlanosPage({ userProfile, onBack }: PlanosPageProps) {
       window.location.href = "/";
     }
   };
+
+  // No app instalado (TWA/standalone) o checkout externo não pode ser exibido
+  // (política de pagamentos do Google Play para bens digitais).
+  if (isRunningAsApp()) {
+    return (
+      <div className="min-h-screen bg-[#f4f1eb] text-[#3c352d] p-4 md:p-8">
+        <GlobalBanner />
+        <div className="max-w-md mx-auto">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-[#8c7f70] hover:text-[#3c352d] text-xs uppercase tracking-widest font-semibold mb-8 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </button>
+          <div className="bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl p-8 text-center shadow-sm">
+            <Star className="w-8 h-8 text-[#8c6239] mx-auto mb-4" />
+            <h1 className="font-serif text-xl tracking-[0.15em] uppercase text-[#3c352d] mb-3">
+              Planos e Assinaturas
+            </h1>
+            <p className="text-sm text-[#6e6356] leading-relaxed">
+              As opções de assinatura e a gestão do seu plano estão disponíveis na versão web do Aquar.IA.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f4f1eb] text-[#3c352d] p-4 md:p-8">

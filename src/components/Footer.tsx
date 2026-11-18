@@ -59,7 +59,6 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
           <a
             href="https://wa.me/5562985857402"
-            target="_blank"
             rel="noopener noreferrer"
             className="hover:text-[#3c352d] transition-colors"
           >
@@ -70,7 +69,6 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
           <a
             href="https://chat.whatsapp.com/BuQ0JxIqiBQK4nf9upmYth"
-            target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
           >
@@ -98,15 +96,13 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
 
-          <a
-            href="#termos"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
+          <button
+            onClick={() => { window.location.hash = "#termos"; }}
+            className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors cursor-pointer"
           >
             <FileText className="w-3 h-3" />
             Termos de uso
-          </a>
+          </button>
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
 
@@ -121,7 +117,6 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
           <a
             href="https://www.instagram.com/aquaria.app"
-            target="_blank"
             rel="noopener noreferrer"
             title="@aquaria.app"
             className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"
@@ -134,7 +129,6 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
           <a
             href="https://www.instagram.com/nathieterapeuta"
-            target="_blank"
             rel="noopener noreferrer"
             title="Idealizadora @nathieterapeuta"
             className="inline-flex items-center gap-1 hover:text-[#3c352d] transition-colors"

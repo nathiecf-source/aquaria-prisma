@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Lock, Sparkles, CreditCard, X, ArrowRight } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
+import { isRunningAsApp } from "../lib/isTwa";
 
 interface PaywallBarrierProps {
   featureId: string;
@@ -35,6 +36,8 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
     return <>{children}</>;
   }
 
+  const inApp = isRunningAsApp();
+
   const handleUnlock = () => {
     window.location.href = "/planos";
   };
@@ -66,25 +69,35 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
       </p>
 
       {/* Pricing Highlight */}
-      <div className="mb-6 inline-flex flex-col items-center px-5 py-3 bg-[#8c6239] text-[#fbf9f5] rounded-2xl shadow-lg shadow-[#8c6239]/15">
-        <span className="text-[10px] uppercase tracking-widest font-semibold opacity-90">Acesso a partir de</span>
-        <span className="text-2xl sm:text-3xl font-serif font-bold">12x de R$ 13,34</span>
-      </div>
+      {!inApp && (
+        <div className="mb-6 inline-flex flex-col items-center px-5 py-3 bg-[#8c6239] text-[#fbf9f5] rounded-2xl shadow-lg shadow-[#8c6239]/15">
+          <span className="text-[10px] uppercase tracking-widest font-semibold opacity-90">Acesso a partir de</span>
+          <span className="text-2xl sm:text-3xl font-serif font-bold">12x de R$ 13,34</span>
+        </div>
+      )}
 
       {/* Upgrade Button */}
-      <button
-        onClick={handleUnlock}
-        className="relative overflow-hidden w-full bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] py-3.5 px-6 rounded-xl font-sans text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-lg shadow-[#8c6239]/10 active:scale-95 flex items-center justify-center gap-2"
-      >
-        <CreditCard className="w-4 h-4" />
-        <span>Ver Planos de Acesso</span>
-        <ArrowRight className="w-4 h-4" />
-      </button>
+      {inApp ? (
+        <p className="font-sans text-xs text-[#6e6356] leading-relaxed text-center">
+          O acesso completo está disponível na versão web do Aquar.IA.
+        </p>
+      ) : (
+        <>
+          <button
+            onClick={handleUnlock}
+            className="relative overflow-hidden w-full bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] py-3.5 px-6 rounded-xl font-sans text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-lg shadow-[#8c6239]/10 active:scale-95 flex items-center justify-center gap-2"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>Ver Planos de Acesso</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
 
-      <p className="font-mono text-[9px] text-[#8c7f70] mt-3 uppercase tracking-widest flex items-center justify-center gap-1">
-        <Lock className="w-3 h-3" />
-        <span>Pagamento seguro via InfinitePay • Pix e Cartão</span>
-      </p>
+          <p className="font-mono text-[9px] text-[#8c7f70] mt-3 uppercase tracking-widest flex items-center justify-center gap-1">
+            <Lock className="w-3 h-3" />
+            <span>Pagamento seguro via InfinitePay • Pix e Cartão</span>
+          </p>
+        </>
+      )}
     </div>
   );
 

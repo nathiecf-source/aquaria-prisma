@@ -17,6 +17,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [fullName, setFullName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -56,6 +57,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       const digits = whatsappNumber.replace(/\D/g, "");
       if (digits.length < 10 || digits.length > 15) {
         setError("Por favor, preencha um número de WhatsApp válido com DDD.");
+        return;
+      }
+      if (!acceptedTerms) {
+        setError("Você precisa ler e aceitar os Termos de Uso para criar a sua conta.");
         return;
       }
     }
@@ -252,6 +257,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               </button>
             </div>
           </div>
+
+          {isSignUp && (
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 shrink-0 accent-[#5c4d66] cursor-pointer"
+              />
+              <span className="text-[11px] text-[#6e6356] leading-relaxed">
+                Li e aceito os{" "}
+                <a
+                  href="#termos"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.hash = "#termos"; }}
+                  className="text-[#5c4d66] underline underline-offset-2 hover:text-[#3c352d] transition-colors"
+                >
+                  Termos de Uso
+                </a>{" "}
+                da AQUAR.IA.
+              </span>
+            </label>
+          )}
 
           {error && (
             <div className="text-red-700 text-xs bg-red-50 p-3 rounded-lg border border-red-200 font-light flex items-start gap-2 animate-shake">

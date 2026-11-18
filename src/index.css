@@ -15,6 +15,27 @@
   --color-lavender: #A38EB0;   /* Lavanda - Interseção/Harmonia */
 }
 
+/* Áreas seguras (notch / barra de gestos) — TWA e standalone */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Elementos fixos na base (botões flutuantes, barras) respeitam a barra de gestos */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+/* Alvos de toque mínimos (~44px) para links/botões de navegação secundária */
+footer a,
+footer button,
+footer .nav-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Classes para os elementos das Casas */
 .house {
   stroke: transparent;

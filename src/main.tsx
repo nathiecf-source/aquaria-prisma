@@ -3,8 +3,12 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// O service worker do PWA é carregado via OneSignalSDKWorker.js (que importa /sw.js).
-// O registro manual é desnecessário para não conflitar com o OneSignal.
+// Service worker do PWA (cache offline + push FCM em segundo plano).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
 
 // Captura antecipadamente o evento de instalação do Chrome/Android
 interface BeforeInstallPromptEvent extends Event {

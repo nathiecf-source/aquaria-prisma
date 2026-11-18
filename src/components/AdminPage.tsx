@@ -238,6 +238,8 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
 
   const [pushTestTitle, setPushTestTitle] = useState("Aquar.IA — Teste de notificação");
   const [pushTestMessage, setPushTestMessage] = useState("Se você recebeu esta mensagem, o push está funcionando.");
+  const [pushOnBanner, setPushOnBanner] = useState(false);
+  const [pushOnChamado, setPushOnChamado] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [dailySkyDate, setDailySkyDate] = useState(todayInSaoPaulo);
   const [dailySkyLoading, setDailySkyLoading] = useState(false);
@@ -620,7 +622,7 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     }
   }
 
-  async function updateSetting(key: keyof SystemSettings, value: any) {
+  async function updateSetting(key: keyof SystemSettings, value: any): Promise<boolean> {
     try {
       const token = await getToken();
       const res = await fetch("/api/admin/settings", {
@@ -634,12 +636,39 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
       if (res.ok) {
         setSettings((prev) => ({ ...prev, [key]: value }));
         setMessage({ type: "success", text: `Configuração ${key} atualizada.` });
-      } else {
-        setMessage({ type: "error", text: "Erro ao atualizar configuração." });
+        return true;
       }
+      setMessage({ type: "error", text: "Erro ao atualizar configuração." });
+      return false;
     } catch (err) {
       console.error("[Admin] Erro ao atualizar setting:", err);
       setMessage({ type: "error", text: "Erro ao atualizar configuração." });
+      return false;
+    }
+  }
+
+  async function sendBroadcastPush(title: string, message: string): Promise<boolean> {
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/broadcast-push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({ title, message }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMessage({ type: "success", text: `Notificação enviada para ${data.sent ?? 0} dispositivo(s).` });
+        return true;
+      }
+      setMessage({ type: "error", text: `Configuração salva, mas o push falhou: ${data.error || "erro desconhecido"}` });
+      return false;
+    } catch (err) {
+      console.error("[Admin] Erro ao enviar broadcast push:", err);
+      setMessage({ type: "error", text: "Configuração salva, mas o push falhou." });
+      return false;
     }
   }
 
@@ -827,7 +856,10 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
   }
 
   async function handleSaveBanner() {
-    await updateSetting("banner_text", bannerText.trim());
+    const ok = await updateSetting("banner_text", bannerText.trim());
+    if (ok && pushOnBanner && bannerText.trim()) {
+      await sendBroadcastPush("Aquar.IA", bannerText.trim());
+    }
   }
 
   async function handleSaveChamado() {
@@ -839,11 +871,13 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
     }
 
     const freeQuota = Math.max(1, Math.min(5, Math.floor(Number(chamadoChatFreeQuota) || 3)));
-    await updateSetting("chamado_active", chamadoActive);
-    await updateSetting("chamado_expires_at", expiresValue);
-    await updateSetting("chamado_features", features);
-    await updateSetting("chamado_banner_text", chamadoBannerText.trim());
-    await updateSetting("chamado_chat_free_quota", freeQuota);
+    const results = await Promise.all([
+      updateSetting("chamado_active", chamadoActive),
+      updateSetting("chamado_expires_at", expiresValue),
+      updateSetting("chamado_features", features),
+      updateSetting("chamado_banner_text", chamadoBannerText.trim()),
+      updateSetting("chamado_chat_free_quota", freeQuota),
+    ]);
 
     setSettings((prev) => ({
       ...prev,
@@ -853,6 +887,13 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
       chamado_banner_text: chamadoBannerText.trim(),
       chamado_chat_free_quota: freeQuota,
     }));
+
+    if (pushOnChamado && chamadoActive && results.every(Boolean)) {
+      await sendBroadcastPush(
+        "O Chamado está ativo",
+        chamadoBannerText.trim() || "Recursos liberados por tempo limitado — abra o Aquar.IA e aproveite."
+      );
+    }
   }
 
   async function handleDeleteCoupon(id: string) {
@@ -1459,6 +1500,16 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
               </div>
             )}
 
+            <label className="flex items-center gap-2 text-xs text-[#6e6356]">
+              <input
+                type="checkbox"
+                checked={pushOnChamado}
+                onChange={(e) => setPushOnChamado(e.target.checked)}
+                className="w-4 h-4 accent-[#8c6239]"
+              />
+              Enviar notificação push ao salvar (só quando o Chamado estiver ativo)
+            </label>
+
             <button
               onClick={handleSaveChamado}
               className="px-5 py-2.5 bg-[#3c352d] text-[#fbf9f5] text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-[#2a251f]"
@@ -1723,6 +1774,16 @@ export default function AdminPage({ userProfile }: AdminPageProps) {
                 />
               </button>
             </div>
+            <label className="flex items-center gap-2 text-xs text-[#6e6356]">
+              <input
+                type="checkbox"
+                checked={pushOnBanner}
+                onChange={(e) => setPushOnBanner(e.target.checked)}
+                className="w-4 h-4 accent-[#8c6239]"
+              />
+              Enviar notificação push com o texto do aviso
+            </label>
+
             <button
               onClick={handleSaveBanner}
               className="px-5 py-2.5 bg-[#3c352d] text-[#fbf9f5] text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-[#2a251f]"

@@ -552,6 +552,32 @@ export default function AstrologyMandala({
       .catch((err) => console.warn("[CosmicEvents] Falha:", err));
   }, []);
 
+  // Deep-link do app (botões nativos da home): ?open=ceu-do-dia|leituras|perfil
+  const deepLinkHandledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (deepLinkHandledRef.current || !profile) return;
+    const open = new URLSearchParams(window.location.search).get("open");
+    if (!open) return;
+    deepLinkHandledRef.current = true;
+    const timer = window.setTimeout(() => {
+      if (open === "ceu-do-dia") {
+        handleOpenTransits("transits");
+      } else if (open === "leituras") {
+        handleOpenDiretriz();
+      } else if (open === "perfil") {
+        if (subscriptionTier === "FREE") {
+          setPaywallFeature("insights");
+        } else {
+          setIsInsightsOpen(true);
+          setIsTransitsModalOpen(false);
+          setIsPlanetPanelOpen(false);
+          setIsDynamicsOpen(false);
+        }
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [profile]);
+
   React.useEffect(() => {
     const userId = userProfile?.id;
     if (!profile || !userId || !hasChamadoFeature(userProfile, "ciclos") || cycleChangesCheckedFor.current === userId) return;

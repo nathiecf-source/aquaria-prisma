@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "app.aquaria.app",
       "sha256_cert_fingerprints": [
-        "6D:D3:30:87:09:07:31:9B:1B:4F:F2:DE:64:C3:34:DB:9A:79:20:CD:25:AA:D2:95:FF:30:F1:FA:0E:7C:D9:6F"
+        "6D:D3:30:87:09:07:31:9B:1B:4F:F2:DE:64:C3:34:DB:9A:79:20:CD:25:AA:D2:95:FF:30:F1:FA:0E:7C:D9:6F",
+        "91:CB:60:66:A3:77:BD:16:A0:79:08:CC:AB:A2:B4:23:4D:46:4D:6A:B7:ED:21:3B:B0:F8:C2:43:B4:D8:68:64"
       ]
     }
   }

@@ -39,6 +39,7 @@ if (
 import express from "express";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { JWT } from "google-auth-library";
 import { fetchAstrologicalData, calculateHighlights, CompleteAstrologicalProfile, calculateVisualState } from "./src/server/astrology";
 import { ensureDrishtis } from "./src/server/astrologyProviders";
 import { generateCaminhoReading, generateHouseReading, generateVetorReading, generateMoonReading, generateNakshatraGuideReading, generateDiretrizAmpla, generateGlossary, generateTransitCycleDetail, generateDashaReading, generateMeditationScript, generateHousePresenceQuestion, generateHouseMeditation, generateHouseMantra, generatePlanetReading, generatePlanetaryDynamicsReading, generateProfectionLordReading, generateRapidActivationsReading, generateVedicStructural, generateSolarReturnReading, generateDailySkyContent, generateCarouselFromText, generateVedicReport, generateDashaPeriodReading, HouseReadingSection } from "./src/server/geminiService";
@@ -384,6 +385,23 @@ function getNextSundayMidnight(date: Date): Date {
   return d;
 }
 
+// Marca uma assinatura como "conhecida" (vista no app ou notificada).
+// Best-effort: a coluna notified_signature pode não existir antes da migração.
+async function markCycleSignatureNotified(userId: string, tab: CycleNoticeTab, signature: string) {
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return;
+    const { error } = await supabase
+      .from("user_cycle_notice_state")
+      .update({ notified_signature: signature })
+      .eq("user_id", userId)
+      .eq("tab", tab);
+    if (error) console.warn("[CYCLE] notified_signature indisponível:", error.message);
+  } catch {
+    // coluna ausente antes da migração — ignora
+  }
+}
+
 async function registerCycleSignature(userId: string, tab: CycleNoticeTab, signature: string, identities: string[]): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase não configurado.");
@@ -401,6 +419,7 @@ async function registerCycleSignature(userId: string, tab: CycleNoticeTab, signa
       .from("user_cycle_notice_state")
       .insert({ user_id: userId, tab, signature, identities, updated_at: new Date().toISOString() });
     if (insertError && insertError.code !== "23505") throw insertError;
+    await markCycleSignatureNotified(userId, tab, signature);
     return false;
   }
 
@@ -414,7 +433,50 @@ async function registerCycleSignature(userId: string, tab: CycleNoticeTab, signa
     .eq("signature", existing.signature)
     .select("signature");
   if (updateError) throw updateError;
-  return Array.isArray(updated) && updated.length > 0;
+  const changed = Array.isArray(updated) && updated.length > 0;
+  if (changed) await markCycleSignatureNotified(userId, tab, signature);
+  return changed;
+}
+
+// Calcula as assinaturas das 3 abas de Ciclos Ativos para um perfil.
+// Compartilhado entre /api/cycles/changes (badge in-app) e o cron de push —
+// precisam produzir assinaturas idênticas para o mesmo perfil.
+async function computeCycleSignatures(
+  profile: any,
+  referenceDate: Date,
+  sharedTransitDegrees?: Record<string, number>
+): Promise<Array<{ tab: CycleNoticeTab; signature: string; identities: string[] }>> {
+  const checks: Array<Promise<{ tab: CycleNoticeTab; signature: string; identities: string[] } | null>> = [
+    Promise.resolve().then(() => {
+      const value = createDashaSignature(profile.vedic_timing || {});
+      return { tab: "dashas" as const, ...value };
+    }).catch((error) => {
+      console.warn("[CYCLE CHANGES] Falha ao verificar Dashas:", error?.message || error);
+      return null;
+    }),
+    calculateProfectionLord(profile, referenceDate, { allowSolarReturnFetch: true }).then((profection) => {
+      const solarReturnYear = getActiveSolarReturnYear(profile.birthData, referenceDate, profile.tropical_natal);
+      const value = createPortalSignature(profection, solarReturnYear);
+      return { tab: "portal" as const, ...value };
+    }).catch((error) => {
+      console.warn("[CYCLE CHANGES] Falha ao verificar Portal:", error?.message || error);
+      return null;
+    }),
+    Promise.all([
+      sharedTransitDegrees ? Promise.resolve(sharedTransitDegrees) : getTropicalTransitDegrees(referenceDate, true),
+      calculateRestructuringCycles(profile, referenceDate),
+    ]).then(([transitDegrees, cycles]) => {
+      const natalPlanets = getNatalDegrees(profile);
+      const payload = calculateAspects(transitDegrees, natalPlanets);
+      const value = createTransitSignature([...payload.transitos_estruturais, ...payload.transitos_dinamicos], cycles);
+      return { tab: "transits" as const, ...value };
+    }).catch((error) => {
+      console.warn("[CYCLE CHANGES] Falha ao verificar trânsitos:", error?.message || error);
+      return null;
+    }),
+  ];
+
+  return (await Promise.all(checks)).filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -517,6 +579,7 @@ async function createApp(): Promise<express.Application> {
     if (
       PUBLIC_API_PATHS.has(path) ||
       path.startsWith("/admin") ||
+      path.startsWith("/cron") ||
       path.startsWith("/checkout") ||
       path.startsWith("/webhooks")
     ) {
@@ -1768,37 +1831,7 @@ async function createApp(): Promise<express.Application> {
       if (!(await requireFeatureAccess(req, res, "ciclos"))) return;
 
       const referenceDate = new Date();
-      const checks: Array<Promise<{ tab: CycleNoticeTab; signature: string; identities: string[] } | null>> = [
-        Promise.resolve().then(() => {
-          const value = createDashaSignature(profile.vedic_timing || {});
-          return { tab: "dashas" as const, ...value };
-        }).catch((error) => {
-          console.warn("[CYCLE CHANGES] Falha ao verificar Dashas:", error?.message || error);
-          return null;
-        }),
-        calculateProfectionLord(profile, referenceDate, { allowSolarReturnFetch: true }).then((profection) => {
-          const solarReturnYear = getActiveSolarReturnYear(profile.birthData, referenceDate, profile.tropical_natal);
-          const value = createPortalSignature(profection, solarReturnYear);
-          return { tab: "portal" as const, ...value };
-        }).catch((error) => {
-          console.warn("[CYCLE CHANGES] Falha ao verificar Portal:", error?.message || error);
-          return null;
-        }),
-        Promise.all([
-          getTropicalTransitDegrees(referenceDate, true),
-          calculateRestructuringCycles(profile, referenceDate),
-        ]).then(([transitDegrees, cycles]) => {
-          const natalPlanets = getNatalDegrees(profile);
-          const payload = calculateAspects(transitDegrees, natalPlanets);
-          const value = createTransitSignature([...payload.transitos_estruturais, ...payload.transitos_dinamicos], cycles);
-          return { tab: "transits" as const, ...value };
-        }).catch((error) => {
-          console.warn("[CYCLE CHANGES] Falha ao verificar trânsitos:", error?.message || error);
-          return null;
-        }),
-      ];
-
-      const results = (await Promise.all(checks)).filter((item): item is NonNullable<typeof item> => item !== null);
+      const results = await computeCycleSignatures(profile, referenceDate);
       const labels: Record<CycleNoticeTab, string> = {
         dashas: "A Tríade do Tempo Cósmico",
         portal: `Portal dos ${calculateCurrentAge(profile.birthData.birthDate, referenceDate)}`,
@@ -4796,11 +4829,77 @@ async function createApp(): Promise<express.Application> {
   });
 
   // ============================================================
-  // OneSignal Push Notifications
+  // Firebase Cloud Messaging (FCM) Push Notifications
   // ============================================================
 
-  const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID || "7f5a7fbe-433b-40cb-9df8-e6e74cdc3a4a";
-  const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "";
+  const FCM_PROJECT_ID = "aquaria-2bc50";
+  const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+
+  interface FcmServiceAccount {
+    client_email: string;
+    private_key: string;
+    project_id?: string;
+  }
+
+  let fcmCredentials: FcmServiceAccount | null | undefined;
+  function getFcmCredentials(): FcmServiceAccount | null {
+    if (fcmCredentials !== undefined) return fcmCredentials;
+    try {
+      const raw = cleanEnvVar(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      fcmCredentials = raw ? (JSON.parse(raw) as FcmServiceAccount) : null;
+    } catch (err) {
+      console.error("[FCM] FIREBASE_SERVICE_ACCOUNT_JSON inválido:", err);
+      fcmCredentials = null;
+    }
+    return fcmCredentials;
+  }
+
+  let fcmAuthClient: JWT | null = null;
+  async function getFcmAccessToken(): Promise<string | null> {
+    const creds = getFcmCredentials();
+    if (!creds?.client_email || !creds?.private_key) return null;
+    fcmAuthClient ??= new JWT({
+      email: creds.client_email,
+      key: creds.private_key,
+      scopes: [FCM_SCOPE],
+    });
+    const { token } = await fcmAuthClient.getAccessToken();
+    return token ?? null;
+  }
+
+  async function sendFcmToToken(
+    fcmToken: string,
+    payload: { title: string; message: string; url: string }
+  ): Promise<{ ok: boolean; unregistered?: boolean; error?: any }> {
+    const accessToken = await getFcmAccessToken();
+    if (!accessToken) return { ok: false, error: "Sem access token FCM." };
+
+    const body = {
+      message: {
+        token: fcmToken,
+        notification: { title: payload.title, body: payload.message },
+        data: { url: payload.url },
+        webpush: {
+          notification: { icon: "/icon-192.png", badge: "/icon-192.png" },
+          fcm_options: { link: payload.url },
+        },
+      },
+    };
+
+    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => ({}));
+    const code = data?.error?.details?.[0]?.errorCode || data?.error?.status;
+    return { ok: false, unregistered: code === "UNREGISTERED", error: data };
+  }
 
   function verifyCronToken(req: any): boolean {
     const cronSecret = process.env.CRON_SECRET || "";
@@ -4828,51 +4927,64 @@ async function createApp(): Promise<express.Application> {
 
       return null;
     } catch (err) {
-      console.error("[OneSignal] Erro ao calcular trânsito do dia:", err);
+      console.error("[FCM] Erro ao calcular trânsito do dia:", err);
       return null;
     }
   }
 
-  async function sendOneSignalNotification(payload: {
+  async function sendFcmNotification(payload: {
     title: string;
     message: string;
     url?: string;
-    include_segments?: string[];
-  }): Promise<{ success: boolean; id?: string; error?: any }> {
-    if (!ONESIGNAL_REST_API_KEY) {
-      console.warn("[OneSignal] ONESIGNAL_REST_API_KEY não configurada. Notificação não enviada.");
-      return { success: false, error: "ONESIGNAL_REST_API_KEY ausente." };
+    user_id?: string;
+  }): Promise<{ success: boolean; id?: string; sent?: number; failed?: number; error?: any }> {
+    if (!getFcmCredentials()) {
+      console.warn("[FCM] FIREBASE_SERVICE_ACCOUNT_JSON não configurada. Notificação não enviada.");
+      return { success: false, error: "FIREBASE_SERVICE_ACCOUNT_JSON ausente." };
+    }
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return { success: false, error: "Supabase não configurado." };
     }
 
     try {
-      const body = {
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: payload.include_segments || ["All"],
-        headings: { en: payload.title, pt: payload.title },
-        contents: { en: payload.message, pt: payload.message },
-        url: payload.url || "https://aquar-ia.app",
-        ttl: 86400,
-      };
-
-      const res = await fetch("https://onesignal.com/api/v1/notifications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${ONESIGNAL_REST_API_KEY}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.error("[OneSignal] Erro ao enviar notificação:", data);
-        return { success: false, error: data };
+      let query = supabase.from("user_devices").select("fcm_token");
+      if (payload.user_id) query = query.eq("user_id", payload.user_id);
+      const { data, error } = await query;
+      if (error) {
+        console.error("[FCM] Erro ao buscar tokens:", error);
+        return { success: false, error };
+      }
+      const tokens: string[] = (data || []).map((r: any) => r.fcm_token).filter(Boolean);
+      if (tokens.length === 0) {
+        return { success: false, error: "Nenhum dispositivo registrado." };
       }
 
-      console.log("[OneSignal] Notificação enviada:", data.id);
-      return { success: true, id: data.id };
+      const targetUrl = payload.url || "https://aquar-ia.app";
+      let sent = 0;
+      let failed = 0;
+      const staleTokens: string[] = [];
+
+      await Promise.all(
+        tokens.map(async (t) => {
+          const r = await sendFcmToToken(t, { title: payload.title, message: payload.message, url: targetUrl });
+          if (r.ok) {
+            sent++;
+          } else {
+            failed++;
+            if (r.unregistered) staleTokens.push(t);
+          }
+        })
+      );
+
+      if (staleTokens.length > 0) {
+        await supabase.from("user_devices").delete().in("fcm_token", staleTokens);
+      }
+
+      console.log(`[FCM] Notificação enviada: ${sent}/${tokens.length} dispositivos`);
+      return { success: sent > 0, id: `${sent}/${tokens.length}`, sent, failed };
     } catch (err: any) {
-      console.error("[OneSignal] Erro de conexão:", err);
+      console.error("[FCM] Erro de conexão:", err);
       return { success: false, error: err?.message || String(err) };
     }
   }
@@ -4893,7 +5005,7 @@ async function createApp(): Promise<express.Application> {
         });
       }
 
-      const result = await sendOneSignalNotification({
+      const result = await sendFcmNotification({
         title: summary.title,
         message: summary.message,
         url: getAppUrl(),
@@ -4916,11 +5028,12 @@ async function createApp(): Promise<express.Application> {
     if (!admin) return;
 
     try {
-      const { title, message, url } = req.body || {};
-      const result = await sendOneSignalNotification({
+      const { title, message, url, user_id } = req.body || {};
+      const result = await sendFcmNotification({
         title: typeof title === "string" && title.trim() ? title : "Aquar.IA — Teste de notificação",
         message: typeof message === "string" && message.trim() ? message : "Se você recebeu esta mensagem, o push está funcionando.",
         url: typeof url === "string" && url.trim() ? url : getAppUrl(),
+        user_id: typeof user_id === "string" && user_id.trim() ? user_id.trim() : undefined,
       });
 
       if (!result.success) {
@@ -4949,7 +5062,7 @@ async function createApp(): Promise<express.Application> {
         });
       }
 
-      const result = await sendOneSignalNotification({
+      const result = await sendFcmNotification({
         title: summary.title,
         message: summary.message,
         url: getAppUrl(),
@@ -4962,6 +5075,197 @@ async function createApp(): Promise<express.Application> {
       return res.json({ success: true, sent: true, summary, notificationId: result.id });
     } catch (err: any) {
       console.error("[Admin] Erro em trigger-daily-transit:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  // POST /api/admin/broadcast-push - broadcast manual (Chamado, Avisos Globais)
+  app.post("/api/admin/broadcast-push", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const { title, message, url } = req.body || {};
+      if (typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ error: "Campo 'message' é obrigatório." });
+      }
+
+      const result = await sendFcmNotification({
+        title: typeof title === "string" && title.trim() ? title.trim() : "Aquar.IA",
+        message: message.trim(),
+        url: typeof url === "string" && url.trim() ? url.trim() : getAppUrl(),
+      });
+
+      if (!result.success) {
+        return res.status(500).json({ error: "Erro ao enviar broadcast.", details: result.error });
+      }
+
+      return res.json({ success: true, sent: result.sent, failed: result.failed });
+    } catch (err: any) {
+      console.error("[Admin] Erro em broadcast-push:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  // ============================================================
+  // Push de mudanças nos Ciclos Ativos (por usuário)
+  // ============================================================
+
+  const CYCLE_TAB_LABELS: Record<CycleNoticeTab, string> = {
+    dashas: "A Tríade do Tempo Cósmico",
+    portal: "Ciclos do Ano",
+    transits: "Ciclos Planetários",
+  };
+
+  // Verifica as assinaturas de ciclos de 1 usuário e notifica se algo mudou.
+  // Só considera abas com linha em user_cycle_notice_state (usuário já abriu a aba).
+  async function checkUserCycleChangesForPush(
+    userId: string,
+    transitDegrees: Record<string, number>,
+    settings: any,
+    profileRow: any
+  ): Promise<{ changed: string[]; notified: boolean; skipped?: string; error?: any }> {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { changed: [], notified: false, error: "Supabase não configurado." };
+
+    if (!hasActiveAccess(profileRow) && !hasChamadoFeature(settings, "ciclos")) {
+      return { changed: [], notified: false, skipped: "sem-acesso" };
+    }
+
+    const { data: chart, error: chartError } = await supabase
+      .from("user_chart")
+      .select("birth_date, birth_time, latitude, longitude, birth_data, tropical_natal, vedic_timing")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (chartError || !chart?.tropical_natal) {
+      return { changed: [], notified: false, skipped: "sem-mapa" };
+    }
+
+    const profile = {
+      birthData: {
+        birthDate: chart.birth_date ?? chart.birth_data?.birthDate,
+        birthTime: chart.birth_time ?? chart.birth_data?.birthTime,
+        birthPlace: chart.birth_data?.birthPlace ?? { latitude: chart.latitude, longitude: chart.longitude },
+        gender: chart.birth_data?.gender,
+      },
+      tropical_natal: chart.tropical_natal,
+      vedic_timing: chart.vedic_timing,
+    };
+
+    const signatures = await computeCycleSignatures(profile, new Date(), transitDegrees);
+    if (signatures.length === 0) return { changed: [], notified: false };
+
+    const { data: states, error: stateError } = await supabase
+      .from("user_cycle_notice_state")
+      .select("tab, signature, notified_signature")
+      .eq("user_id", userId);
+    if (stateError) return { changed: [], notified: false, error: stateError };
+
+    const changedSigs = signatures.filter((sig) => {
+      const state = (states || []).find((s: any) => s.tab === sig.tab);
+      if (!state) return false;
+      const known = state.notified_signature ?? state.signature;
+      return !!known && known !== sig.signature;
+    });
+    if (changedSigs.length === 0) return { changed: [], notified: false };
+
+    const labels = changedSigs.map((s) => CYCLE_TAB_LABELS[s.tab]);
+    const result = await sendFcmNotification({
+      title: "Seus ciclos mudaram",
+      message: `Novidades em ${labels.join(", ")}. Abra o Aquar.IA e confira.`,
+      url: getAppUrl(),
+      user_id: userId,
+    });
+    if (!result.success) {
+      return { changed: changedSigs.map((s) => s.tab), notified: false, error: result.error };
+    }
+
+    for (const sig of changedSigs) {
+      await markCycleSignatureNotified(userId, sig.tab, sig.signature);
+    }
+
+    return { changed: changedSigs.map((s) => s.tab), notified: true };
+  }
+
+  // POST /api/cron/cycle-changes - disparado pelo Cloud Scheduler diariamente
+  app.post("/api/cron/cycle-changes", async (req, res) => {
+    try {
+      if (!verifyCronToken(req)) {
+        return res.status(401).json({ error: "Token inválido." });
+      }
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const { data: devices, error: devError } = await supabase.from("user_devices").select("user_id");
+      if (devError) throw devError;
+      const userIds = [...new Set((devices || []).map((d: any) => d.user_id).filter(Boolean))] as string[];
+      if (userIds.length === 0) {
+        return res.json({ success: true, checked: 0, notified: 0 });
+      }
+
+      const settings = await getSystemSettings(supabase);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, has_access, access_expires_at, subscription_tier")
+        .in("id", userIds);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      const transitDegrees = await getTropicalTransitDegrees(new Date(), true);
+
+      let checked = 0;
+      let notified = 0;
+      const errors: any[] = [];
+      const CONCURRENCY = 5;
+      for (let i = 0; i < userIds.length; i += CONCURRENCY) {
+        await Promise.all(
+          userIds.slice(i, i + CONCURRENCY).map(async (uid) => {
+            try {
+              const r = await checkUserCycleChangesForPush(uid, transitDegrees, settings, profileMap.get(uid));
+              checked++;
+              if (r.notified) notified++;
+            } catch (e: any) {
+              errors.push({ user_id: uid, error: e?.message || String(e) });
+            }
+          })
+        );
+      }
+
+      console.log(`[Cron] cycle-changes: ${checked} verificados, ${notified} notificados`);
+      return res.json({ success: true, checked, notified, errors: errors.slice(0, 10) });
+    } catch (err: any) {
+      console.error("[Cron] Erro em cycle-changes:", err);
+      return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
+    }
+  });
+
+  // POST /api/admin/test-cycle-push - verifica/envia ciclo para um usuário (teste direcionado)
+  app.post("/api/admin/test-cycle-push", async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const userId = typeof req.body?.user_id === "string" && req.body.user_id.trim()
+        ? req.body.user_id.trim()
+        : admin.user.id;
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: "Supabase não configurado." });
+      }
+
+      const settings = await getSystemSettings(supabase);
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("id, has_access, access_expires_at, subscription_tier")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const transitDegrees = await getTropicalTransitDegrees(new Date(), true);
+      const result = await checkUserCycleChangesForPush(userId, transitDegrees, settings, profileRow);
+      return res.json({ success: true, user_id: userId, ...result });
+    } catch (err: any) {
+      console.error("[Admin] Erro em test-cycle-push:", err);
       return res.status(500).json({ error: "Erro interno.", details: err?.message || String(err) });
     }
   });
@@ -4988,6 +5292,14 @@ async function createApp(): Promise<express.Application> {
     app.get("/sw.js", (_req, res) => {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.sendFile(path.join(distPath, "sw.js"));
+    });
+
+    // Digital Asset Links (TWA): express.static ignora dotfiles, entao o
+    // assetlinks precisa de rota explicita antes do static e do fallback SPA.
+    app.get("/.well-known/assetlinks.json", (_req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.sendFile(path.join(distPath, ".well-known", "assetlinks.json"));
     });
 
     app.use(express.static(distPath));

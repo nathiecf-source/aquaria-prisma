@@ -25,7 +25,7 @@ import { CommunityPopup } from "./components/CommunityPopup";
 
 import { hasPlusAccess, hasChamadoFeature } from "./lib/access";
 import { useUserFlags } from "./hooks/useUserFlags";
-import { promptOneSignalPush, oneSignalLogin, oneSignalLogout } from "./lib/onesignal";
+import { requestPushPermissionAndToken, fetchAndStoreFcmToken, removeFcmToken, listenForegroundMessages } from "./lib/firebase";
 
 type FlowStep = "form" | "confirm" | "loading" | "mandala";
 
@@ -103,13 +103,13 @@ export default function App() {
   const handleCompleteTour = () => {
     setShowTour(false);
     markTourAsSeen();
-    promptOneSignalPush();
+    requestPushPermissionAndToken(userProfile?.id);
   };
 
   const handleSkipTour = () => {
     setShowTour(false);
     markTourAsSeen();
-    promptOneSignalPush();
+    requestPushPermissionAndToken(userProfile?.id);
   };
 
   const loadChartOnLogin = async (userId: string, currentSession: any) => {
@@ -315,7 +315,8 @@ export default function App() {
         }
 
         fetchUserProfile(currentUserId, currentSession);
-        oneSignalLogin(currentUserId);
+        fetchAndStoreFcmToken(currentUserId);
+        listenForegroundMessages();
         if (!chartLoadedRef.current && !isSpecialRoute(pathname)) {
           chartLoadedRef.current = true;
           loadChartOnLogin(currentUserId, currentSession);
@@ -357,12 +358,14 @@ export default function App() {
     markFirstAccess(userProfile).then(() => {
       if (!isFlagSeen("has_seen_onboarding", userProfile) && currentDay <= 1) {
         setShowTour(true);
+      } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        requestPushPermissionAndToken(userProfile.id);
       }
     });
   }, [step, userProfile, isLoadingSession, isFlagSeen, markFirstAccess, currentDay]);
 
   const handleSignOut = async () => {
-    oneSignalLogout();
+    removeFcmToken(userProfile?.id);
     await supabase.auth.signOut();
     chartLoadedRef.current = false;
     isLoadingChartRef.current = false;

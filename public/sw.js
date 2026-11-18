@@ -1,3 +1,37 @@
+// Firebase Cloud Messaging — push em segundo plano (navegador e TWA).
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
+firebase.initializeApp({
+  apiKey: 'AIzaSyBW8mMJf7JiksMLGW8bO7ARtBZAX4NWr-w',
+  authDomain: 'aquaria-2bc50.firebaseapp.com',
+  projectId: 'aquaria-2bc50',
+  storageBucket: 'aquaria-2bc50.firebasestorage.app',
+  messagingSenderId: '745535854634',
+  appId: '1:745535854634:web:b4f36bf1fc9e6d1c0a0b53',
+});
+const fcm = firebase.messaging();
+fcm.onBackgroundMessage((payload) => {
+  const n = payload.notification || payload.data || {};
+  self.registration.showNotification(n.title || 'AquarIA', {
+    body: n.body || '',
+    icon: '/icon-192.png',
+    data: { url: n.click_action || '/' },
+  });
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if ('focus' in client) return client.focus();
+      }
+      return clients.openWindow(url);
+    })
+  );
+});
+
 const CACHE_NAME = 'aquaria-v2';
 const STATIC_ASSETS = [
   '/',

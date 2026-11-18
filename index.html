@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AQUAR.IA — Prisma Astrológico</title>
     <meta name="description" content="AQUAR.IA Prisma: a luz que revela sua potência original." />
     <link rel="icon" type="image/png" href="/logo.png" />
@@ -19,37 +19,6 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/og-image.png" />
 
-    <!-- OneSignal Web Push SDK -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-    <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(function (OneSignal) {
-        if (window.location.hostname !== "aquar-ia.app" && window.location.hostname !== "localhost") return;
-        OneSignal.init({
-          appId: "%VITE_ONESIGNAL_APP_ID%",
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerParam: { scope: "/" },
-          serviceWorkerPath: "OneSignalSDKWorker.js",
-          notifyButton: { enable: false },
-          promptOptions: {
-            slidedown: {
-              prompts: [
-                {
-                  type: "push",
-                  autoPrompt: false,
-                  text: {
-                    actionMessage: "Ative as notificações para receber as movimentações celestes do dia.",
-                    acceptButton: "Permitir",
-                    cancelButton: "Depois",
-                  },
-                  delay: { pageViews: 1, timeDelay: 0 },
-                },
-              ],
-            },
-          },
-        });
-      });
-    </script>
   </head>
   <body>
     <div id="root"></div>

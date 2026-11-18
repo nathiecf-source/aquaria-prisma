@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, RefreshCcw } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
+import { isRunningAsApp } from "../lib/isTwa";
 
 interface RenewalPopupProps {
   userProfile?: any;
@@ -122,13 +123,19 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
 
         <p className="text-sm text-[#5c544d] leading-relaxed mb-6">{body}</p>
 
-        <button
-          onClick={handleOpenMonthly}
-          className="w-full py-3.5 px-6 rounded-xl bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-[#8c6239]/10 flex items-center justify-center gap-2"
-        >
-          <RefreshCcw className="w-4 h-4" />
-          Clique para renovar
-        </button>
+        {isRunningAsApp() ? (
+          <p className="text-xs text-[#6e6356] leading-relaxed text-center">
+            A renovação da assinatura está disponível na versão web do Aquar.IA.
+          </p>
+        ) : (
+          <button
+            onClick={handleOpenMonthly}
+            className="w-full py-3.5 px-6 rounded-xl bg-[#8c6239] hover:bg-[#6b452b] text-[#fbf9f5] font-sans text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-[#8c6239]/10 flex items-center justify-center gap-2"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            Clique para renovar
+          </button>
+        )}
       </div>
     </div>
   );
