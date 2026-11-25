@@ -30,6 +30,10 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
     const expiresAt = new Date(userProfile.access_expires_at);
     const now = new Date();
     const expired = expiresAt.getTime() <= now.getTime();
+
+    // Assinante PLUS com acesso válido não recebe aviso de vencimento —
+    // assinaturas recorrentes renovam automaticamente.
+    if (!expired && userProfile.subscription_tier === "PLUS") return;
     const daysUntil = expired
       ? 0
       : Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -94,7 +98,7 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
   const body = isExpired ? (
     <>
       Seu plano venceu. Para retomar a leitura dos ciclos e o uso do chat
-      astrológico, você pode fazer uma assinatura mensal.
+      astrológico, você pode escolher um dos planos para assinar.
     </>
   ) : (
     <>
@@ -103,7 +107,7 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
         {days} {days === 1 ? "dia" : "dias"}
       </strong>
       . Para manter a leitura dos ciclos e o uso do chat astrológico, você pode
-      agora fazer uma assinatura mensal.
+      agora escolher um dos planos abaixo para assinar.
     </>
   );
 

@@ -329,6 +329,7 @@ export default function App() {
           loadChartOnLogin(currentUserId, currentSession);
         }
       } else {
+        purchasesLogOut();
         chartLoadedRef.current = false;
         isLoadingChartRef.current = false;
         lastUserIdRef.current = null;

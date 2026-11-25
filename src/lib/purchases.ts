@@ -4,6 +4,7 @@ import { Purchases } from "@revenuecat/purchases-capacitor";
 import type { PurchasesOfferings, PurchasesPackage, CustomerInfo } from "@revenuecat/purchases-capacitor";
 import { Capacitor } from "@capacitor/core";
 import { isNativeMobileApp } from "./isTwa";
+import { supabase } from "./supabaseClient";
 
 export type { PurchasesOfferings, PurchasesPackage, CustomerInfo };
 
@@ -70,10 +71,28 @@ export async function getOfferings(): Promise<PurchasesOfferings | null> {
   }
 }
 
+/**
+ * Garante que o appUserID do RevenueCat bate com o usuário logado no Supabase
+ * antes de comprar — evita vincular a compra a um appUserID anônimo ou de
+ * outro usuário (idempotente: logIn com o mesmo ID é no-op).
+ */
+async function syncPurchasesUserBeforePurchase(): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data?.session?.user?.id;
+    if (uid) {
+      await Purchases.logIn({ appUserID: uid });
+    }
+  } catch (err) {
+    console.warn("[RC] Falha ao sincronizar appUserID antes da compra:", err);
+  }
+}
+
 /** Executa a compra nativa de um package. Retorna CustomerInfo ou null. */
 export async function purchasePackage(aPackage: PurchasesPackage): Promise<CustomerInfo | null> {
   if (!(await ensureConfigured())) return null;
   try {
+    await syncPurchasesUserBeforePurchase();
     const result = await Purchases.purchasePackage({ aPackage });
     return result.customerInfo;
   } catch (err: any) {
