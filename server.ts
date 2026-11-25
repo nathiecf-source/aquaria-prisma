@@ -549,6 +549,29 @@ async function createApp(): Promise<express.Application> {
     next();
   });
 
+  // CORS — o app nativo (Capacitor) chama a API cross-origin a partir de
+  // capacitor://localhost (iOS) e http(s)://localhost (Android). Preflight
+  // responde 204 aqui, antes do middleware de auth, senão o OPTIONS falharia 401.
+  const CORS_ALLOWED_ORIGINS = new Set([
+    "capacitor://localhost",
+    "http://localhost",
+    "https://localhost",
+    "https://aquar-ia.app",
+  ]);
+  app.use((req: any, res: any, next: any) => {
+    const origin = req.headers.origin;
+    if (origin && CORS_ALLOWED_ORIGINS.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-Id");
+    }
+    if (req.method === "OPTIONS") {
+      return res.status(204).end();
+    }
+    next();
+  });
+
   // Middleware for parsing JSON
   app.use(express.json());
   app.use((req: any, res: any, next: any) => {

@@ -214,12 +214,27 @@ export const supabase = supabaseClientInstance;
 
 // Intercepta fetchs para /api e injeta o token de acesso automaticamente
 // quando o header Authorization ainda não foi fornecido.
+// No app nativo (Capacitor), as chamadas relativas não têm backend local —
+// VITE_API_BASE_URL (injetada no build nativo) prefixa /api com a URL do Cloud Run.
+// Vazia = comportamento relativo (web/TWA), sem mudança.
+const apiBaseUrl = ((import.meta as any).env?.VITE_API_BASE_URL || '')
+  .trim()
+  .replace(/^["']|["']$/g, '')
+  .replace(/\/+$/, '');
+
 if (typeof window !== "undefined" && (window as any).fetch) {
   const originalFetch = (window as any).fetch.bind(window);
   (window as any).fetch = async (input: any, init?: any) => {
     try {
       const url = typeof input === "string" ? input : input?.url;
       if (typeof url === "string" && url.startsWith("/api")) {
+        const targetUrl = apiBaseUrl ? `${apiBaseUrl}${url}` : url;
+        const targetInput =
+          typeof input === "string"
+            ? targetUrl
+            : input instanceof Request
+              ? new Request(targetUrl, input)
+              : input;
         const { data } = await supabase.auth.getSession();
         const token = data?.session?.access_token;
         if (token) {
@@ -227,8 +242,9 @@ if (typeof window !== "undefined" && (window as any).fetch) {
           if (!headers.has("Authorization") || !headers.get("Authorization")) {
             headers.set("Authorization", `Bearer ${token}`);
           }
-          return await originalFetch(input, { ...init, headers });
+          return await originalFetch(targetInput, { ...init, headers });
         }
+        return await originalFetch(targetInput, init);
       }
     } catch (err) {
       console.warn("[fetch] Não foi possível injetar token:", err);
