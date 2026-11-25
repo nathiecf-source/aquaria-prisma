@@ -17,6 +17,15 @@ export function isIosApp(): boolean {
   }
 }
 
+/** True em qualquer app nativo Capacitor (iOS ou Android), false na web/TWA. */
+export function isNativeMobileApp(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
+
 export function isRunningAsApp(): boolean {
   if (typeof window === "undefined") return false;
   const standalone =

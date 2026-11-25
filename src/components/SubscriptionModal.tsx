@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { X, CalendarClock, Check, Star, RefreshCcw, ExternalLink, ArrowRight } from "lucide-react";
 import { hasActiveAccess, formatAccessExpiry } from "../lib/access";
-import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { isRunningAsApp, isNativeMobileApp } from "../lib/isTwa";
 import { IosPackages } from "./IosPaywall";
 import { getPlanDisplayName, isPlanRecurring, MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { supabase } from "../lib/supabaseClient";
@@ -73,7 +73,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       .finally(() => setLoadingHistory(false));
   }, []);
 
-  const inApp = isRunningAsApp() || isIosApp();
+  const inApp = isRunningAsApp() || isNativeMobileApp();
   const hasBoughtLongTermPass = history?.hasBoughtLongTermPass === true;
   const hasAnyAccessHistory = hasBoughtLongTermPass || history?.hasBoughtMonthly;
   const expiry = profileExpiry || (history?.accessExpiresAt ? new Date(history.accessExpiresAt).toLocaleDateString("pt-BR") : null);
@@ -171,7 +171,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <p className="text-[10px] uppercase tracking-widest text-[#8c7f70] font-semibold mb-2">
                     Continuidade
                   </p>
-                  {isIosApp() ? (
+                  {isNativeMobileApp() ? (
                     <IosPackages />
                   ) : inApp ? (
                     <p className="text-xs text-[#6e6356] leading-relaxed">
@@ -241,7 +241,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     ))}
                   </ul>
 
-                  {isIosApp() ? (
+                  {isNativeMobileApp() ? (
                     <IosPackages />
                   ) : inApp ? (
                     <p className="text-xs text-[#6e6356] leading-relaxed">

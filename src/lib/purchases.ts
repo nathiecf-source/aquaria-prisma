@@ -2,17 +2,30 @@
 // Na web/Android o checkout externo (InfinitePay) continua sendo o fluxo.
 import { Purchases } from "@revenuecat/purchases-capacitor";
 import type { PurchasesOfferings, PurchasesPackage, CustomerInfo } from "@revenuecat/purchases-capacitor";
-import { isIosApp } from "./isTwa";
+import { Capacitor } from "@capacitor/core";
+import { isNativeMobileApp } from "./isTwa";
 
 export type { PurchasesOfferings, PurchasesPackage, CustomerInfo };
 
 let configured = false;
 
+/** Chave pública RevenueCat por plataforma nativa (appl_ iOS / goog_ Android). */
+function getRevenueCatApiKey(): string | undefined {
+  const platform = Capacitor.getPlatform();
+  if (platform === "ios") {
+    return import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined;
+  }
+  if (platform === "android") {
+    return import.meta.env.VITE_REVENUECAT_ANDROID_KEY as string | undefined;
+  }
+  return undefined;
+}
+
 async function ensureConfigured(): Promise<boolean> {
-  if (!isIosApp()) return false;
-  const apiKey = import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined;
+  if (!isNativeMobileApp()) return false;
+  const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
-    console.warn("[RC] VITE_REVENUECAT_IOS_KEY não configurada.");
+    console.warn("[RC] Chave pública RevenueCat não configurada para esta plataforma.");
     return false;
   }
   if (configured) return true;
@@ -38,7 +51,7 @@ export async function purchasesLogIn(userId: string): Promise<void> {
 
 /** Desvincula o appUserID no logout. */
 export async function purchasesLogOut(): Promise<void> {
-  if (!isIosApp() || !configured) return;
+  if (!isNativeMobileApp() || !configured) return;
   try {
     await Purchases.logOut();
   } catch (err) {

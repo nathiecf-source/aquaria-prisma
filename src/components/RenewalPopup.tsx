@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, RefreshCcw } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
-import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { isRunningAsApp, isNativeMobileApp } from "../lib/isTwa";
 import { IosPackages } from "./IosPaywall";
 
 interface RenewalPopupProps {
@@ -124,7 +124,7 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
 
         <p className="text-sm text-[#5c544d] leading-relaxed mb-6">{body}</p>
 
-        {isIosApp() ? (
+        {isNativeMobileApp() ? (
           <IosPackages />
         ) : isRunningAsApp() ? (
           <p className="text-xs text-[#6e6356] leading-relaxed text-center">

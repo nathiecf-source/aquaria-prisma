@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Lock, Sparkles, CreditCard, X, ArrowRight } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
-import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { isRunningAsApp, isNativeMobileApp } from "../lib/isTwa";
 import { IosPackages } from "./IosPaywall";
 
 interface PaywallBarrierProps {
@@ -37,7 +37,7 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
     return <>{children}</>;
   }
 
-  const inApp = isRunningAsApp() || isIosApp();
+  const inApp = isRunningAsApp() || isNativeMobileApp();
 
   const handleUnlock = () => {
     window.location.href = "/planos";
@@ -78,7 +78,7 @@ export const PaywallBarrier: React.FC<PaywallBarrierProps> = ({
       )}
 
       {/* Upgrade Button */}
-      {isIosApp() ? (
+      {isNativeMobileApp() ? (
         <div className="w-full">
           <IosPackages />
         </div>

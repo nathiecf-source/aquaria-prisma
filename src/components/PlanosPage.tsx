@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Star, Check, Loader2, Lock, Tag } from "lucide-react";
 import { paymentService } from "../lib/paymentService";
-import { isRunningAsApp, isIosApp } from "../lib/isTwa";
+import { isRunningAsApp, isNativeMobileApp } from "../lib/isTwa";
 import { IosPlanosPage } from "./IosPaywall";
 import { hasPlusAccess, getDaysUntilExpiry } from "../lib/access";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
@@ -189,9 +189,9 @@ export default function PlanosPage({ userProfile, onBack }: PlanosPageProps) {
     }
   };
 
-  // No iOS nativo, a compra é exclusivamente via In-App Purchase (RevenueCat) —
-  // a Apple proíbe links/checkout externos para bens digitais (Guideline 3.1.1).
-  if (isIosApp()) {
+  // Em app nativo (iOS/Android via Capacitor), a compra é exclusivamente via
+  // In-App Purchase (RevenueCat) — lojas proíbem checkout externo p/ bens digitais.
+  if (isNativeMobileApp()) {
     return <IosPlanosPage onBack={handleBack} />;
   }
 
