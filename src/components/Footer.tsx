@@ -3,6 +3,7 @@ import { FileText, Instagram, RefreshCw, Users } from "lucide-react";
 import { AboutModal } from "./AboutModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { FAQModal } from "./FAQModal";
+import { SupportModal } from "./SupportModal";
 import { BookingModal } from "./BookingModal";
 import { FeedbackSection } from "./FeedbackSection";
 import { useVersionCheck } from "../hooks/useVersionCheck";
@@ -15,6 +16,7 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
   const [showAbout, setShowAbout] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const { updateAvailable, refresh } = useVersionCheck();
@@ -57,13 +59,12 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
 
-          <a
-            href="https://wa.me/5562985857402"
-            rel="noopener noreferrer"
-            className="hover:text-[#3c352d] transition-colors"
+          <button
+            onClick={() => setShowSupport(true)}
+            className="hover:text-[#3c352d] transition-colors cursor-pointer"
           >
             Suporte
-          </a>
+          </button>
 
           <span className="hidden sm:inline text-[#e6e2d8]">•</span>
 
@@ -152,6 +153,10 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
 
       {showFAQ && (
         <FAQModal onClose={() => setShowFAQ(false)} />
+      )}
+
+      {showSupport && (
+        <SupportModal onClose={() => setShowSupport(false)} />
       )}
 
       {showBooking && (

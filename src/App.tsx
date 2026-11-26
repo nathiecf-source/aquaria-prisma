@@ -9,6 +9,8 @@ import { supabase } from "./lib/supabaseClient";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { AuthScreen } from "./components/AuthScreen";
 import TermsPage from "./components/TermsPage";
+import PrivacyPage from "./components/PrivacyPage";
+import { SupportPage } from "./components/SupportModal";
 import { Footer } from "./components/Footer";
 import OnboardingTour, { TourStep } from "./components/OnboardingTour";
 import { FloatingChatButton } from "./components/FloatingChatButton";
@@ -216,7 +218,7 @@ export default function App() {
     }
   };
 
-  const isSpecialRoute = (path: string) => path === "/planos" || path === "/sucesso";
+  const isSpecialRoute = (path: string) => path === "/planos" || path === "/sucesso" || path === "/suporte";
 
   const fetchUserProfile = async (userId: string, currentSession: any) => {
     try {
@@ -638,6 +640,16 @@ export default function App() {
   // Página de Termos de Uso acessível via hash #termos
   if (hash === "#termos") {
     return <TermsPage />;
+  }
+
+  // Página de Política de Privacidade acessível via hash #privacidade
+  if (hash === "#privacidade") {
+    return <PrivacyPage />;
+  }
+
+  // Central de Suporte pública — acessível sem login (Diretriz 1.5 App Store)
+  if (pathname === "/suporte") {
+    return <SupportPage />;
   }
 
   if (isLoadingSession) {

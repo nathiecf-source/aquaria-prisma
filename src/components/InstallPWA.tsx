@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Download, Smartphone, Apple, X } from "lucide-react";
+import { isNativeMobileApp } from "../lib/isTwa";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -92,7 +93,7 @@ export const InstallPWA: React.FC<InstallPWAProps> = ({ userProfile, onMarkSeen 
     setShowIOSInstructions(true);
   };
 
-  if (isStandalone) return null;
+  if (isStandalone || isNativeMobileApp()) return null;
 
   return (
     <>
