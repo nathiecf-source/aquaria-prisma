@@ -15,9 +15,10 @@
   --color-lavender: #A38EB0;   /* Lavanda - Interseção/Harmonia */
 }
 
-/* Áreas seguras (notch / barra de gestos) — TWA e standalone */
+/* Áreas seguras (notch / barra de gestos) — TWA, standalone e edge-to-edge */
 body {
   padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }

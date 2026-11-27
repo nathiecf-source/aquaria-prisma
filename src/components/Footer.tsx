@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FileText, Instagram, RefreshCw, Users } from "lucide-react";
+import { App } from "@capacitor/app";
 import { AboutModal } from "./AboutModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { FAQModal } from "./FAQModal";
 import { SupportModal } from "./SupportModal";
 import { BookingModal } from "./BookingModal";
 import { FeedbackSection } from "./FeedbackSection";
+import { AndroidBackClose } from "./AndroidBackClose";
 import { useVersionCheck } from "../hooks/useVersionCheck";
+import { isNativeMobileApp } from "../lib/isTwa";
 
 interface FooterProps {
   userProfile?: any;
@@ -21,10 +24,27 @@ export const Footer: React.FC<FooterProps> = ({ userProfile }) => {
   const [showFeedback, setShowFeedback] = useState(false);
   const { updateAvailable, refresh } = useVersionCheck();
 
-  const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
+  // No app nativo (iOS/Android) exibe a versão real do bundle instalado;
+  // na web, a versão do package.json injetada pelo Vite no build.
+  const [appVersion, setAppVersion] = useState<string | null>(() =>
+    typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null
+  );
+
+  useEffect(() => {
+    if (!isNativeMobileApp()) return;
+    App.getInfo()
+      .then((info) => setAppVersion(info.version))
+      .catch(() => {});
+  }, []);
 
   return (
     <>
+      <AndroidBackClose when={showAbout} onClose={() => setShowAbout(false)} />
+      <AndroidBackClose when={showSubscription} onClose={() => setShowSubscription(false)} />
+      <AndroidBackClose when={showFAQ} onClose={() => setShowFAQ(false)} />
+      <AndroidBackClose when={showSupport} onClose={() => setShowSupport(false)} />
+      <AndroidBackClose when={showBooking} onClose={() => setShowBooking(false)} />
+      <AndroidBackClose when={showFeedback} onClose={() => setShowFeedback(false)} />
       <footer className="max-w-3xl mx-auto text-center mt-6 sm:mt-10 py-6 border-t border-[#e6e2d8]">
         <p className="text-[10px] text-[#8c7f70] tracking-wider font-mono mb-3">
           Copyright (2026 Aquar.IA. Todos os direitos reservados.){appVersion && <span className="ml-2">v{appVersion}</span>}

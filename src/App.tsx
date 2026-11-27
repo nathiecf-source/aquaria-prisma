@@ -11,6 +11,7 @@ import { AuthScreen } from "./components/AuthScreen";
 import TermsPage from "./components/TermsPage";
 import PrivacyPage from "./components/PrivacyPage";
 import { SupportPage } from "./components/SupportModal";
+import { AndroidBackClose } from "./components/AndroidBackClose";
 import { Footer } from "./components/Footer";
 import OnboardingTour, { TourStep } from "./components/OnboardingTour";
 import { FloatingChatButton } from "./components/FloatingChatButton";
@@ -689,6 +690,14 @@ export default function App() {
   return (
     <main className="min-h-screen w-full bg-[#f4f1eb] text-[#3c352d] flex flex-col justify-between py-8 sm:py-12 px-4 selection:bg-[#5c4d66]/15 selection:text-[#5c4d66] transition-all duration-500">
       <GlobalBanner />
+      {/* Botão Voltar do Android: overlays entram na pilha por ordem de abertura */}
+      <AndroidBackClose when={showAccountMenu} onClose={() => setShowAccountMenu(false)} />
+      <AndroidBackClose when={showDeleteModal} onClose={() => { setShowDeleteModal(false); setDeleteConfirmText(""); setDeleteError(null); }} />
+      <AndroidBackClose when={showChatPaywall} onClose={() => setShowChatPaywall(false)} />
+      <AndroidBackClose when={isChatOpen && chatActive} onClose={() => setIsChatOpen(false)} />
+      <AndroidBackClose when={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
+      <AndroidBackClose when={showFeedbackModal} onClose={() => setShowFeedbackModal(false)} />
+      <AndroidBackClose when={showTour} onClose={handleCompleteTour} />
       {session && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
           {/* User Tier Badge & Sign Out */}

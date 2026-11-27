@@ -3,6 +3,7 @@ import { getReadingForId, ReadingData } from "../lib/mockReadings";
 import ReadingPanel from "./ReadingPanel";
 import { ArrowLeft, BellRing, User, X, Loader2 } from "lucide-react";
 import TechnicalDataModal from "./TechnicalDataModal";
+import { AndroidBackClose } from "./AndroidBackClose";
 import Markdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
@@ -2369,6 +2370,16 @@ export default function AstrologyMandala({
           </div>
         )}
       </div>
+
+      {/* Botão Voltar do Android: cada painel/modal entra na pilha ao abrir */}
+      <AndroidBackClose when={isTransitsModalOpen} onClose={() => { setIsTransitsModalOpen(false); setActiveTransit(null); }} />
+      <AndroidBackClose when={isDynamicsOpen} onClose={() => setIsDynamicsOpen(false)} />
+      <AndroidBackClose when={isInsightsOpen} onClose={() => setIsInsightsOpen(false)} />
+      <AndroidBackClose when={isPlanetPanelOpen && !!selectedPlanetId} onClose={() => { setIsPlanetPanelOpen(false); setSelectedPlanetId(null); }} />
+      <AndroidBackClose when={isPanelOpen} onClose={() => setIsPanelOpen(false)} />
+      <AndroidBackClose when={isTechModalOpen} onClose={() => setIsTechModalOpen(false)} />
+      <AndroidBackClose when={isDiretrizModalOpen} onClose={() => setIsDiretrizModalOpen(false)} />
+      <AndroidBackClose when={!!paywallFeature} onClose={() => setPaywallFeature(null)} />
 
       {/* Transit Panel — drawer lateral */}
       <RightPanelDrawer

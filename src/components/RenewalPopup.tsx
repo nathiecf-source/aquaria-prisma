@@ -3,6 +3,7 @@ import { X, RefreshCcw } from "lucide-react";
 import { MONTHLY_SUBSCRIPTION_URL } from "../lib/plans";
 import { isRunningAsApp, isNativeMobileApp } from "../lib/isTwa";
 import { IosPackages } from "./IosPaywall";
+import { AndroidBackClose } from "./AndroidBackClose";
 
 interface RenewalPopupProps {
   userProfile?: any;
@@ -113,6 +114,7 @@ export const RenewalPopup: React.FC<RenewalPopupProps> = ({ userProfile }) => {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#3c352d]/60 backdrop-blur-sm">
+      <AndroidBackClose when={isOpen} onClose={handleClose} />
       <div className="relative w-full max-w-md bg-[#fbf9f5] border border-[#e6e2d8] rounded-2xl shadow-[0_20px_60px_rgba(60,53,45,0.18)] p-6 sm:p-8">
         <button
           onClick={handleClose}

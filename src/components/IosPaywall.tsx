@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, Check, Loader2, RefreshCcw, Star } from "lucide-react";
+import { ArrowLeft, Check, Loader2, RefreshCcw, Star, Ticket } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
+import { Purchases } from "@revenuecat/purchases-capacitor";
 import {
   getOfferings,
   purchasePackage,
@@ -61,6 +64,22 @@ export const IosPackages: React.FC = () => {
         setMessage({ kind: "ok", text: "Compra registrada. Atualizando seu acesso..." });
         setTimeout(() => window.location.reload(), 2500);
       }
+    }
+  };
+
+  const handleRedeemCode = async () => {
+    setBusy("__redeem__");
+    setMessage(null);
+    try {
+      if (Capacitor.getPlatform() === "ios") {
+        await Purchases.presentCodeRedemptionSheet();
+      } else {
+        await Browser.open({ url: "https://play.google.com/redeem" });
+      }
+    } catch (err) {
+      console.warn("[RC] Falha ao abrir resgate de código:", err);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -135,6 +154,21 @@ export const IosPackages: React.FC = () => {
           </>
         )}
       </button>
+
+      <button
+        onClick={handleRedeemCode}
+        disabled={busy !== null}
+        className="w-full py-1.5 text-[#8c7f70] hover:text-[#3c352d] font-sans text-[10px] tracking-widest uppercase transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+      >
+        {busy === "__redeem__" ? (
+          <Loader2 className="w-3 h-3 animate-spin" />
+        ) : (
+          <>
+            <Ticket className="w-3 h-3" />
+            Possui um código promocional?
+          </>
+        )}
+      </button>
     </div>
   );
 };
@@ -167,7 +201,7 @@ export const IosPlanosPage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
       <div className="bg-[#fbf9f5] border-2 border-[#8c6239] rounded-2xl p-6 shadow-[0_16px_50px_-12px_rgba(140,98,57,0.22)] mb-6">
         <div className="flex items-center justify-center gap-1 mb-4 text-[#8c6239]">
           <Star className="w-4 h-4" />
-          <span className="text-[10px] uppercase tracking-widest font-bold">Passe de Expansão</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold">Valor de Lançamento</span>
         </div>
         <ul className="space-y-3 mb-6">
           {BENEFITS.map((feature, idx) => (

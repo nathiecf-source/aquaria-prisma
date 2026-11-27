@@ -8,6 +8,7 @@ import './index.css';
 // Web Push/PushManager — não registrar o SW para evitar erros silenciosos,
 // exibição duplicada e fluxos quebrados. O TWA segue usando o SW normalmente.
 import {isNativeMobileApp} from './lib/isTwa';
+import {initAndroidBackButton} from './lib/androidBack';
 if ("serviceWorker" in navigator && !isNativeMobileApp()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -27,6 +28,9 @@ const handleBeforeInstallPrompt = (e: Event) => {
   console.log('[PWA] beforeinstallprompt capturado');
 };
 window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+// Botão Voltar físico/gesto do Android (no-op fora do app nativo Android).
+initAndroidBackButton();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
