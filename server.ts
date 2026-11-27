@@ -5071,6 +5071,32 @@ async function createApp(): Promise<express.Application> {
     return queryToken === cronSecret || headerToken === cronSecret;
   }
 
+  // Chave de idempotência diária (UTC) para locks de envio.
+  function pushDateKey(d = new Date()): string {
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Lock de idempotência em push_send_log: o primeiro insert vence e o envio
+   * prossegue; unique violation significa que a notificação já foi disparada
+   * (retry do Cloud Scheduler, múltiplas instâncias do Cloud Run etc.).
+   * Fail-open se a tabela não existir — não bloqueia o envio por ausência de lock.
+   */
+  async function acquirePushLock(dedupeKey: string): Promise<boolean> {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return true;
+    try {
+      const { error } = await supabase.from("push_send_log").insert({ dedupe_key: dedupeKey });
+      if (!error) return true;
+      if ((error as any)?.code === "23505") return false;
+      console.warn("[FCM] push_send_log indisponível, enviando sem lock:", (error as any)?.message);
+      return true;
+    } catch (err: any) {
+      console.warn("[FCM] Falha no lock de push:", err?.message || err);
+      return true;
+    }
+  }
+
   async function getDailyTransitSummary(): Promise<{ title: string; message: string } | null> {
     try {
       const now = new Date();
@@ -5110,14 +5136,29 @@ async function createApp(): Promise<express.Application> {
     }
 
     try {
-      let query = supabase.from("user_devices").select("fcm_token");
+      let query = supabase.from("user_devices").select("fcm_token, user_id, platform, updated_at");
       if (payload.user_id) query = query.eq("user_id", payload.user_id);
       const { data, error } = await query;
       if (error) {
         console.error("[FCM] Erro ao buscar tokens:", error);
         return { success: false, error };
       }
-      const tokens: string[] = (data || []).map((r: any) => r.fcm_token).filter(Boolean);
+      // Dedupe em duas camadas: 1) DISTINCT por fcm_token; 2) um token por
+      // (user_id, platform) — o mais recente — para não disparar Web Push +
+      // FCM nativo no mesmo aparelho quando o usuário tem mais de um registro.
+      const seenTokens = new Set<string>();
+      const latestByUserPlatform = new Map<string, any>();
+      for (const row of data || []) {
+        const token = row.fcm_token;
+        if (!token || seenTokens.has(token)) continue;
+        seenTokens.add(token);
+        const key = `${row.user_id}|${row.platform || "web"}`;
+        const prev = latestByUserPlatform.get(key);
+        if (!prev || new Date(row.updated_at || 0).getTime() > new Date(prev.updated_at || 0).getTime()) {
+          latestByUserPlatform.set(key, row);
+        }
+      }
+      const tokens: string[] = [...latestByUserPlatform.values()].map((r: any) => r.fcm_token);
       if (tokens.length === 0) {
         return { success: false, error: "Nenhum dispositivo registrado." };
       }
@@ -5165,6 +5206,11 @@ async function createApp(): Promise<express.Application> {
           sent: false,
           reason: "Nenhum evento astral relevante identificado para hoje.",
         });
+      }
+
+      const lockKey = `daily-transit:${pushDateKey()}`;
+      if (!(await acquirePushLock(lockKey))) {
+        return res.json({ success: true, sent: false, reason: "Notificação de hoje já enviada (idempotente)." });
       }
 
       const result = await sendFcmNotification({
@@ -5222,6 +5268,11 @@ async function createApp(): Promise<express.Application> {
           sent: false,
           reason: "Nenhum evento astral relevante identificado para hoje.",
         });
+      }
+
+      const lockKey = `daily-transit:${pushDateKey()}`;
+      if (!(await acquirePushLock(lockKey))) {
+        return res.json({ success: true, sent: false, reason: "Notificação de hoje já enviada (idempotente).", summary });
       }
 
       const result = await sendFcmNotification({
@@ -5332,6 +5383,10 @@ async function createApp(): Promise<express.Application> {
     if (changedSigs.length === 0) return { changed: [], notified: false };
 
     const labels = changedSigs.map((s) => CYCLE_TAB_LABELS[s.tab]);
+    const lockKey = `cycle-changes:${userId}:${pushDateKey()}`;
+    if (!(await acquirePushLock(lockKey))) {
+      return { changed: changedSigs.map((s) => s.tab), notified: false, skipped: "lock-duplicado" };
+    }
     const result = await sendFcmNotification({
       title: "Seus ciclos mudaram",
       message: `Novidades em ${labels.join(", ")}. Abra o Aquar.IA e confira.`,

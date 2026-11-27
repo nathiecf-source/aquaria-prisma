@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aquar.IA</string>
+    <string name="title_activity_main">Aquar.IA</string>
+    <string name="package_name">app.aquaria.app</string>
+    <string name="custom_url_scheme">app.aquaria.app</string>
+</resources>

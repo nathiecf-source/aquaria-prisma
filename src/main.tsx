@@ -4,10 +4,11 @@ import App from './App.tsx';
 import './index.css';
 
 // Service worker do PWA (cache offline + push FCM em segundo plano).
-// No iOS nativo (WKWebView/Capacitor) não existe Push API — não registrar o SW
-// de push para evitar erros silenciosos e fluxos quebrados.
-import {isIosApp} from './lib/isTwa';
-if ("serviceWorker" in navigator && !isIosApp()) {
+// No app nativo (WKWebView iOS / WebView Android via Capacitor) não existe
+// Web Push/PushManager — não registrar o SW para evitar erros silenciosos,
+// exibição duplicada e fluxos quebrados. O TWA segue usando o SW normalmente.
+import {isNativeMobileApp} from './lib/isTwa';
+if ("serviceWorker" in navigator && !isNativeMobileApp()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   });

@@ -17,6 +17,15 @@ export function isIosApp(): boolean {
   }
 }
 
+/** Retorna true apenas quando roda dentro do app nativo Android (Capacitor). */
+export function isAndroidApp(): boolean {
+  try {
+    return Capacitor.getPlatform() === "android";
+  } catch {
+    return false;
+  }
+}
+
 /** True em qualquer app nativo Capacitor (iOS ou Android), false na web/TWA. */
 export function isNativeMobileApp(): boolean {
   try {

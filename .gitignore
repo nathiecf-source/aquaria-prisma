@@ -24,3 +24,14 @@ android-twa/
 internal-release.keystore
 internal-release-certificate.pem
 android-twa*.zip
+*.aab
+upload-keystore.jks
+upload_certificate.pem
+android/keystore.properties
+android/local.properties
+android/app/google-services.json
+android/app/build/
+android/app/release/
+android/build/
+android/.gradle/
+android/app/.cxx/

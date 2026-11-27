@@ -11,11 +11,15 @@ firebase.initializeApp({
 });
 const fcm = firebase.messaging();
 fcm.onBackgroundMessage((payload) => {
-  const n = payload.notification || payload.data || {};
+  // Payloads com bloco `notification` já são exibidos automaticamente pelo
+  // SDK do FCM (e delegados ao app no TWA). Exibir de novo aqui causaria a
+  // notificação duplicada — só notificamos manualmente payload data-only.
+  if (payload.notification) return;
+  const n = payload.data || {};
   self.registration.showNotification(n.title || 'AquarIA', {
     body: n.body || '',
     icon: '/icon-192.png',
-    data: { url: n.click_action || '/' },
+    data: { url: n.click_action || n.url || '/' },
   });
 });
 
